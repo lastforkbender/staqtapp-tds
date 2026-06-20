@@ -1,7 +1,8 @@
 # Staqtapp-TDS — Temporal Directory System
 
 > **A virtual file system engineered for ASI-scale computation.**
-> Binary-native. Math-accelerated. Concurrency-first. No JSON. No CSV. No comma crap.
+> Binary-native. Math-accelerated. Concurrency-first. No CSV. No comma crap.
+> Updated to v1.1.188, several fixes.
 
 ---
 
