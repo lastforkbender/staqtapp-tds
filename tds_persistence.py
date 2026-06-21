@@ -60,7 +60,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
-from tds_filesystem import (TDSDirectory, TDSEntry, TDSFileSystem, FmtID, DirFlags, ConcurrencyPool, decode_header, encode_header, _compute_subdir_offsets, _serialize_payload, _deserialize_payload, HEADER_SIZE, TDS_MAGIC,)
+from staqtapp_tds.tds_filesystem import (TDSDirectory, TDSEntry, TDSFileSystem, FmtID, DirFlags, ConcurrencyPool, decode_header, encode_header, _compute_subdir_offsets, _serialize_payload, _deserialize_payload, HEADER_SIZE, TDS_MAGIC,)
 
 try:
     from numba import njit, prange
