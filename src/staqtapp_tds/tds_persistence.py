@@ -1,6 +1,6 @@
 """
 ////////////////////////////////////////////////////////////////////////////////
->>> Staqtapp-TDS v1.3.0 / tds_persistence.py
+>>> Staqtapp-TDS v1.7.1 / tds_persistence.py
 ////////////////////////////////////////////////////////////////////////////////
 
 Staqtapp-TDS / Temporal Directory System
@@ -64,6 +64,8 @@ from staqtapp_tds.tds_filesystem import (
     decode_header, encode_header, _compute_subdir_offsets,
     _serialize_payload, _deserialize_payload, HEADER_SIZE, TDS_MAGIC,
 )
+from staqtapp_tds.manifest import ManifestPolicy, load_manifest, write_default_manifest
+from staqtapp_tds.telemetry import TelemetryMode
 
 try:
     from numba import njit, prange
@@ -542,6 +544,11 @@ class TDSWriter:
             'fmt_id':    int(directory.fmt_id),
             'dir_id':    directory.dir_id,
             'ts_create': directory._ts_create,
+            'manifest_hash': directory.manifest_policy.manifest_hash,
+            'srz': directory.srz.as_dict(),
+            'telemetry': directory.telemetry.snapshot(),
+            'capabilities': directory.capability_names(),
+            'reserved_namespaces': directory.reserved_namespaces.to_dict(),
         }
         meta_tmp = self._meta.with_suffix(self._meta.suffix + '.tmp')
         meta_tmp.write_text(json.dumps(meta))
@@ -564,9 +571,12 @@ class TDSPersistence:
       calling reader.keys() + per-key lookup (halves dict operations).
     """
 
-    def __init__(self, mount_dir):
+    def __init__(self, mount_dir, *, create_manifest: bool = True):
         self.mount_dir = Path(mount_dir)
         self.mount_dir.mkdir(parents=True, exist_ok=True)
+        if create_manifest:
+            write_default_manifest(self.mount_dir, overwrite=False)
+        self.manifest_policy: ManifestPolicy = load_manifest(self.mount_dir, inherit=True)
         self._readers: Dict[str, TDSReader] = {}
         self._lock     = threading.Lock()
         self._fs:  Optional[TDSFileSystem] = None
@@ -615,6 +625,8 @@ class TDSPersistence:
         fmt_id    = FmtID.RAW_BINARY
         dir_id    = None
         ts_create = None
+        srz_meta  = {}
+        telemetry_snapshot = {}
         if meta_path.exists():
             try:
                 meta      = json.loads(meta_path.read_text())
@@ -622,12 +634,24 @@ class TDSPersistence:
                 fmt_id    = FmtID(meta.get('fmt_id', int(FmtID.RAW_BINARY)))
                 dir_id    = meta.get('dir_id')
                 ts_create = meta.get('ts_create')
+                srz_meta  = meta.get('srz', {}) or {}
+                telemetry_snapshot = meta.get('telemetry', {}) or {}
             except Exception:
                 pass
         if into is None:
-            into = TDSDirectory(name=name, fmt_id=fmt_id, flags=flags)
+            into = TDSDirectory(
+                name=name, fmt_id=fmt_id, flags=flags,
+                manifest_policy=self.manifest_policy,
+                srz_enabled=bool(srz_meta.get('enabled', False)),
+                route_stamp=str(srz_meta.get('route_stamp', '')),
+                source_tags=list(srz_meta.get('source_tags', []) or []),
+                aliases=list(srz_meta.get('aliases', []) or []),
+                latent_id=srz_meta.get('latent_id'),
+            )
         if dir_id:    into.dir_id     = dir_id
         if ts_create: into._ts_create = ts_create
+        if telemetry_snapshot:
+            into.telemetry.restore_snapshot(telemetry_snapshot)
 
         with self._lock:
             self._readers[str(tds_path)] = reader
