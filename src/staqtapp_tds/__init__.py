@@ -1,8 +1,8 @@
 """
 Staqtapp-TDS — Temporal Directory System
-VFS for ASI-scale computation. v1.6.0
+VFS for ASI-scale computation. v1.7.1
 
-New in v1.6.0: src-layout repo, EntryIndex facade, backend package, native-extension seam, and arena module split.
+New in v1.7.1: src-layout repo, EntryIndex facade, backend package, native-extension seam, and arena module split.
 
 Performance uplift over v1.2.0 (all v1.2.0 bug fixes retained)
 ──────────────────────────────────────────────────────────────────
@@ -80,7 +80,16 @@ from staqtapp_tds.tds_persistence import (
     FILE_MAGIC,
 )
 
-__version__ = "1.6.0"
+from staqtapp_tds.manifest import (
+    ManifestPolicy, MANIFEST_FILENAME, load_manifest, write_default_manifest,
+)
+from staqtapp_tds.srz import SRZMetadata, SRZ_DTYPE, route_id_for
+from staqtapp_tds.telemetry import DirectoryTelemetry, TelemetryMode, TELEMETRY_DTYPE
+from staqtapp_tds.latency import LatencyPolicy, LatencyBucket, classify_latency, latency_ratio
+from staqtapp_tds.capabilities import CapabilityRegistry, ZoneCapability
+from staqtapp_tds.namespaces import ReservedNamespaces
+
+__version__ = "1.7.1"
 __all__ = [
     # filesystem
     "TDSFileSystem", "TDSDirectory", "TDSEntry",
@@ -94,4 +103,10 @@ __all__ = [
     "TDSReader", "TDSWriter", "TDSPersistence", "ParallelFlusher",
     "SlotIndex", "SlotRecord",
     "FILE_HDR_SIZE", "FILE_MAGIC",
+    # v1.7 semantic infrastructure
+    "ManifestPolicy", "MANIFEST_FILENAME", "load_manifest", "write_default_manifest",
+    "SRZMetadata", "SRZ_DTYPE", "route_id_for",
+    "DirectoryTelemetry", "TelemetryMode", "TELEMETRY_DTYPE",
+    "LatencyPolicy", "LatencyBucket", "classify_latency", "latency_ratio",
+    "CapabilityRegistry", "ZoneCapability", "ReservedNamespaces",
 ]
