@@ -16,6 +16,8 @@ class ZoneCapability(IntFlag):
     NATIVE_INDEX_READY = 1 << 5
     MANIFEST_BOUND = 1 << 6
     RESERVED_NAMESPACES = 1 << 7
+    RADIX_ROUTER = 1 << 8
+    SWISS_TABLE_INDEX = 1 << 9
 
 
 CAPABILITY_NAMES: Dict[str, ZoneCapability] = {
@@ -27,6 +29,8 @@ CAPABILITY_NAMES: Dict[str, ZoneCapability] = {
     "native_index_ready": ZoneCapability.NATIVE_INDEX_READY,
     "manifest_bound": ZoneCapability.MANIFEST_BOUND,
     "reserved_namespaces": ZoneCapability.RESERVED_NAMESPACES,
+    "radix_router": ZoneCapability.RADIX_ROUTER,
+    "swiss_table_index": ZoneCapability.SWISS_TABLE_INDEX,
 }
 
 

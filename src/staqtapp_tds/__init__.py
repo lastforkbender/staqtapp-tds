@@ -1,8 +1,8 @@
 """
 Staqtapp-TDS — Temporal Directory System
-VFS for ASI-scale computation. v1.7.3
+VFS for ASI-scale computation. v2.1.0
 
-New in v1.7.3: src-layout repo, EntryIndex facade, backend package, native-extension seam, and arena module split.
+New in v2.1.0: radix directory router and native Swiss-table-inspired EntryIndex backend with GIL-released reads.
 
 Performance uplift over v1.2.0 (all v1.2.0 bug fixes retained)
 ──────────────────────────────────────────────────────────────────
@@ -93,8 +93,11 @@ from staqtapp_tds.variables import VariableControl, StalkState
 from staqtapp_tds.errors import ErrorTelemetry, ErrorLogMode
 from staqtapp_tds.serializers import PayloadKind, CompressionPolicy, SerializerDecision, choose_variable_kind, content_hash_bytes
 from staqtapp_tds.invariants import InvariantEngine, InvariantReport, InvariantViolation, InvariantCode, INVARIANT_DTYPE
+from staqtapp_tds.provenance import ProvenanceTag, ProvenanceClass, PROVENANCE_DTYPE
+from staqtapp_tds.cluster import TDSClusterIdentity, CLUSTER_DTYPE, query_requires_selector
+from staqtapp_tds.radix import RadixDirectoryRouter
 
-__version__ = "1.7.3"
+__version__ = "2.1.0"
 __all__ = [
     # filesystem
     "TDSFileSystem", "TDSDirectory", "TDSEntry",
@@ -117,4 +120,6 @@ __all__ = [
     "TDSResult", "VariableControl", "StalkState", "ErrorTelemetry", "ErrorLogMode",
     "PayloadKind", "CompressionPolicy", "SerializerDecision", "choose_variable_kind", "content_hash_bytes",
     "InvariantEngine", "InvariantReport", "InvariantViolation", "InvariantCode", "INVARIANT_DTYPE",
+    "ProvenanceTag", "ProvenanceClass", "PROVENANCE_DTYPE",
+    "TDSClusterIdentity", "CLUSTER_DTYPE", "query_requires_selector", "RadixDirectoryRouter",
 ]

@@ -1,6 +1,6 @@
 """
 ////////////////////////////////////////////////////////////////////////////////
->>> Staqtapp-TDS v1.7.3 / tds_filesystem.py
+>>> Staqtapp-TDS v2.0.1 / tds_filesystem.py
 ////////////////////////////////////////////////////////////////////////////////
 
 Staqtapp-TDS / Temporal Directory System
@@ -72,6 +72,8 @@ from staqtapp_tds.errors import ErrorLogMode
 from staqtapp_tds.variables import VariableControl
 from staqtapp_tds.serializers import CompressionPolicy, PayloadKind, choose_variable_kind, content_hash_bytes, json_dumps_fast, json_loads_fast, kind_name
 from staqtapp_tds.invariants import InvariantEngine
+from staqtapp_tds.provenance import ProvenanceTag, ProvenanceClass
+from staqtapp_tds.radix import RadixDirectoryRouter
 
 try:
     from numba import njit, prange
@@ -763,6 +765,7 @@ class TDSEntry:
     content_hash: str = field(default='')
     raw_size: int = 0
     stored_size: int = 0
+    provenance: ProvenanceTag = field(default_factory=ProvenanceTag)
 
     def serialise(self) -> bytes:
         raw = _serialize_payload(self.data, self.fmt_id, self.codec)
@@ -771,7 +774,7 @@ class TDSEntry:
     @classmethod
     def deserialise(cls, name: str, fmt_id: FmtID, buf: bytes,
                     ts_written: int = 0, entry_id: str = '',
-                    codec: str = '') -> 'TDSEntry':
+                    codec: str = '', provenance: ProvenanceTag | str | None = None) -> 'TDSEntry':
         length = struct.unpack('>I', buf[:4])[0]
         raw    = buf[4: 4 + length]
         data   = _deserialize_payload(raw, fmt_id, codec)
@@ -784,6 +787,39 @@ class TDSEntry:
 # ////////////////////////////////////////////////////////////////////////////////
 # § 8  TDS DIRECTORY NODE
 # ////////////////////////////////////////////////////////////////////////////////
+
+
+def _split_utf8_chunks(raw: bytes, chunk_size: int) -> List[bytes]:
+    """Split UTF-8 encoded bytes without cutting through a code point.
+
+    chunk_size is a byte budget, not a Python-character count. When a single
+    code point is wider than chunk_size, that one code point is emitted alone
+    so every chunk remains valid UTF-8 and round-trippable.
+    """
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be positive")
+    chunks: List[bytes] = []
+    i = 0
+    n = len(raw)
+    while i < n:
+        end = min(i + chunk_size, n)
+        while end > i:
+            try:
+                raw[i:end].decode('utf-8')
+                break
+            except UnicodeDecodeError:
+                end -= 1
+        if end == i:
+            end = min(i + 4, n)
+            while end <= n:
+                try:
+                    raw[i:end].decode('utf-8')
+                    break
+                except UnicodeDecodeError:
+                    end += 1
+        chunks.append(raw[i:end])
+        i = end
+    return chunks
 
 class TDSDirectory:
     def __init__(self, name: str, fmt_id: FmtID = FmtID.RAW_BINARY,
@@ -806,7 +842,7 @@ class TDSDirectory:
         self._ts_mod    = self._ts_create
         self._entry_index = EntryIndex(shards=64)
         self._entries = self._entry_index  # compatibility alias; not a raw dict in v1.5
-        self._children: Dict[str, 'TDSDirectory'] = {}
+        self._children: RadixDirectoryRouter['TDSDirectory'] = RadixDirectoryRouter()
         self._schemas:  Dict[str, EntrySchema]    = {}
         self._lock      = threading.RLock()
         self._pool      = ConcurrencyPool.acquire()
@@ -828,6 +864,7 @@ class TDSDirectory:
         caps = self.manifest_policy.capabilities.names()
         self.capabilities = CapabilityRegistry.from_names(caps)
         self.capabilities.enable(ZoneCapability.NATIVE_INDEX_READY)
+        self.capabilities.enable(ZoneCapability.RADIX_ROUTER)
         self.capabilities.enable(ZoneCapability.SHARED_ARENA)
         if srz_enabled:
             self.capabilities.enable(ZoneCapability.SRZ)
@@ -886,18 +923,19 @@ class TDSDirectory:
     def write(self, name: str, value: Any,
               fmt_id: FmtID = FmtID.PICKLE_OBJ,
               compress: bool | None = False,
-              codec: str = '') -> 'TDSEntry':
+              codec: str = '', provenance: ProvenanceTag | str | None = None) -> 'TDSEntry':
         self._validate(name, value)
         raw_fmt = FmtID(fmt_id & ~FmtID.COMPRESSED)
         raw = _serialize_payload(value, raw_fmt, codec)
         do_compress = self.compression_policy.should_compress(len(raw), force=compress)
         final_fmt = FmtID(raw_fmt | FmtID.COMPRESSED) if do_compress else raw_fmt
         stored = CompressorRegistry.compress(raw, codec) if do_compress else raw
+        ptag = provenance if isinstance(provenance, ProvenanceTag) else (ProvenanceTag.create(provenance) if isinstance(provenance, str) else ProvenanceTag())
         entry = TDSEntry(
             name=name, fmt_id=final_fmt, data=value, codec=codec,
             payload_kind=kind_name(int(raw_fmt)),
             content_hash=content_hash_bytes(raw),
-            raw_size=len(raw), stored_size=len(stored),
+            raw_size=len(raw), stored_size=len(stored), provenance=ptag,
         )
         with self._lock:
             self._entries.put(name, entry)
@@ -906,21 +944,21 @@ class TDSDirectory:
         self._registry.put(name, entry)
         return entry
 
-    def write_variable(self, name: str, value: Any, *, compress: bool | None = None, codec: str = '') -> 'TDSEntry':
+    def write_variable(self, name: str, value: Any, *, compress: bool | None = None, codec: str = '', provenance: ProvenanceTag | str | None = None) -> 'TDSEntry':
         kind = choose_variable_kind(value)
-        return self.write(name, value, fmt_id=FmtID(int(kind)), compress=compress, codec=codec)
+        return self.write(name, value, fmt_id=FmtID(int(kind)), compress=compress, codec=codec, provenance=provenance)
 
-    def write_json(self, name: str, value: Any, *, overwrite: bool = False, compress: bool | None = None, codec: str = '') -> TDSResult:
+    def write_json(self, name: str, value: Any, *, overwrite: bool = False, compress: bool | None = None, codec: str = '', provenance: ProvenanceTag | str | None = None) -> TDSResult:
         with self._lock:
             exists = name in self._entries
         if exists and not overwrite:
             self.variables.errors.record('JSON_EXISTS', path=self.path(), name=name)
             return TDSResult.fail('JSON_EXISTS', 'JSON entry already exists; use overwrite=True to replace.', name=name, path=self.path())
-        self.write(name, value, fmt_id=FmtID.JSON_UTF8, compress=compress, codec=codec)
+        self.write(name, value, fmt_id=FmtID.JSON_UTF8, compress=compress, codec=codec, provenance=provenance)
         return TDSResult.success('JSON_WRITTEN' if not exists else 'JSON_OVERWRITTEN', 'JSON entry stored.', name=name, path=self.path(), value=value)
 
     def write_text(self, name: str, text: str, *, overwrite: bool = False,
-                   compress: bool | None = None, codec: str = '') -> TDSResult:
+                   compress: bool | None = None, codec: str = '', provenance: ProvenanceTag | str | None = None) -> TDSResult:
         """Store a whole text file as first-class UTF-8 text.
 
         Duplicate text names return structured feedback unless overwrite=True.
@@ -934,7 +972,7 @@ class TDSDirectory:
         if exists and not overwrite:
             self.variables.errors.record('TEXT_EXISTS', path=self.path(), name=name)
             return TDSResult.fail('TEXT_EXISTS', 'Text entry already exists; use overwrite=True to replace.', name=name, path=self.path())
-        entry = self.write(name, text, fmt_id=FmtID.TEXT_UTF8, compress=compress, codec=codec)
+        entry = self.write(name, text, fmt_id=FmtID.TEXT_UTF8, compress=compress, codec=codec, provenance=provenance)
         return TDSResult.success('TEXT_WRITTEN' if not exists else 'TEXT_OVERWRITTEN', 'Text entry stored.', name=name, path=self.path(), value=text, meta={'compressed': bool(entry.fmt_id & FmtID.COMPRESSED), 'codec': codec or CompressorRegistry._default, 'content_hash': entry.content_hash, 'raw_size': entry.raw_size, 'stored_size': entry.stored_size})
 
     def _text_chunk_prefix(self, name: str) -> str:
@@ -963,14 +1001,15 @@ class TDSDirectory:
                 pass
         raw = text.encode('utf-8')
         prefix = self._text_chunk_prefix(name)
-        chunks = [text[i:i + int(chunk_size)] for i in range(0, len(text), int(chunk_size))] or ['']
+        chunks_raw = _split_utf8_chunks(raw, int(chunk_size)) or [b'']
         chunk_names = []
-        for i, chunk in enumerate(chunks):
+        for i, chunk_raw in enumerate(chunks_raw):
             cname = f"{prefix}{i:06d}"
-            self.write(cname, chunk, fmt_id=FmtID.TEXT_UTF8, compress=compress, codec=codec)
+            self.write(cname, chunk_raw.decode('utf-8'), fmt_id=FmtID.TEXT_UTF8, compress=compress, codec=codec)
             chunk_names.append(cname)
         manifest = {
-            'kind': 'TEXT_CHUNKED_UTF8', 'name': name, 'chunk_size': int(chunk_size),
+            'kind': 'TEXT_CHUNKED_UTF8', 'name': name,
+            'chunk_size': int(chunk_size), 'chunk_size_unit': 'utf8_bytes',
             'chunks': chunk_names, 'content_hash': content_hash_bytes(raw),
             'raw_size': len(raw), 'chunk_count': len(chunk_names),
         }
@@ -1019,10 +1058,17 @@ class TDSDirectory:
             'content_hash': entry.content_hash, 'raw_size': int(entry.raw_size),
             'stored_size': int(entry.stored_size), 'codec': entry.codec,
             'compressed': bool(entry.fmt_id & FmtID.COMPRESSED),
+            'provenance': getattr(entry, 'provenance', ProvenanceTag()).as_dict(),
         }
 
     def invariant_report(self) -> dict:
         return self.invariants.evaluate_directory(self).as_dict()
+
+    def provenance_record(self, name: str) -> np.ndarray:
+        entry = self._entries.get(name)
+        if entry is None:
+            raise KeyError(name)
+        return getattr(entry, 'provenance', ProvenanceTag()).compact_record(f'{self.path()}::{name}')
 
     def read(self, name: str) -> Any:
         start_ns = self.telemetry.start()
@@ -1227,7 +1273,7 @@ class TDSFileSystem:
         asyncio.run(db.awrite("key", value))
         value = asyncio.run(db.aread("key"))
     """
-    VERSION = (1, 7, 3)
+    VERSION = (2, 0, 1)
 
     def __init__(self, name: str = "tds_root", manifest_policy: Optional[ManifestPolicy] = None):
         self.manifest_policy = manifest_policy or ManifestPolicy.default()
@@ -1245,6 +1291,9 @@ class TDSFileSystem:
         for part in parts:
             node = node.cd(part)
         return node
+
+    def resolve_radix(self, path: str) -> TDSDirectory:
+        return self.root._children.resolve_path(path) if path.strip('/') else self.root
 
     def makedirs(self, path: str, **kwargs) -> TDSDirectory:
         parts = [p for p in path.strip('/').split('/') if p]

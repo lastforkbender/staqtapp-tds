@@ -1,5 +1,5 @@
 """
-EntryIndex facade for Staqtapp-TDS v1.7.0.
+EntryIndex facade for Staqtapp-TDS v2.1.0.
 
 The VFS talks to this small class only. Today it defaults to a pure-Python
 backend; later it can select a Cython/pybind11 backend that releases the GIL for
@@ -45,6 +45,11 @@ class EntryIndex:
 
     def get_handle(self, key: str) -> int:
         return int(self._impl.get_handle(key))
+
+    def get_handles(self, keys: List[str]) -> List[int]:
+        if hasattr(self._impl, "get_handles"):
+            return [int(h) for h in self._impl.get_handles(list(keys))]
+        return [self.get_handle(k) for k in keys]
 
     def get_by_handle(self, handle: int) -> Optional[Any]:
         return self._impl.get_by_handle(handle)
