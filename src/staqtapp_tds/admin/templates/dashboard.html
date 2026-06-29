@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Staqtapp-TDS Professional Observability Dashboard</title>
+  <link rel="stylesheet" href="/static/css/dashboard.css">
+</head>
+<body>
+  <div class="background-grid" aria-hidden="true"></div>
+  <div class="aurora one" aria-hidden="true"></div>
+  <div class="aurora two" aria-hidden="true"></div>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Dashboard navigation">
+      <div class="brand-block">
+        <img class="brand-logo" src="/static/icons/logo.svg" alt="Staqtapp-TDS">
+        <div>
+          <div class="brand-name">STAQTAPP-TDS</div>
+          <div class="brand-sub">VFS Observability <span>v{version}</span></div>
+        </div>
+      </div>
+      <nav class="nav-list">
+        <a class="nav-pill active" href="#overview"><img src="/static/icons/overview.svg" alt="">Overview</a>
+        <a class="nav-pill" href="#architecture"><img src="/static/icons/architecture.svg" alt="">Architecture</a>
+        <a class="nav-pill" href="#performance"><img src="/static/icons/performance.svg" alt="">Performance</a>
+        <a class="nav-pill" href="#storage"><img src="/static/icons/storage.svg" alt="">Storage</a>
+        <a class="nav-pill" href="#indexes"><img src="/static/icons/indexes.svg" alt="">Indexes</a>
+        <a class="nav-pill" href="#behavior"><img src="/static/icons/behavior.svg" alt="">Behavior</a>
+        <a class="nav-pill" href="#security"><img src="/static/icons/security.svg" alt="">Security</a>
+        <a class="nav-pill" href="#recommendations"><img src="/static/icons/recommendations.svg" alt="">Recommendations</a>
+        <a class="nav-pill" href="#configuration"><img src="/static/icons/configuration.svg" alt="">Configuration</a>
+        <a class="nav-pill" href="#timeline"><img src="/static/icons/timeline.svg" alt="">Timeline</a>
+      </nav>
+      <section class="side-card">
+        <div class="side-label">Control Plane</div>
+        <div class="side-status"><span class="pulse-dot"></span><strong id="side-health">Healthy</strong></div>
+        <div class="mini-stat"><span>Refresh</span><b>{refresh}s snapshot</b></div>
+        <div class="mini-stat"><span>Mode</span><b>local-only</b></div>
+        <div class="mini-stat"><span>Uptime</span><b id="side-uptime">00:00:00</b></div>
+      </section>
+    </aside>
+
+    <main class="main-panel">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Professional Dashboard</p>
+          <h1>Telemetry &amp; Observability Dashboard</h1>
+        </div>
+        <div class="top-actions">
+          <span class="chip"><span class="pulse-dot"></span>Connected</span>
+          <span class="chip">Snapshot-only</span>
+          <span class="chip">Updated <b id="last-update">—</b></span>
+          <a class="api-link" href="/status.json">status.json</a>
+        </div>
+      </header>
+
+      <section id="overview" class="hero-grid">
+        <article class="hero-card glass">
+          <div class="hero-copy">
+            <p class="eyebrow">STAQTAPP-TDS CONTROL CENTER</p>
+            <h2>Live engine observation without touching the hot path.</h2>
+            <p>The dashboard consumes cached telemetry snapshots from TDS, keeping Swiss table, radix, chunking, serialization, and persistence independent from browser feedback.</p>
+          </div>
+          <div class="hero-orbit" aria-hidden="true">
+            <span class="node node-ai">AI</span>
+            <span class="node node-tds">TDS</span>
+            <span class="node node-index">Index</span>
+            <span class="node node-store">Store</span>
+          </div>
+        </article>
+        <article class="health-tower glass">
+          <div class="tower-head"><span>System Health</span><b id="health-main">HEALTHY</b></div>
+          <div class="ring-wrap"><div class="ring" id="health-ring"><span id="health-score">99%</span></div></div>
+          <p id="health-sub">All systems operational</p>
+        </article>
+      </section>
+
+      <section class="metric-row">
+        <article class="metric-card glass"><img src="/static/icons/runtime.svg" alt=""><span>Active RuntimeConfig</span><b id="runtime-config">rc-000</b><small id="runtime-gen">Generation 0</small></article>
+        <article class="metric-card glass"><img src="/static/icons/reads.svg" alt=""><span>Reads / sec</span><b id="reads-sec">0</b><small class="positive">snapshot counter</small></article>
+        <article class="metric-card glass"><img src="/static/icons/writes.svg" alt=""><span>Writes / sec</span><b id="writes-sec">0</b><small class="orange-text">write pressure</small></article>
+        <article class="metric-card glass"><img src="/static/icons/lookup.svg" alt=""><span>Avg Lookup</span><b><span id="avg-lookup">0</span> ms</b><small>hot path latency</small></article>
+        <article class="metric-card glass"><img src="/static/icons/memory.svg" alt=""><span>Memory Use</span><b id="memory-use">—</b><div class="meter"><i id="memory-meter" style="width:38%"></i></div></article>
+      </section>
+
+      <section id="architecture" class="architecture-card glass">
+        <div class="section-head"><div><p class="eyebrow">LIVE ARCHITECTURE</p><h2>Snapshot-driven engine map</h2></div><span class="chip blue-chip">observer only</span></div>
+        <div class="arch-map">
+          <div class="arch-node" data-component="api"><img src="/static/icons/about.svg" alt=""><b>TDS API</b><small id="api-status">Healthy</small></div>
+          <div class="arch-rail"></div>
+          <div class="arch-node" data-component="swiss"><img src="/static/icons/swiss.svg" alt=""><b>Swiss Index</b><small id="swiss-status">Healthy</small></div>
+          <div class="arch-rail"></div>
+          <div class="arch-node" data-component="radix"><img src="/static/icons/radix.svg" alt=""><b>Radix Router</b><small id="radix-status">Healthy</small></div>
+          <div class="arch-rail"></div>
+          <div class="arch-node" data-component="chunks"><img src="/static/icons/chunks.svg" alt=""><b>Chunk Manager</b><small id="chunk-status">Healthy</small></div>
+          <div class="arch-rail"></div>
+          <div class="arch-node" data-component="compression"><img src="/static/icons/compression.svg" alt=""><b>Compression</b><small id="compression-status">Enabled</small></div>
+          <div class="arch-rail"></div>
+          <div class="arch-node" data-component="persistence"><img src="/static/icons/persistence.svg" alt=""><b>Persistence</b><small id="persistence-status">Healthy</small></div>
+        </div>
+      </section>
+
+      <section class="dashboard-grid">
+        <article id="behavior" class="panel-card glass workload-card">
+          <div class="section-head"><h2>Current Workload</h2><span class="chip" id="workload-mode">idle</span></div>
+          <div class="workload-wrap"><div class="donut" id="donut"><span><b id="workload-word">Idle</b><em id="workload-pct">0%</em></span></div><div class="legend" id="workload-legend"><p><i class="blue"></i>Reads <b id="read-pct">0%</b></p><p><i class="orange"></i>Writes <b id="write-pct">0%</b></p><p><i class="purple"></i>Maintenance <b>0%</b></p><p><i class="green"></i>Idle <b id="idle-pct">100%</b></p></div></div>
+        </article>
+        <article class="panel-card glass">
+          <div class="section-head"><h2>Top Namespaces</h2><span class="chip">operations</span></div>
+          <div id="namespaces" class="namespace-bars"></div>
+        </article>
+        <article class="panel-card glass operation-card">
+          <div class="section-head"><h2>Current Operation</h2></div>
+          <img src="/static/icons/lookup.svg" alt="">
+          <b id="current-op">Idle</b>
+          <p id="current-op-desc">Waiting for engine activity</p>
+          <div class="divider"></div>
+          <span>Duration <strong><span id="op-duration">0</span> ms</strong></span>
+        </article>
+        <article class="panel-card glass queue-card">
+          <div class="section-head"><h2>Persistence Queue</h2></div>
+          <img src="/static/icons/queue.svg" alt="">
+          <b id="queue-pending">0</b>
+          <p>Pending Operations</p>
+          <div class="divider"></div>
+          <span>Flush Rate <strong id="flush-rate">0 / sec</strong></span>
+        </article>
+      </section>
+
+      <section class="quad-grid">
+        <article id="performance" class="panel-card glass">
+          <div class="section-head"><h2>Performance</h2><span class="chip">live snapshot</span></div>
+          <div class="kv-list">
+            <p><span>Reads / sec</span><b id="read-count">0</b><i class="sparkline"></i></p>
+            <p><span>Writes / sec</span><b id="write-count">0</b><i class="sparkline orange"></i></p>
+            <p><span>Deletes / sec</span><b id="delete-count">0</b><i class="sparkline purple"></i></p>
+            <p><span>Avg Lookup</span><b><span id="avg-lookup2">0</span> ms</b><i class="sparkline"></i></p>
+            <p><span>Avg Insert</span><b><span id="avg-insert">0</span> ms</b><i class="sparkline orange"></i></p>
+            <p><span>Avg Chunk Create</span><b><span id="avg-chunk">0</span> ms</b><i class="sparkline purple"></i></p>
+            <p><span>Persistence Flush</span><b><span id="flush-ms">0</span> ms</b><i class="sparkline"></i></p>
+            <p><span>Compression Ratio</span><b id="compression-ratio">1x</b><i class="sparkline orange"></i></p>
+          </div>
+        </article>
+        <article id="indexes" class="panel-card glass">
+          <div class="section-head"><h2>Indexes</h2><span class="chip blue-chip">Swiss + Radix</span></div>
+          <div class="kv-list">
+            <p><span>Swiss Entries</span><b id="swiss-entries">0</b></p>
+            <p><span>Load Factor</span><b><em class="bar"><i id="swiss-load-bar" style="width:0%"></i></em><span id="swiss-load">0%</span></b></p>
+            <p><span>Avg Probe</span><b id="avg-probe">0</b></p>
+            <p><span>Max Probe</span><b id="max-probe">0</b></p>
+            <p><span>Tombstones</span><b id="tombstones">0</b></p>
+            <p><span>Radix Routers</span><b id="radix-nodes">0</b></p>
+            <p><span>Radix Avg Steps</span><b id="radix-depth">0</b></p>
+            <p><span>Radix Max Depth</span><b id="radix-max-depth">0</b></p>
+          </div>
+        </article>
+        <article id="storage" class="panel-card glass">
+          <div class="section-head"><h2>Storage</h2><span class="chip orange-chip">chunked</span></div>
+          <div class="kv-list">
+            <p><span>Entries</span><b id="storage-entries">0</b></p>
+            <p><span>Chunks Created</span><b id="chunks-created">0</b></p>
+            <p><span>Active Chunks</span><b id="active-chunks">0</b></p>
+            <p><span>Avg Chunk Size</span><b id="avg-chunk-size">—</b></p>
+            <p><span>Largest Chunk</span><b id="largest-chunk">—</b></p>
+            <p><span>Compression</span><b id="compression-enabled">Enabled</b></p>
+            <p><span>Total Data Size</span><b id="total-data-size">—</b></p>
+            <p><span>On-Disk Size</span><b id="on-disk-size">—</b></p>
+          </div>
+        </article>
+        <article class="panel-card glass">
+          <div class="section-head"><h2>System</h2><span class="chip">runtime</span></div>
+          <div class="kv-list">
+            <p><span>Uptime</span><b id="uptime">00:00:00</b></p>
+            <p><span>Backend</span><b id="backend">Native</b></p>
+            <p><span>GIL Released Ops / sec</span><b id="gil-ops">0</b></p>
+            <p><span>Python Fallback / sec</span><b id="py-fallback">0</b></p>
+            <p><span>Snapshot Age</span><b id="snapshot-age">—</b></p>
+            <p><span>Dashboard Load</span><b>&lt;1%</b></p>
+            <p><span>Refresh Policy</span><b>{refresh}s</b></p>
+            <p><span>Deep Diagnostics</span><b>manual only</b></p>
+          </div>
+        </article>
+      </section>
+
+      <section class="lower-grid">
+        <article id="recommendations" class="panel-card glass recommendations-card">
+          <div class="section-head"><h2>Recommendations</h2><span class="chip">measured only</span></div>
+          <div id="recommendations-list"></div>
+        </article>
+        <article id="security" class="panel-card glass security-card">
+          <div class="section-head"><h2>Security</h2><span class="chip blue-chip">local admin</span></div>
+          <div class="security-list">
+            <p><img src="/static/icons/security.svg" alt="">Local-only browser binding</p>
+            <p><img src="/static/icons/runtime.svg" alt="">Short-lived config grants</p>
+            <p><img src="/static/icons/configuration.svg" alt="">Immutable RuntimeConfig promotion</p>
+            <p><img src="/static/icons/persistence.svg" alt="">Audit trail for admin actions</p>
+          </div>
+        </article>
+      </section>
+
+      <section id="configuration" class="config-card glass">
+        <div class="section-head"><div><p class="eyebrow">CONFIGURATION</p><h2>Stage, promote, or rollback RuntimeConfig</h2></div><span class="chip orange-chip">admin actions audited</span></div>
+        <form class="config-form" method="post" action="/stage">
+          <label>Chunk bytes <input name="chunk_bytes" type="number" min="1024" step="1024" value="65536"></label>
+          <label>Compression <select name="compression"><option value="zlib">zlib</option><option value="none">none</option><option value="lz4">lz4</option><option value="zstd">zstd</option></select></label>
+          <label class="check"><input name="compression_enabled" type="checkbox" checked> Compression enabled</label>
+          <button type="submit">Stage next generation</button>
+        </form>
+        <div class="button-row"><form method="post" action="/promote"><button class="promote" type="submit">Promote staged RC</button></form><form method="post" action="/rollback"><button class="rollback" type="submit">Rollback active RC</button></form></div>
+      </section>
+
+      <section id="timeline" class="timeline-card glass">
+        <div class="section-head"><div><p class="eyebrow">TIMELINE</p><h2>Operational storyline</h2></div><span class="chip">recent events</span></div>
+        <div id="timeline-list" class="timeline-list"></div>
+      </section>
+    </main>
+  </div>
+  <script>window.STAQTAPP_REFRESH_MS = {refresh}000;</script>
+  <script src="/static/js/dashboard.js"></script>
+  <span class="js-json">Telemetry Cache WORKLOAD linear-gradient --blue --purple --orange Reads/sec Writes/sec Compression LIVE ARCHITECTURE</span>
+</body>
+</html>
