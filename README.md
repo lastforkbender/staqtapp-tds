@@ -203,6 +203,8 @@ cfg = RuntimeConfig.default().next_generation(
 
 Spiral (Sequential-Parallel-Aggregative-Reinforcement-Learning) support is intentionally neutral:
 
+- https://github.com/sjkncs/ai-papers-and-notes/blob/main/papers/2026/week-25-jun18-24/spiral-learning-to-search-and-aggregate/review.md
+
 ```text
 Agent / verifier / ranker decides.
 TDS stores the trace, score, provenance, and metadata.
