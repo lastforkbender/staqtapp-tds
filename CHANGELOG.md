@@ -1,4 +1,18 @@
-# Staqtapp-TDS v2.4.0
+# Staqtapp-TDS v2.4.2
+
+## v2.4.2 — Metadata and Native Execution Hardening
+
+- Added `staqtapp_tds.version` and centralized `__version__ = "2.4.2"`.
+- Added compact immutable `staqtapp_tds.metadata` records using `@dataclass(slots=True, frozen=True)`.
+- Re-exported Spiral trace, trace-set, and aggregation records from the metadata package while preserving the optional `staqtapp_tds.spiral` API.
+- Added richer ranking provenance fields: rank method, confidence, rank config id, and verifier id.
+- Fixed and validated native extension build configuration with `setup.py`.
+- Added GIL-released native batch insert and batch erase paths.
+- Added internal tiny-key memory-pool reuse counters for the native Swiss index.
+- Added native checksum and UTF-8-safe chunk-boundary helper functions.
+- Added execution telemetry fields for pool reuse and allocator calls.
+- Updated the professional dashboard system panel to display pool reuse and allocator-call feedback.
+- Added v2.4.2 tests for slotted metadata, native batch put/pop, native checksum/chunk bounds, and pool telemetry.
 
 ## v2.4.0 — Native Performance Expansion
 
