@@ -60,7 +60,11 @@ class AdminPanelServer:
 
     def _status_snapshot(self) -> dict[str, object]:
         snap = self.control.status()
-        snap["system_health"] = "HEALTHY"
+        obs = snap.get("observation") if isinstance(snap, dict) else None
+        if isinstance(obs, dict) and "health" in obs:
+            snap["system_health"] = str(obs.get("system_health") or obs["health"].get("state", "healthy")).upper()
+        else:
+            snap["system_health"] = "HEALTHY"
         snap["panel"] = {
             "mode": "local-only",
             "refresh_seconds": PANEL_REFRESH_SECONDS,
