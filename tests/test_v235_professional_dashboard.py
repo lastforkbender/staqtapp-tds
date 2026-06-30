@@ -4,7 +4,7 @@ from staqtapp_tds.admin.panel import AdminPanelServer, HTML, render_dashboard_ht
 
 
 def test_v235_professional_dashboard_has_polished_sections_and_assets():
-    html = render_dashboard_html(version="2.3.5")
+    html = render_dashboard_html(version="2.4.0")
     assert "Professional Observability Dashboard" in html
     assert "LIVE ARCHITECTURE" in html
     assert "Timeline" in html
