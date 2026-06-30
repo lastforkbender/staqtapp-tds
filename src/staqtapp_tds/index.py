@@ -35,6 +35,12 @@ class EntryIndex:
     def put(self, key: str, entry: Any) -> int:
         return int(self._impl.put(key, entry))
 
+    def put_many(self, items: List[Tuple[str, Any]]) -> List[int]:
+        pairs = list(items)
+        if hasattr(self._impl, "put_many"):
+            return [int(h) for h in self._impl.put_many(pairs)]
+        return [self.put(k, v) for k, v in pairs]
+
     def get(self, key: str, default: Optional[Any] = None) -> Optional[Any]:
         return self._impl.get(key, default)
 
@@ -51,6 +57,11 @@ class EntryIndex:
 
     def pop(self, key: str, default: Optional[Any] = None) -> Optional[Any]:
         return self._impl.pop(key, default)
+
+    def pop_many(self, keys: List[str], default: Optional[Any] = None) -> List[Optional[Any]]:
+        if hasattr(self._impl, "pop_many"):
+            return list(self._impl.pop_many(list(keys), default))
+        return [self.pop(k, default) for k in keys]
 
     def keys(self) -> List[str]:
         return list(self._impl.keys())
@@ -74,13 +85,20 @@ class EntryIndex:
             "gil_released_get_handles": False,
             "gil_released_pop_lookup": False,
             "gil_released_stats_scan": False,
+            "gil_released_put_many": False,
+            "gil_released_pop_many": False,
             "native_put_calls": 0,
+            "native_batch_put_calls": 0,
             "native_lookup_calls": 0,
             "native_batch_lookup_calls": 0,
             "native_pop_calls": 0,
+            "native_batch_pop_calls": 0,
             "native_stats_calls": 0,
             "gil_released_calls": 0,
             "python_native_transitions": 0,
+            "pool_reuse_count": 0,
+            "pool_allocator_calls": 0,
+            "pool_frees": 0,
         }
 
     def __setitem__(self, key: str, entry: Any) -> None:

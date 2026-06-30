@@ -32,7 +32,7 @@ TELEMETRY_DTYPE = np.dtype([
 ])
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True, frozen=True)
 class TraceRecord:
     timestamp_ns: int
     route_id: int
@@ -122,7 +122,7 @@ class DirectoryTelemetry:
 # v2.3 Observation Layer
 # =============================================================================
 
-@dataclass(frozen=True)
+@dataclass(slots=True, frozen=True)
 class TelemetrySnapshot:
     """Immutable dashboard-facing snapshot.
 
@@ -195,6 +195,8 @@ class TelemetryManager:
             "spiral_trace_sets": 0,
             "spiral_aggregations": 0,
             "spiral_finals": 0,
+            "pool_reuse_count": 0,
+            "pool_allocator_calls": 0,
         }
         self._timers_ns: Dict[str, int] = {
             "read_ns": 0,
@@ -285,12 +287,17 @@ class TelemetryManager:
                 ("python_native_transitions", "python_native_transitions"),
                 ("gil_released_calls", "gil_released_ops"),
                 ("native_batch_lookup_calls", "native_batch_ops"),
+                ("native_batch_put_calls", "native_batch_ops"),
+                ("native_batch_pop_calls", "native_batch_ops"),
+                ("pool_reuse_count", "pool_reuse_count"),
+                ("pool_allocator_calls", "pool_allocator_calls"),
             ):
                 if src in stats:
                     self._counters[dst] = max(int(self._counters.get(dst, 0)), int(stats.get(src) or 0))
             native_calls = sum(int(stats.get(k) or 0) for k in (
                 "native_put_calls", "native_lookup_calls", "native_batch_lookup_calls",
-                "native_pop_calls", "native_stats_calls"
+                "native_pop_calls", "native_batch_put_calls", "native_batch_pop_calls",
+                "native_stats_calls", "native_checksum_calls", "native_chunk_scan_calls"
             ))
             self._counters["native_backend_ops"] = max(int(self._counters.get("native_backend_ops", 0)), native_calls)
 
@@ -441,6 +448,9 @@ class TelemetryManager:
                 "python_native_transitions_per_sec": round(counters.get("python_native_transitions", 0) / uptime, 3),
                 "native_batch_ops": counters.get("native_batch_ops", 0),
                 "native_batch_ops_per_sec": round(counters.get("native_batch_ops", 0) / uptime, 3),
+                "pool_reuse_count": counters.get("pool_reuse_count", 0),
+                "pool_allocator_calls": counters.get("pool_allocator_calls", 0),
+                "pool_reuse_percent": round(100.0 * counters.get("pool_reuse_count", 0) / max(1, counters.get("pool_reuse_count", 0) + counters.get("pool_allocator_calls", 0)), 2),
                 "timer_samples": sum(timer_counts.values()),
             }
             native_ops = float(performance.get("native_backend_ops", 0) or 0)
