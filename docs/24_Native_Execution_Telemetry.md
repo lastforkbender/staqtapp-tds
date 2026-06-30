@@ -1,6 +1,6 @@
 # Native Execution Telemetry
 
-Staqtapp-TDS v2.4.2 adds execution-mode telemetry for performance engineering.
+Staqtapp-TDS v2.5.0 adds execution-mode telemetry for performance engineering.
 
 The goal is to show where storage work is happening without making the dashboard part of the storage engine. TDS records boundary-level counters for:
 

@@ -1,6 +1,6 @@
-# v2.4.2 Metadata and Native Execution Hardening
+# v2.5.0 Metadata and Native Execution Hardening
 
-v2.4.2 focuses on making the existing TDS architecture smaller, faster, and more measurable without adding new reasoning behavior.
+v2.5.0 focuses on making the existing TDS architecture smaller, faster, and more measurable without adding new reasoning behavior.
 
 ## Slotted metadata records
 
@@ -10,7 +10,7 @@ Controllers, managers, dashboards, configuration builders, and security/control-
 
 ## Native execution additions
 
-The native Swiss index now exposes GIL-released batch insert and batch erase operations in addition to lookup, batch lookup, pop, put, and stats scans. v2.4.2 also adds native checksum and UTF-8 chunk-boundary helpers.
+The native Swiss index now exposes GIL-released batch insert and batch erase operations in addition to lookup, batch lookup, pop, put, and stats scans. v2.5.0 also adds native checksum and UTF-8 chunk-boundary helpers.
 
 ## Memory-pool telemetry
 
