@@ -1,9 +1,9 @@
 <p align="center">
-    <img src="docs/dashboard-v2.3.5.jpeg" alt="Staqtapp-TDS v2.3.0 Dashboard" width="100%"/>
+    <img src="docs/dashboard-v2.3.5.jpeg" alt="Staqtapp-TDS v2.4.0 Dashboard" width="100%"/>
 </p>
 
 
-# 🟦🟪🟧 Staqtapp-TDS v2.3.7
+# 🟦🟪🟧 Staqtapp-TDS v2.4.0
 
 Staqtapp-TDS is a content-neutral Temporal Directory System: a directory-first virtual storage engine with radix routing, Swiss-table-style indexing, chunking, persistence, admin control, and an observation dashboard.
 
@@ -21,19 +21,26 @@ The core principle remains unchanged:
 - RuntimeConfig generations with stage/promote/rollback control flow.
 - Local-only browser admin panel and professional observability dashboard.
 - Telemetry snapshots for performance, storage, index health, behavior, recommendations, and timeline-style feedback.
+- Execution-mode telemetry: native %, Python %, GIL-released %, batch ops, and Python↔native transitions.
 - Optional Spiral-compatible trace/provenance module for trace-shaped workflows.
 
-## What is new in v2.3.7
+## What is new in v2.4.0
+
+### Native performance expansion and execution-mode telemetry
+
+v2.4.0 moves TDS back toward engine hardening after the v2.3 dashboard and Spiral-support work. The native Swiss-table backend now reports execution counters and releases the GIL for the native put path in addition to lookup, batch lookup, pop lookup, and stats scans. The observation layer exposes an execution-mode view so the dashboard can show native execution percentage, Python fallback percentage, GIL-released operation percentage, batch operation count, and Python↔native transition rate.
+
+These values are engineering telemetry. They are not a profiler and they do not inspect stored payloads. They answer operational questions such as whether work is moving into native code, whether batch operations are reducing Python/C boundary crossings, and whether dashboard observation remains separated from the hot TDS path.
 
 ### Optional Spiral-compatible trace support
 
-v2.3.7 adds `staqtapp_tds.spiral`, an optional workflow module for storing SPIRAL shaped data without changing TDS into a reasoning system.
+v2.4.0 includes `staqtapp_tds.spiral`, an optional workflow module for storing Spiral-shaped data without changing TDS into a reasoning system.
 
-It supports Sequential-Parallel-Aggregative-Reinforcement-Learning (SPIRAL) for proper ASI direction by Jubayer Ibn Hamid, Ifdita Hasan Orney, Michael Y. Li, Omar Shaikh, Yoonho Lee, Dorsa Sadigh, Chelsea Finn and Noah Goodman / Stanford University:
+It supports:
 
 - Spiral-like run directories
-- *search trace records
-- *trace-set manifests
+- search trace records
+- trace-set manifests
 - aggregation provenance records
 - externally supplied rank metadata
 - final-output provenance
@@ -41,8 +48,8 @@ It supports Sequential-Parallel-Aggregative-Reinforcement-Learning (SPIRAL) for 
 
 It does **not** perform:
 
-- *trace ranking decisions
-- *reward assignment
+- trace ranking decisions
+- reward assignment
 - aggregation
 - model training
 - reasoning
@@ -102,7 +109,7 @@ run.store_final("answer.tds", "final answer", derived_from=["agg_0001"])
 
 ### Version cleanup
 
-v2.3.7 centralizes package versioning around `pyproject.toml` and `staqtapp_tds.__version__`. Historical release comments in runtime source files were reduced or removed so the source tree no longer reads like a stack of older version banners.
+v2.4.0 centralizes package versioning around `pyproject.toml` and `staqtapp_tds.__version__`. Historical release comments in runtime source files were reduced or removed so the source tree no longer reads like a stack of older version banners.
 
 ### Telemetry and semantic storage positioning
 
@@ -147,7 +154,7 @@ from staqtapp_tds.admin.panel import AdminPanelServer
 AdminPanelServer().serve_forever()
 ```
 
-The panel remains local-only by default.
+The panel remains local-only by default. In v2.4.0 it also surfaces execution-mode telemetry so performance work can be verified visually without making the dashboard part of the storage engine.
 
 ## RuntimeConfig boundary
 
@@ -167,7 +174,9 @@ cfg = RuntimeConfig.default().next_generation(
 
 ## Design rule
 
-Spiral support is intentionally neutral:
+Spiral (Sequential-Parallel-Aggregative-Reinforcement-Learning) support is intentionally neutral:
+
+- Spiral support was added to Staqtapp-TDS v2.3.7 after critical examination of the paper here -> https://www.emergentmind.com/papers/2606.23595
 
 ```text
 Agent / verifier / ranker decides.

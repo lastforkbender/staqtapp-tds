@@ -1,4 +1,13 @@
-# Staqtapp-TDS v2.3.7
+# Staqtapp-TDS v2.4.0
+
+## v2.4.0 — Native Performance Expansion
+
+- Added execution-mode telemetry for native %, Python %, GIL-released %, batch operations, and Python↔native transition rate.
+- Added native Swiss-table counters for put, lookup, batch lookup, pop, stats, GIL-released calls, and transitions.
+- Changed the native Swiss-table put path to release the GIL while performing native table insertion/update.
+- Preserved the professional dashboard as a separated snapshot-only subsystem.
+- Added dashboard fields for native execution and Python/native boundary activity.
+- Added tests for execution telemetry, native execution counters, and dashboard fields.
 
 ## v2.3.7 — Optional Spiral-Compatible Trace Support
 
