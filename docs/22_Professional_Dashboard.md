@@ -1,6 +1,6 @@
-# Staqtapp-TDS v2.3.5 Professional Dashboard
+# Staqtapp-TDS Professional Dashboard
 
-The v2.3.5 admin panel is a packaged, asset-driven observability interface under `src/staqtapp_tds/admin/`. It keeps the browser outside the hot TDS path by polling `/status.json` every two seconds and rendering cached telemetry snapshots only.
+The admin panel is a packaged, asset-driven observability interface under `src/staqtapp_tds/admin/`. It keeps the browser outside the hot TDS path by polling `/status.json` every two seconds and rendering cached telemetry snapshots only.
 
 ## Included pages/regions
 

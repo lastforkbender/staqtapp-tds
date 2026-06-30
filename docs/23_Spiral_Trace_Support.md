@@ -1,6 +1,6 @@
 # Optional Spiral-Compatible Trace Support
 
-Staqtapp-TDS v2.3.7 can store Spiral-shaped workflow data without becoming a
+Staqtapp-TDS can store Spiral-shaped workflow data without becoming a
 Spiral implementation.
 
 SPIRAL-style systems use sequential traces, parallel trace sets, and aggregation
