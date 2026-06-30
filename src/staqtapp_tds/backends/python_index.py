@@ -1,9 +1,5 @@
-"""
-Pure-Python EntryIndex backend for Staqtapp-TDS v1.7.0.
+"""Pure-Python EntryIndex backend for Staqtapp-TDS."""
 
-This backend is correctness-first and portable. It does not remove the GIL, but
-it preserves the exact handle-based API expected from a future native backend.
-"""
 from __future__ import annotations
 
 import threading

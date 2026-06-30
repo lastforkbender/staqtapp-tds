@@ -90,3 +90,22 @@ class NativeEntryIndexBackend:
             max_probe=int(s.get("max_probe", 0)),
             avg_probe=float(s.get("avg_probe", 0.0)),
         )
+
+    def native_execution_stats(self) -> Dict[str, int | bool | str]:
+        """Return raw native execution counters for dashboard telemetry."""
+        s = self._index.stats()
+        return {
+            "backend": str(s.get("backend", self.backend_name)),
+            "gil_released_put": bool(s.get("gil_released_put", False)),
+            "gil_released_get_handle": bool(s.get("gil_released_get_handle", False)),
+            "gil_released_get_handles": bool(s.get("gil_released_get_handles", False)),
+            "gil_released_pop_lookup": bool(s.get("gil_released_pop_lookup", False)),
+            "gil_released_stats_scan": bool(s.get("gil_released_stats_scan", False)),
+            "native_put_calls": int(s.get("native_put_calls", 0)),
+            "native_lookup_calls": int(s.get("native_lookup_calls", 0)),
+            "native_batch_lookup_calls": int(s.get("native_batch_lookup_calls", 0)),
+            "native_pop_calls": int(s.get("native_pop_calls", 0)),
+            "native_stats_calls": int(s.get("native_stats_calls", 0)),
+            "gil_released_calls": int(s.get("gil_released_calls", 0)),
+            "python_native_transitions": int(s.get("python_native_transitions", 0)),
+        }

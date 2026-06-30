@@ -1,4 +1,5 @@
-"""Optional native EntryIndex boundary for v1.8.0."""
+"""Optional native EntryIndex boundary."""
+
 from __future__ import annotations
 
 from typing import Any
