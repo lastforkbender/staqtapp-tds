@@ -2,7 +2,7 @@ from staqtapp_tds import TDSFileSystem, RuntimeConfig, TraceRecord, TraceSetMani
 
 
 def test_version_and_runtime_config_spiral_flag():
-    assert __version__ == "2.4.0"
+    assert __version__ == "2.4.2"
     cfg = RuntimeConfig.default().next_generation(spiral_support_enabled=True)
     assert cfg.spiral_support_enabled is True
     assert RuntimeConfig.from_mapping(cfg.to_dict()).spiral_support_enabled is True

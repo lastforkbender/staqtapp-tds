@@ -4,7 +4,7 @@ from staqtapp_tds.admin.panel import AdminPanelServer, HTML, render_dashboard_ht
 
 
 def test_v231_dashboard_is_packaged_asset_driven():
-    html = render_dashboard_html(version="2.4.0")
+    html = render_dashboard_html(version="2.4.2")
     assert "Telemetry &amp; Observability Dashboard" in html
     assert "/static/css/dashboard.css" in html
     assert "/static/js/dashboard.js" in html

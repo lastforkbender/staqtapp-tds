@@ -42,7 +42,7 @@ def test_filesystem_dashboard_snapshot_contains_execution_percentages():
 
 
 def test_professional_dashboard_has_execution_mode_fields():
-    html = render_dashboard_html(version="2.4.0", refresh_seconds=2)
+    html = render_dashboard_html(version="2.4.2", refresh_seconds=2)
     assert "Native Execution" in html
     assert "Python↔Native" in html
     assert "native-exec-pct" in html
