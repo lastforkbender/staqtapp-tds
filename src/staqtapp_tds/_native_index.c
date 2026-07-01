@@ -345,50 +345,28 @@ static PyObject *NativeHandleIndex_put(NativeHandleIndex *self, PyObject *args) 
     return PyLong_FromLongLong(out_handle);
 }
 
-static void free_key_sequence(const char **keys, Py_ssize_t *lens, Py_ssize_t n) {
-    if (keys) {
-        for (Py_ssize_t i = 0; i < n; ++i) free((void*)keys[i]);
-    }
-    free((void*)keys);
-    free(lens);
-}
-
-/*
- * Copy a Python sequence of bytes/str keys into native-owned memory before
- * entering GIL-released batch operations. This avoids holding borrowed pointers
- * into a caller-owned mutable list while another Python thread could mutate that
- * list and drop the last reference to one of its items.
- */
-static int extract_key_sequence(PyObject *seq, const char ***keys_out, Py_ssize_t **lens_out, Py_ssize_t *n_out) {
+static int extract_key_sequence(PyObject *seq, PyObject **fast_out, const char ***keys_out, Py_ssize_t **lens_out, Py_ssize_t *n_out) {
     PyObject *fast = PySequence_Fast(seq, "expected a sequence of bytes/str keys");
     if (!fast) return -1;
     Py_ssize_t n = PySequence_Fast_GET_SIZE(fast);
     const char **keys = (const char**)calloc((size_t)n, sizeof(char*));
     Py_ssize_t *lens = (Py_ssize_t*)calloc((size_t)n, sizeof(Py_ssize_t));
-    if (!keys || !lens) { free_key_sequence(keys, lens, n); PyErr_NoMemory(); return -1; }
+    if (!keys || !lens) { free(keys); free(lens); Py_DECREF(fast); PyErr_NoMemory(); return -1; }
     for (Py_ssize_t i = 0; i < n; ++i) {
         PyObject *item = PySequence_Fast_GET_ITEM(fast, i);
-        const char *src = NULL;
-        Py_ssize_t len = 0;
         if (PyBytes_Check(item)) {
-            if (PyBytes_AsStringAndSize(item, (char**)&src, &len) < 0) { free_key_sequence(keys, lens, n); Py_DECREF(fast); return -1; }
+            if (PyBytes_AsStringAndSize(item, (char**)&keys[i], &lens[i]) < 0) { free(keys); free(lens); Py_DECREF(fast); return -1; }
         } else if (PyUnicode_Check(item)) {
-            src = PyUnicode_AsUTF8AndSize(item, &len);
-            if (!src) { free_key_sequence(keys, lens, n); Py_DECREF(fast); return -1; }
+            keys[i] = PyUnicode_AsUTF8AndSize(item, &lens[i]);
+            if (!keys[i]) { free(keys); free(lens); Py_DECREF(fast); return -1; }
         } else {
-            free_key_sequence(keys, lens, n); Py_DECREF(fast);
+            free(keys); free(lens); Py_DECREF(fast);
             PyErr_SetString(PyExc_TypeError, "keys must be bytes or str");
             return -1;
         }
-        if (len <= 0) { free_key_sequence(keys, lens, n); Py_DECREF(fast); PyErr_SetString(PyExc_ValueError, "keys must be non-empty"); return -1; }
-        char *copy = (char*)malloc((size_t)len);
-        if (!copy) { free_key_sequence(keys, lens, n); Py_DECREF(fast); PyErr_NoMemory(); return -1; }
-        memcpy(copy, src, (size_t)len);
-        keys[i] = copy;
-        lens[i] = len;
+        if (lens[i] <= 0) { free(keys); free(lens); Py_DECREF(fast); PyErr_SetString(PyExc_ValueError, "keys must be non-empty"); return -1; }
     }
-    Py_DECREF(fast);
-    *keys_out = keys; *lens_out = lens; *n_out = n; return 0;
+    *fast_out = fast; *keys_out = keys; *lens_out = lens; *n_out = n; return 0;
 }
 
 static PyObject *int64_list_from_array(int64_t *out, Py_ssize_t n) {
@@ -405,16 +383,16 @@ static PyObject *int64_list_from_array(int64_t *out, Py_ssize_t n) {
 static PyObject *NativeHandleIndex_put_many(NativeHandleIndex *self, PyObject *args) {
     PyObject *seq;
     if (!PyArg_ParseTuple(args, "O", &seq)) return NULL;
-    const char **keys = NULL; Py_ssize_t *lens = NULL; Py_ssize_t n = 0;
-    if (extract_key_sequence(seq, &keys, &lens, &n) < 0) return NULL;
+    PyObject *fast = NULL; const char **keys = NULL; Py_ssize_t *lens = NULL; Py_ssize_t n = 0;
+    if (extract_key_sequence(seq, &fast, &keys, &lens, &n) < 0) return NULL;
     int64_t *out = (int64_t*)calloc((size_t)n, sizeof(int64_t));
-    if (!out) { free_key_sequence(keys, lens, n); PyErr_NoMemory(); return NULL; }
+    if (!out) { free((void*)keys); free(lens); Py_DECREF(fast); PyErr_NoMemory(); return NULL; }
     int rc;
     bump_u64(&self->python_native_transitions); bump_u64(&self->gil_released_calls); bump_u64(&self->native_batch_put_calls);
     Py_BEGIN_ALLOW_THREADS
     rc = put_handles_nogil(self, keys, lens, n, out);
     Py_END_ALLOW_THREADS
-    free_key_sequence(keys, lens, n);
+    free((void*)keys); free(lens); Py_DECREF(fast);
     if (rc == -1) { free(out); PyErr_NoMemory(); return NULL; }
     if (rc == -2) { free(out); PyErr_SetString(PyExc_RuntimeError, "native index is full"); return NULL; }
     PyObject *list = int64_list_from_array(out, n);
@@ -459,32 +437,32 @@ static PyObject *NativeHandleIndex_pop(NativeHandleIndex *self, PyObject *args) 
 static PyObject *NativeHandleIndex_get_handles(NativeHandleIndex *self, PyObject *args) {
     PyObject *seq;
     if (!PyArg_ParseTuple(args, "O", &seq)) return NULL;
-    const char **keys = NULL; Py_ssize_t *lens = NULL; Py_ssize_t n = 0;
-    if (extract_key_sequence(seq, &keys, &lens, &n) < 0) return NULL;
+    PyObject *fast = NULL; const char **keys = NULL; Py_ssize_t *lens = NULL; Py_ssize_t n = 0;
+    if (extract_key_sequence(seq, &fast, &keys, &lens, &n) < 0) return NULL;
     int64_t *out = (int64_t*)calloc((size_t)n, sizeof(int64_t));
-    if (!out) { free_key_sequence(keys, lens, n); PyErr_NoMemory(); return NULL; }
+    if (!out) { free((void*)keys); free(lens); Py_DECREF(fast); PyErr_NoMemory(); return NULL; }
     bump_u64(&self->python_native_transitions); bump_u64(&self->gil_released_calls); bump_u64(&self->native_batch_lookup_calls);
     Py_BEGIN_ALLOW_THREADS
     lookup_handles_nogil(self, keys, lens, n, out);
     Py_END_ALLOW_THREADS
     PyObject *list = int64_list_from_array(out, n);
-    free_key_sequence(keys, lens, n); free(out);
+    free((void*)keys); free(lens); free(out); Py_DECREF(fast);
     return list;
 }
 
 static PyObject *NativeHandleIndex_pop_many(NativeHandleIndex *self, PyObject *args) {
     PyObject *seq;
     if (!PyArg_ParseTuple(args, "O", &seq)) return NULL;
-    const char **keys = NULL; Py_ssize_t *lens = NULL; Py_ssize_t n = 0;
-    if (extract_key_sequence(seq, &keys, &lens, &n) < 0) return NULL;
+    PyObject *fast = NULL; const char **keys = NULL; Py_ssize_t *lens = NULL; Py_ssize_t n = 0;
+    if (extract_key_sequence(seq, &fast, &keys, &lens, &n) < 0) return NULL;
     int64_t *out = (int64_t*)calloc((size_t)n, sizeof(int64_t));
-    if (!out) { free_key_sequence(keys, lens, n); PyErr_NoMemory(); return NULL; }
+    if (!out) { free((void*)keys); free(lens); Py_DECREF(fast); PyErr_NoMemory(); return NULL; }
     bump_u64(&self->python_native_transitions); bump_u64(&self->gil_released_calls); bump_u64(&self->native_batch_pop_calls);
     Py_BEGIN_ALLOW_THREADS
     pop_handles_nogil(self, keys, lens, n, out);
     Py_END_ALLOW_THREADS
     PyObject *list = int64_list_from_array(out, n);
-    free_key_sequence(keys, lens, n); free(out);
+    free((void*)keys); free(lens); free(out); Py_DECREF(fast);
     return list;
 }
 

@@ -11,6 +11,7 @@ from typing import Callable, Deque, Dict, List
 import numpy as np
 
 from staqtapp_tds.latency import LatencyBucket, LatencyPolicy
+from staqtapp_tds.asi import estimate_pressure
 
 
 class TelemetryMode(IntEnum):
@@ -225,6 +226,15 @@ class TelemetryManager:
             "spiral_finals": 0,
             "pool_reuse_count": 0,
             "pool_allocator_calls": 0,
+            "chunk_pending": 0,
+            "chunk_sealed": 0,
+            "chunk_verified": 0,
+            "chunk_indexed": 0,
+            "chunk_exposed": 0,
+            "chunk_quarantined": 0,
+            "telemetry_dropped": 0,
+            "telemetry_skipped": 0,
+            "snapshot_discarded": 0,
         }
         self._timers_ns: Dict[str, int] = {
             "read_ns": 0,
@@ -239,8 +249,11 @@ class TelemetryManager:
         self._last_snapshot_at = 0.0
         self._last_snapshot: Dict[str, object] | None = None
         self._published_snapshot: Dict[str, object] | None = None
+        self._execution_timeline: Deque[Dict[str, float | int]] = deque(maxlen=120)
         self._publisher_updates = 0
         self._last_publish_duration_ns = 0
+        self._snapshot_epoch = 0
+        self._last_pressure_snapshot: Dict[str, object] | None = None
 
     def set_level(self, level: TelemetryLevel | str | int) -> None:
         with self._lock:
@@ -265,6 +278,8 @@ class TelemetryManager:
             self._publisher_updates += 1
             self._last_publish_duration_ns = max(0, int(duration_ns))
             snap = dict(snapshot)
+            self._snapshot_epoch += 1
+            snap["snapshot_epoch"] = self._snapshot_epoch
             health = self.health_state(snapshot_age_seconds=0.0)
             snap["health"] = health
             snap["system_health"] = str(health.get("state", "healthy")).upper()
@@ -418,6 +433,18 @@ class TelemetryManager:
         if elapsed_ns:
             self.record_timer("chunk_ns", elapsed_ns)
 
+
+    def record_telemetry_drop(self, amount: int = 1) -> None:
+        self.incr("telemetry_dropped", amount)
+
+    def record_telemetry_skip(self, amount: int = 1) -> None:
+        self.incr("telemetry_skipped", amount)
+
+    def record_chunk_transition(self, state: str, amount: int = 1) -> None:
+        key = f"chunk_{str(state).strip().lower()}"
+        if key in {"chunk_pending", "chunk_sealed", "chunk_verified", "chunk_indexed", "chunk_exposed", "chunk_quarantined"}:
+            self.incr(key, amount)
+
     def record_spiral_event(self, kind: str, amount: int = 1) -> None:
         """Record optional Spiral-compatible pipeline activity.
 
@@ -432,6 +459,26 @@ class TelemetryManager:
             "final": "spiral_finals",
         }
         self.incr(key_map.get(str(kind), str(kind)), amount)
+
+    def _record_execution_timeline_locked(self, now: float, counters: Dict[str, int], uptime: float) -> List[Dict[str, float | int]]:
+        native_ops = int(counters.get("native_backend_ops", 0))
+        python_ops = int(counters.get("python_backend_ops", 0))
+        gil_ops = int(counters.get("gil_released_ops", 0))
+        transitions = int(counters.get("python_native_transitions", 0))
+        total_ops = max(1, native_ops + python_ops)
+        point = {
+            "t": round(float(now), 3),
+            "uptime_seconds": round(float(uptime), 3),
+            "native_execution_percent": round(100.0 * native_ops / total_ops, 2),
+            "python_execution_percent": round(100.0 * python_ops / total_ops, 2),
+            "gil_released_percent": round(100.0 * min(gil_ops, total_ops) / total_ops, 2),
+            "python_native_transitions": transitions,
+            "native_batch_ops": int(counters.get("native_batch_ops", 0)),
+        }
+        last = self._execution_timeline[-1] if self._execution_timeline else None
+        if last is None or any(last.get(k) != point.get(k) for k in ("native_execution_percent", "python_execution_percent", "gil_released_percent", "python_native_transitions", "native_batch_ops")):
+            self._execution_timeline.append(point)
+        return [dict(x) for x in self._execution_timeline]
 
     def _average_ms(self, total_key: str) -> float:
         total = int(self._timers_ns.get(total_key, 0))
@@ -460,12 +507,15 @@ class TelemetryManager:
             + counters.get("spiral_aggregations", 0)
             + counters.get("spiral_finals", 0)
         )
+        pressure = estimate_pressure(counters)
         return {
             "workload_mode": mode,
             "read_percent": read_pct,
             "write_percent": write_pct,
             "compression_ratio": round(ratio, 3),
-            "pressure": "low" if counters.get("errors", 0) == 0 else "attention",
+            "pressure": pressure.mode.name.lower(),
+            "pressure_score": pressure.score,
+            "vfs_state": pressure.vfs_state.name.lower(),
             "current_operation": "trace_pipeline" if spiral_events else "idle",
             "spiral_trace_activity": spiral_events,
         }
@@ -548,12 +598,22 @@ class TelemetryManager:
             performance["native_execution_percent"] = round(100.0 * native_ops / total_ops, 2)
             performance["python_execution_percent"] = round(100.0 * python_ops / total_ops, 2)
             performance["gil_released_percent"] = round(100.0 * min(float(performance.get("gil_released_ops", 0) or 0), total_ops) / total_ops, 2)
+            performance["gil_released_ops_per_sec"] = round(counters.get("gil_released_ops", 0) / uptime, 3)
+            performance["execution_timeline"] = self._record_execution_timeline_locked(now, counters, uptime)
             storage: Dict[str, float | int | str] = {
                 "bytes_raw": counters.get("bytes_raw", 0),
                 "bytes_stored": counters.get("bytes_stored", 0),
                 "chunks_created": counters.get("chunks_created", 0),
                 "deletes": counters.get("deletes", 0),
                 "errors": counters.get("errors", 0),
+                "chunk_pending": counters.get("chunk_pending", 0),
+                "chunk_sealed": counters.get("chunk_sealed", 0),
+                "chunk_verified": counters.get("chunk_verified", 0),
+                "chunk_indexed": counters.get("chunk_indexed", 0),
+                "chunk_exposed": counters.get("chunk_exposed", 0),
+                "chunk_quarantined": counters.get("chunk_quarantined", 0),
+                "telemetry_dropped": counters.get("telemetry_dropped", 0),
+                "telemetry_skipped": counters.get("telemetry_skipped", 0),
             }
             storage.update(storage_extra)
             spiral = {
@@ -569,6 +629,11 @@ class TelemetryManager:
             storage["spiral"] = spiral
             behavior = self._behavior(counters)
             recs = self._recommendations(counters, indexes, behavior)
+            snapshot_lag = max(0, self._snapshot_epoch - self._publisher_updates)
+            swiss_stats = indexes.get("swiss", {}) if isinstance(indexes.get("swiss"), dict) else {}
+            swiss_probe_pressure = int(min(12, max(0.0, float(swiss_stats.get("average_probe", swiss_stats.get("avg_probe", 0.0)) or 0.0) * 3)))
+            pressure_snapshot = estimate_pressure(counters, snapshot_lag=snapshot_lag, swiss_probe_pressure=swiss_probe_pressure).to_dict()
+            self._last_pressure_snapshot = dict(pressure_snapshot)
             health = self.health_state(snapshot_age_seconds=0.0, counters=counters, components=components)
             snap = TelemetrySnapshot(
                 schema_version=self.schema_version,
@@ -583,6 +648,8 @@ class TelemetryManager:
                 health=health,
             ).to_dict()
             snap["system_health"] = str(health.get("state", "healthy")).upper()
+            snap["pressure"] = pressure_snapshot
+            snap["snapshot_epoch"] = self._snapshot_epoch
             self._last_snapshot_at = now
             self._last_snapshot = snap
             if self._published_snapshot is None:

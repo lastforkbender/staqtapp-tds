@@ -140,25 +140,6 @@ def _pack_slot_fixed_batch(name_hashes: np.ndarray,
         out[base + 23] =  nl                  & np.uint16(0xFF)
 
 
-@njit(cache=True)
-def _slot_binary_search(hashes: np.ndarray, target: np.int64) -> np.int64:
-    lo, hi = np.int64(0), np.int64(hashes.shape[0] - 1)
-    while lo <= hi:
-        mid = (lo + hi) >> np.int64(1)
-        if hashes[mid] == target:
-            return mid
-        elif hashes[mid] < target:
-            lo = mid + np.int64(1)
-        else:
-            hi = mid - np.int64(1)
-    return np.int64(-1)
-
-
-@njit(cache=True)
-def _build_sorted_order(hashes: np.ndarray) -> np.ndarray:
-    return np.argsort(hashes)
-
-
 # ////////////////////////////////////////////////////////////////////////////////
 # § 11  SLOT INDEX
 # ////////////////////////////////////////////////////////////////////////////////
@@ -184,28 +165,13 @@ class SlotIndex:
     def __init__(self):
         self._records:  List[SlotRecord]       = []
         self._by_name:  Dict[str, SlotRecord]  = {}
-        self._hashes:   Optional[np.ndarray]   = None
-        self._order:    Optional[np.ndarray]   = None
-        self._dirty     = True
         self._lock      = threading.Lock()
 
     def add(self, record: SlotRecord) -> None:
         with self._lock:
             self._records.append(record)
             self._by_name[record.name] = record
-            self._dirty = True
 
-    def _rebuild(self) -> None:
-        if not self._records:
-            self._hashes = np.array([], dtype=np.int64)
-            self._order  = np.array([], dtype=np.int64)
-            self._dirty  = False
-            return
-        raw_hashes   = np.array([r.name_hash for r in self._records], dtype=np.int64)
-        order        = _build_sorted_order(raw_hashes)
-        self._hashes = raw_hashes[order]
-        self._order  = order
-        self._dirty  = False
 
     def lookup(self, name: str) -> Optional[SlotRecord]:
         with self._lock:
