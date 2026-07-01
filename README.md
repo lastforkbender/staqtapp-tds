@@ -1,11 +1,12 @@
 <p align="center">
-    <img src="docs/dashboard-v2.3.5.jpeg" alt="Staqtapp-TDS v2.5.0 Dashboard" width="100%"/>
+    <img src="docs/dashboard-v2.3.5.jpeg" alt="Staqtapp-TDS v2.6.0 Dashboard" width="100%"/>
 </p>
 
+- Image seen above may not reflect the current Staqtapp-TDS Dashboard's features applied
 
-# 🟦🟪🟧 Staqtapp-TDS v2.5.0
+# 🟦🟪🟧 Staqtapp-TDS v2.6.0
 
-Staqtapp-TDS is a content-neutral Temporal Directory System: a directory-first virtual storage engine with radix routing, Swiss-table-style indexing, chunking, persistence, admin control, and an observation dashboard.
+Staqtapp-TDS is a substantial content-neutral unique Temporal Directory System(TDS): a directory-first virtual storage engine with radix routing, Swiss-table-style indexing, chunking, persistence, admin control, and an observation dashboard.
 
 The core principle remains unchanged:
 
@@ -24,9 +25,9 @@ The core principle remains unchanged:
 - Execution-mode telemetry: native %, Python %, GIL-released %, batch ops, and Python↔native transitions.
 - Optional Spiral-compatible trace/provenance module for trace-shaped workflows.
 
-## What is new in v2.5.0
+## What is new in v2.6.0
 
-v2.5.0 is a hardening release. It keeps the v2.4 native execution work intact and adds a one-way telemetry publisher, health-state snapshots, explicit verification checks, telemetry levels, and native sanitizer build hooks. The release keeps Spiral support optional and neutral: trace ranking metadata is stored for provenance, but TDS does not perform ranking or aggregation.
+v2.6.0 is the ASI-storm observability and backpressure foundation release. It keeps the v2.5.1 hardening line, then adds explicit pressure modes, semantic VFS states, chunk lifecycle telemetry, snapshot pressure scoring, custom SVG dashboard panels for ASI pressure, and a deeper GIL-release path for UTF-8 chunk boundary scanning through the optional native extension. Spiral support remains optional and neutral: trace ranking metadata is stored for provenance, but TDS does not perform ranking or aggregation.
 
 ### Hardening and one-way telemetry
 
@@ -181,7 +182,7 @@ from staqtapp_tds.admin.panel import AdminPanelServer
 AdminPanelServer().serve_forever()
 ```
 
-The panel remains local-only by default. In v2.5.0 it also surfaces execution-mode telemetry so performance work can be verified visually without making the dashboard part of the storage engine.
+The panel remains local-only by default. In v2.5.1 it also surfaces execution-mode telemetry and a native/GIL feedback timeline so performance work can be verified visually without making the dashboard part of the storage engine.
 
 ## RuntimeConfig boundary
 
@@ -202,8 +203,6 @@ cfg = RuntimeConfig.default().next_generation(
 ## Design rule
 
 Spiral (Sequential-Parallel-Aggregative-Reinforcement-Learning) support is intentionally neutral:
-
-- https://github.com/sjkncs/ai-papers-and-notes/blob/main/papers/2026/week-25-jun18-24/spiral-learning-to-search-and-aggregate/review.md
 
 ```text
 Agent / verifier / ranker decides.

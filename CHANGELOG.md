@@ -1,4 +1,13 @@
-# Staqtapp-TDS v2.5.0
+# v2.6.0
+
+- Added ASI Storm pressure model with explicit pressure modes and semantic VFS states.
+- Added chunk lifecycle telemetry counters for pending, sealed, verified, indexed, exposed, and quarantined states.
+- Added dashboard pressure panels with custom SVG icons in the blue/purple/orange theme.
+- Added immutable snapshot pressure payloads for browser-only observation and backpressure feedback.
+- Routed UTF-8 chunk boundary scanning through the optional native extension when available so large chunk scans can release the GIL before Python manifest commits.
+- Added documentation for ASI Storm operations, one-way telemetry isolation, and pressure-mode behavior.
+
+# Staqtapp-TDS v2.5.1
 
 ## v2.5.0 — Hardening and One-Way Telemetry
 
