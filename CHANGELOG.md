@@ -1,10 +1,26 @@
-# v2.6.1
+## 2.7.4
+
+- Added advisory Recovery Planner observer module.
+- Integrated recovery plans into telemetry snapshots.
+- Added dashboard Recovery Planner rendering with action cards, confidence, primary subsystem, and guardrails.
+- Preserved native diagnostics hot-path isolation and snapshot-only browser behavior.
+- Added v2.7.4 tests for recovery planning and browser integration.
+
+# v2.7.1
+
+- Added named native diagnostic transition taxonomy for slot lifecycle, index events, memory pool transitions, and snapshot markers.
+- Expanded diagnostic event ring capacity to 4096 fixed-width events with occupancy, capacity, and wraparound counters.
+- Enriched Python diagnostic snapshots with event/subsystem names for browser rendering while preserving fixed-width native events.
+- Added Dashboard transition-ring panel showing ring occupancy and recent native transition events.
+- Added v2.7.1 tests for transition taxonomy, event enrichment, and ring accounting.
+
+# v2.7.0
 
 - Centralized JSON parsing and emission in `staqtapp_tds.tds_json` with simdjson-aware reads, orjson canonical writes, strict manifest/snapshot/policy loaders, and stdlib fallback.
 - Added native `checksum32_many()` for batch chunk checksum verification with the GIL released when the optional extension is available.
 - Added per-chunk checksum metadata for chunked UTF-8 text and read-time checksum/content-hash validation before reconstructed text is returned.
 - Added telemetry counters for JSON parse/serialize calls, simdjson reads, orjson writes, and average JSON boundary timing.
-- Added v2.6.1 tests for JSON centralization, malformed/strict loaders, native batch checksum parity, chunk corruption detection, and telemetry counters.
+- Added v2.7.0 tests for JSON centralization, malformed/strict loaders, native batch checksum parity, chunk corruption detection, and telemetry counters.
 
 # v2.6.0
 
@@ -76,3 +92,11 @@
 ## v2.1.x — Performance Seams
 
 - Added UTF-8 byte-safe chunking, batch EntryIndex lookup, native backend seams, and stronger radix/Swiss-table measurements.
+
+
+## 2.7.3
+
+- Redesigned the browser Operations Console toward the polished Pressure Diagnostics mockup style.
+- Added categorized left navigation for overview, diagnostics, analytics, operations, and configuration.
+- Added shared console page shells for Snapshot Explorer, Lock Contention, Comparative Views, Recovery Planner, and Alerts & Events.
+- Preserved snapshot-only browser behavior and all v2.7.2 pressure telemetry IDs.

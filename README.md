@@ -1,11 +1,11 @@
 <p align="center">
-    <img src="docs/dashboard-v2.3.5.jpeg" alt="Staqtapp-TDS v2.6.0 Dashboard" width="100%"/>
+    <img src="docs/dashboard-v2.7.4.png" alt="Staqtapp-TDS v2.7.4 Dashboard" width="100%"/>
 </p>
 
 - Image seen above may not reflect the current Staqtapp-TDS Dashboard's features applied
 
 
-# 🟦🟪🟧 Staqtapp-TDS v2.6.1
+# 🟦🟪🟧 Staqtapp-TDS v2.7.4
 
 Staqtapp-TDS is a content-neutral Temporal Directory System: a directory-first virtual storage engine with radix routing, Swiss-table-style indexing, chunking, persistence, admin control, and an observation dashboard.
 
@@ -26,9 +26,9 @@ The core principle remains unchanged:
 - Execution-mode telemetry: native %, Python %, GIL-released %, batch ops, and Python↔native transitions.
 - Optional Spiral-compatible trace/provenance module for trace-shaped workflows.
 
-## What is new in v2.6.1
+## What is new in v2.7.4
 
-v2.6.1 is a hardening/performance release on top of the v2.6 ASI-storm foundation. It centralizes JSON through a stateless `tds_json` boundary, uses simdjson for fast reads when installed, keeps orjson as the preferred canonical writer, adds native batch checksum verification for chunked UTF-8 payloads, and exposes JSON/GIL performance counters for the browser operations console. Spiral (Sequential-Parallel-Aggregative-Reinforcement-Learning) support remains optional and neutral: trace ranking metadata is stored for provenance, but TDS does not perform ranking or aggregation.
+v2.7.4 finalizes the dashboard Recovery Planner page and adds an advisory Recovery Planner observer. v2.7.3 extends the Native Diagnostics Engine foundation with named slot/index/memory transition events, ring occupancy telemetry, and browser transition-ring rendering. v2.7.0 introduced native atomic counters, a bounded diagnostic event ring, immutable diagnostic snapshots, a Python diagnostics bridge, and browser Operations Console integration. Diagnostics observes consequences only; it owns no storage objects, mutates no VFS/chunk/index state, and never blocks storage hot paths. v2.7.0 also preserves the v2.6.1 JSON centralization, native checksum batching, and chunk corruption checks.
 
 ### Hardening and one-way telemetry
 
@@ -212,3 +212,8 @@ Dashboard observes storage behavior.
 ```
 
 That keeps TDS useful underneath advanced AI workflows while preserving its directory engagement and storage identity.
+
+
+## v2.7.3 Pressure Calculations Engine
+
+Adds component-level operational pressure scoring for engine, storage, index, lock, diagnostic-ring, memory, Python bridge, and dashboard pressure. The browser Operations Console consumes these values from immutable telemetry snapshots only.
