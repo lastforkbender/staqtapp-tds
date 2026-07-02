@@ -24,5 +24,88 @@
 .timeline-graph .spark{height:92px;display:flex;align-items:flex-end;gap:5px}
 .timeline-graph .spark i{flex:1;min-width:6px;border-radius:7px 7px 2px 2px;background:linear-gradient(180deg,var(--purple),var(--blue));position:relative}
 .timeline-graph .spark i::after{content:attr(data-label);position:absolute;left:50%;bottom:100%;transform:translateX(-50%);font-size:10px;opacity:.65;margin-bottom:3px}
-.pressure-grid{display:grid;grid-template-columns:1.15fr .9fr .95fr;gap:14px;margin-bottom:18px}.pressure-card{min-height:250px}.pressure-gauge{display:flex;align-items:center;gap:22px;margin:16px 0}.pressure-gauge img{width:88px;height:88px;filter:drop-shadow(0 0 22px rgba(179,92,255,.25))}.pressure-gauge b{font-size:42px;letter-spacing:-.04em}.pressure-gauge p{margin:2px 0 0;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-size:12px}.pressure-meter{height:12px;margin:12px 0 16px}.pressure-meter i{background:linear-gradient(90deg,var(--blue),var(--purple),var(--orange))}.panel-note{color:var(--muted);line-height:1.55}.lifecycle-row{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:12px 0 16px}.lifecycle-row span{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#dbe7ff;border:1px solid rgba(138,179,255,.22);border-radius:999px;padding:7px 6px;text-align:center;background:linear-gradient(135deg,rgba(22,133,255,.14),rgba(179,92,255,.12),rgba(255,152,14,.08))}
+.pressure-grid{display:grid;grid-template-columns:1.15fr .9fr .95fr;gap:14px;margin-bottom:18px}.pressure-card{min-height:250px}.pressure-components-card,.pressure-causes-card{min-height:250px}.pressure-components .bar{min-width:92px}.pressure-gauge{display:flex;align-items:center;gap:22px;margin:16px 0}.pressure-gauge img{width:88px;height:88px;filter:drop-shadow(0 0 22px rgba(179,92,255,.25))}.pressure-gauge b{font-size:42px;letter-spacing:-.04em}.pressure-gauge p{margin:2px 0 0;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-size:12px}.pressure-meter{height:12px;margin:12px 0 16px}.pressure-meter i{background:linear-gradient(90deg,var(--blue),var(--purple),var(--orange))}.panel-note{color:var(--muted);line-height:1.55}.lifecycle-row{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:12px 0 16px}.lifecycle-row span{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#dbe7ff;border:1px solid rgba(138,179,255,.22);border-radius:999px;padding:7px 6px;text-align:center;background:linear-gradient(135deg,rgba(22,133,255,.14),rgba(179,92,255,.12),rgba(255,152,14,.08))}
 @media (max-width:1180px){.pressure-grid{grid-template-columns:1fr}}
+
+.diag-ring-meter{height:9px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;margin:14px 0 4px}.diag-ring-meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--blue),var(--purple),var(--orange));box-shadow:0 0 24px rgba(22,133,255,.35)}.diagnostics-events-card{min-height:260px}.diag-event-list{display:flex;flex-direction:column;gap:10px}.diag-event-row{padding:12px 13px;border:1px solid rgba(138,179,255,.13);border-radius:14px;background:rgba(255,255,255,.035)}.diag-event-row b{display:block;color:#fff;margin-bottom:4px}.diag-event-row span{display:block;color:var(--muted);font-size:12px}.quad-grid .diagnostics-events-card{grid-column:span 2}
+
+/* v2.7.3 console redesign: pressure-diagnostics visual language generalized */
+:root{
+  --tds-bg:#050914;
+  --tds-panel:#0b1428;
+  --tds-panel-2:#101b34;
+  --tds-border:rgba(108,132,255,.24);
+  --tds-border-strong:rgba(108,132,255,.42);
+  --tds-text:#f6f8ff;
+  --tds-muted:#a9b5d6;
+  --tds-faint:#6f7fa7;
+  --tds-glow:0 0 36px rgba(63,124,255,.22), 0 18px 60px rgba(0,0,0,.32);
+}
+*{box-sizing:border-box}
+body{
+  background:
+    radial-gradient(circle at 18% 8%, rgba(58,109,255,.18), transparent 32%),
+    radial-gradient(circle at 82% 18%, rgba(255,123,43,.12), transparent 30%),
+    linear-gradient(135deg,#030713 0%,#081225 54%,#050812 100%);
+  color:var(--tds-text);
+}
+.background-grid{
+  background-image:linear-gradient(rgba(92,119,255,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(92,119,255,.055) 1px,transparent 1px);
+  background-size:34px 34px;
+  mask-image:linear-gradient(90deg,rgba(0,0,0,.82),transparent 86%);
+}
+.app-shell{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:100vh;width:100%}
+.sidebar{
+  background:linear-gradient(180deg,rgba(10,18,38,.98),rgba(5,10,23,.98));
+  border-right:1px solid var(--tds-border);
+  box-shadow:14px 0 34px rgba(0,0,0,.22);
+  padding:18px 12px;
+  position:sticky;top:0;height:100vh;overflow:auto;
+}
+.brand-block{gap:12px;padding:0 4px 18px;margin-bottom:10px;border-bottom:1px solid rgba(119,139,255,.14)}
+.brand-logo{width:50px;height:50px;filter:drop-shadow(0 0 14px rgba(48,139,255,.45))}
+.brand-name{font-size:29px;letter-spacing:.03em;font-weight:900;background:linear-gradient(90deg,#72e4ff,#5874ff);-webkit-background-clip:text;color:transparent}
+.brand-sub{color:var(--tds-muted);font-size:12px}.brand-sub span{display:block;color:#d8deff;margin-top:3px}
+.nav-list{gap:4px}.diagnostic-nav{padding:0 0 12px}.nav-section-label{
+  margin:16px 8px 6px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#aebcff;
+}
+.nav-pill{
+  height:34px;border-radius:8px;padding:0 10px;gap:10px;color:#e7ecff;border:1px solid transparent;
+  font-size:13px;line-height:34px;transition:background .18s,border-color .18s,transform .18s;
+}
+.nav-pill:hover{background:rgba(102,119,255,.12);border-color:rgba(112,129,255,.22);transform:translateX(2px)}
+.nav-pill.active{background:linear-gradient(90deg,rgba(86,76,255,.58),rgba(66,86,220,.28));border-color:rgba(134,139,255,.35);box-shadow:0 0 18px rgba(72,82,255,.24)}
+.nav-pill img{width:16px;height:16px;filter:drop-shadow(0 0 5px rgba(91,178,255,.2))}
+.side-card{border:1px solid rgba(91,115,255,.18);background:linear-gradient(180deg,rgba(13,24,50,.72),rgba(9,16,34,.72));border-radius:14px;padding:14px;margin-top:14px}
+.main-panel{padding:18px 18px 24px;min-width:0}.topbar{
+  min-height:68px;margin-bottom:10px;padding:0 6px 14px;border-bottom:1px solid rgba(111,132,255,.18);
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+}
+.topbar h1{font-size:28px;line-height:1.1;margin:0;color:#fff;letter-spacing:-.02em}.eyebrow{color:#9fb3ff;letter-spacing:.12em}.chip,.api-link{
+  border:1px solid rgba(115,136,255,.22);background:rgba(13,25,55,.64);box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
+  border-radius:999px;color:#e9edff;
+}
+.glass,.panel-card,.metric-card,.architecture-card,.config-card,.timeline-card{
+  background:linear-gradient(180deg,rgba(14,26,54,.86),rgba(8,16,34,.86));
+  border:1px solid var(--tds-border);border-radius:12px;box-shadow:var(--tds-glow);backdrop-filter:blur(18px);
+}
+.section-head{align-items:flex-start}.section-head h2{font-size:15px;text-transform:uppercase;letter-spacing:.02em;color:#fff}.section-head .eyebrow{font-size:10px;margin-bottom:4px}
+.metric-row{grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:10px}.metric-card{min-height:92px;padding:14px}.metric-card img{width:24px;height:24px}.metric-card b{font-size:24px;color:#fff}.metric-card span{color:#dbe4ff}
+.hero-grid{grid-template-columns:minmax(0,1.85fr) minmax(260px,.65fr);gap:10px}.hero-card,.health-tower{min-height:190px}.hero-copy h2{font-size:30px}.hero-copy p{max-width:780px;color:#c3cee9}
+.architecture-card,.dashboard-grid,.pressure-grid,.console-page-grid,.lower-grid{margin-top:10px}.arch-map{gap:8px}.arch-node{min-height:92px;border-radius:12px;background:rgba(10,20,44,.84);border:1px solid rgba(113,135,255,.22)}
+.dashboard-grid{grid-template-columns:1.1fr 1.1fr .9fr .9fr;gap:10px}.panel-card{padding:16px;overflow:hidden}.divider{border-color:rgba(128,145,255,.14)}
+.pressure-diagnostics-page{display:grid;grid-template-columns:1.15fr 1fr;gap:10px;align-items:stretch}.pressure-diagnostics-page .pressure-card{grid-row:span 2}.pressure-gauge{min-height:148px;border-radius:14px;background:radial-gradient(circle at center,rgba(255,194,36,.13),rgba(21,32,62,.72));border:1px solid rgba(255,194,36,.25)}
+.pressure-gauge b{font-size:46px;background:linear-gradient(90deg,#ffcc2d,#ff7438);-webkit-background-clip:text;color:transparent}.pressure-meter i{background:linear-gradient(90deg,#42e585,#ffcf28,#ff7438,#ff4141)}
+.kv-list p,.diag-event-row,.recommendation,.timeline-item{border:1px solid rgba(105,127,255,.14);background:rgba(8,16,34,.5);border-radius:10px;padding:10px 12px;margin-bottom:8px}.diag-event-row b{color:#ffc83d}.diag-event-row span{color:#c9d4ef}.pressure-breakdown{display:grid;gap:8px}.pressure-breakdown .meter{height:9px;background:rgba(112,130,170,.18)}
+.console-page-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.wide-panel{min-height:178px}.page-placeholder{display:flex;gap:18px;align-items:center;min-height:112px;border:1px dashed rgba(119,140,255,.2);border-radius:12px;padding:18px;background:linear-gradient(135deg,rgba(77,91,255,.12),rgba(7,14,30,.42))}.page-placeholder img{width:46px;height:46px}.page-placeholder p{color:#c4cfee;line-height:1.55;margin:0}.security-list p{background:rgba(8,16,34,.56);border:1px solid rgba(110,131,255,.14);border-radius:10px;padding:10px}
+.config-form input,.config-form select{background:#0b152d;border:1px solid rgba(117,138,255,.24);color:#fff;border-radius:8px}.config-form button,.button-row button,.api-link{background:linear-gradient(90deg,#3f55db,#5e4bff);border:1px solid rgba(154,160,255,.32);color:#fff;border-radius:8px}
+@media(max-width:1180px){.app-shell{grid-template-columns:82px 1fr}.brand-block>div,.nav-section-label,.nav-pill{font-size:0}.nav-pill{justify-content:center;padding:0}.side-card{display:none}.metric-row{grid-template-columns:repeat(3,1fr)}.dashboard-grid,.pressure-diagnostics-page,.console-page-grid,.lower-grid{grid-template-columns:1fr}.hero-grid{grid-template-columns:1fr}}
+@media(max-width:760px){.app-shell{display:block}.sidebar{position:relative;height:auto}.nav-pill{font-size:13px;justify-content:flex-start}.nav-section-label,.brand-block>div{font-size:initial}.metric-row{grid-template-columns:1fr}.topbar{display:block}.top-actions{margin-top:12px}.hero-copy h2{font-size:23px}}
+
+
+/* v2.7.4 recovery planner finalization and dashboard polish */
+.recovery-planner-page{min-height:360px}
+.recovery-summary-grid{display:grid;grid-template-columns:1.35fr .65fr;gap:10px;margin:12px 0}
+.recovery-command-card,.recovery-confidence-card{border:1px solid rgba(119,140,255,.18);border-radius:12px;background:linear-gradient(135deg,rgba(77,91,255,.13),rgba(8,16,34,.58));padding:14px;min-height:114px}
+.recovery-command-card{display:flex;gap:14px;align-items:center}.recovery-command-card img{width:54px;height:54px;filter:drop-shadow(0 0 16px rgba(255,152,14,.28))}.recovery-command-card span,.recovery-confidence-card span{display:block;color:var(--tds-muted);font-size:11px;text-transform:uppercase;letter-spacing:.1em}.recovery-command-card b{display:block;color:#fff;font-size:22px;margin:2px 0}.recovery-command-card small{display:block;color:#c8d4ef;line-height:1.45}.recovery-confidence-card b{font-size:42px;line-height:1.1;background:linear-gradient(90deg,#47e6ff,#ffbd4a);-webkit-background-clip:text;color:transparent}.recovery-confidence-card p{color:var(--tds-muted);margin:4px 0 0;text-transform:uppercase;letter-spacing:.1em;font-size:11px}.recovery-actions{display:grid;gap:9px}.recovery-action{border:1px solid rgba(119,140,255,.17);border-left:3px solid var(--blue);border-radius:12px;background:rgba(8,16,34,.55);padding:12px}.recovery-action.warning{border-left-color:var(--orange)}.recovery-action.critical{border-left-color:var(--red)}.recovery-action.info{border-left-color:var(--cyan)}.recovery-action b{display:block;color:#fff;font-size:14px}.recovery-action span{display:block;color:#cfd8f4;margin-top:4px}.recovery-action small{display:block;color:#9fb3ff;margin-top:6px;text-transform:uppercase;letter-spacing:.06em}.recovery-action em{display:block;color:#aebbd1;margin-top:7px;font-style:normal;font-size:12px}.recovery-guardrails{display:grid;grid-template-columns:1fr;gap:8px;margin-top:12px}.recovery-guardrails p{margin:0}
+@media(max-width:760px){.recovery-summary-grid{grid-template-columns:1fr}}
