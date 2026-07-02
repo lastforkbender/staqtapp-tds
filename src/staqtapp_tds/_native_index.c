@@ -549,6 +549,48 @@ static PyObject *module_checksum32(PyObject *self, PyObject *args) {
     return PyLong_FromUnsignedLong((unsigned long)out);
 }
 
+static PyObject *module_checksum32_many(PyObject *self, PyObject *args) {
+    PyObject *seq;
+    if (!PyArg_ParseTuple(args, "O", &seq)) return NULL;
+    PyObject *fast = PySequence_Fast(seq, "checksum32_many expects an iterable of bytes-like objects");
+    if (!fast) return NULL;
+    Py_ssize_t n = PySequence_Fast_GET_SIZE(fast);
+    PyObject **items = PySequence_Fast_ITEMS(fast);
+    const char **ptrs = (const char**)calloc((size_t)n, sizeof(char*));
+    Py_ssize_t *lens = (Py_ssize_t*)calloc((size_t)n, sizeof(Py_ssize_t));
+    uint32_t *outs = (uint32_t*)calloc((size_t)n, sizeof(uint32_t));
+    if (!ptrs || !lens || !outs) {
+        Py_DECREF(fast); free(ptrs); free(lens); free(outs); PyErr_NoMemory(); return NULL;
+    }
+    /* Acquire stable buffers before releasing the GIL. */
+    Py_buffer *views = (Py_buffer*)calloc((size_t)n, sizeof(Py_buffer));
+    if (!views) { Py_DECREF(fast); free(ptrs); free(lens); free(outs); PyErr_NoMemory(); return NULL; }
+    for (Py_ssize_t i = 0; i < n; ++i) {
+        if (PyObject_GetBuffer(items[i], &views[i], PyBUF_SIMPLE) < 0) {
+            for (Py_ssize_t j = 0; j < i; ++j) PyBuffer_Release(&views[j]);
+            Py_DECREF(fast); free(ptrs); free(lens); free(outs); free(views); return NULL;
+        }
+        ptrs[i] = (const char*)views[i].buf;
+        lens[i] = views[i].len;
+    }
+    Py_BEGIN_ALLOW_THREADS
+    for (Py_ssize_t i = 0; i < n; ++i) outs[i] = checksum32_nogil(ptrs[i], lens[i]);
+    Py_END_ALLOW_THREADS
+    PyObject *list = PyList_New(n);
+    if (!list) {
+        for (Py_ssize_t i = 0; i < n; ++i) PyBuffer_Release(&views[i]);
+        Py_DECREF(fast); free(ptrs); free(lens); free(outs); free(views); return NULL;
+    }
+    for (Py_ssize_t i = 0; i < n; ++i) {
+        PyObject *v = PyLong_FromUnsignedLong((unsigned long)outs[i]);
+        if (!v) { Py_DECREF(list); list = NULL; break; }
+        PyList_SET_ITEM(list, i, v);
+    }
+    for (Py_ssize_t i = 0; i < n; ++i) PyBuffer_Release(&views[i]);
+    Py_DECREF(fast); free(ptrs); free(lens); free(outs); free(views);
+    return list;
+}
+
 static Py_ssize_t utf8_safe_cut_nogil(const unsigned char *buf, Py_ssize_t n, Py_ssize_t limit) {
     if (limit >= n) return n;
     if (limit <= 0) return 0;
@@ -623,6 +665,7 @@ static PyTypeObject NativeHandleIndexType = {
 
 static PyMethodDef module_methods[] = {
     {"checksum32", module_checksum32, METH_VARARGS, "FNV-1a 32-bit checksum with GIL released."},
+    {"checksum32_many", module_checksum32_many, METH_VARARGS, "Batch FNV-1a 32-bit checksums with the GIL released."},
     {"utf8_chunk_bounds", module_utf8_chunk_bounds, METH_VARARGS, "Return UTF-8 safe chunk end offsets with GIL released."},
     {NULL, NULL, 0, NULL}
 };

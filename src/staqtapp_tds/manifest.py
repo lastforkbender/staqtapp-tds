@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
@@ -12,13 +11,14 @@ from staqtapp_tds.capabilities import CapabilityRegistry
 from staqtapp_tds.latency import LatencyPolicy
 from staqtapp_tds.telemetry import TelemetryMode
 from staqtapp_tds.namespaces import ReservedNamespaces
+from staqtapp_tds.tds_json import dumps_canonical, dumps_pretty, loads_manifest
 
 MANIFEST_FILENAME = ".tds_manifest"
 DEFAULT_FOLDER_SIGNATURE = "STAQTTDS-SRZ-v1"
 
 
 def _stable_json(data: Dict[str, Any]) -> str:
-    return json.dumps(data, sort_keys=True, separators=(",", ":"))
+    return dumps_canonical(data)[0].decode("utf-8")
 
 
 @dataclass(frozen=True)
@@ -119,7 +119,7 @@ def load_manifest(folder: Path, *, inherit: bool = True) -> ManifestPolicy:
     manifest_path = find_manifest(folder) if inherit else folder / MANIFEST_FILENAME
     if manifest_path is None or not manifest_path.exists():
         return ManifestPolicy.default()
-    data = json.loads(manifest_path.read_text())
+    data, _backend = loads_manifest(manifest_path.read_bytes())
     return ManifestPolicy.from_dict(data)
 
 
@@ -130,5 +130,5 @@ def write_default_manifest(folder: Path, *, overwrite: bool = False) -> Path:
     if target.exists() and not overwrite:
         return target
     policy = ManifestPolicy.default()
-    target.write_text(json.dumps(policy.to_dict(include_hash=False), indent=2, sort_keys=True) + "\n")
+    target.write_text(dumps_pretty(policy.to_dict(include_hash=False))[0])
     return target

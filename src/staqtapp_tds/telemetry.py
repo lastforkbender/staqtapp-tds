@@ -235,6 +235,12 @@ class TelemetryManager:
             "telemetry_dropped": 0,
             "telemetry_skipped": 0,
             "snapshot_discarded": 0,
+            "json_parse_ns": 0,
+            "json_parse_calls": 0,
+            "json_serialize_ns": 0,
+            "json_serialize_calls": 0,
+            "json_simdjson_reads": 0,
+            "json_orjson_writes": 0,
         }
         self._timers_ns: Dict[str, int] = {
             "read_ns": 0,
@@ -445,6 +451,24 @@ class TelemetryManager:
         if key in {"chunk_pending", "chunk_sealed", "chunk_verified", "chunk_indexed", "chunk_exposed", "chunk_quarantined"}:
             self.incr(key, amount)
 
+    def record_json(self, *, parse_ns: int = 0, serialize_ns: int = 0, backend: str = "") -> None:
+        """Record JSON boundary cost without retaining payloads or parser state."""
+        if parse_ns:
+            self.record_timer("json_parse_ns", parse_ns)
+            self.incr("json_parse_calls")
+            with self._lock:
+                self._counters["json_parse_ns"] += max(0, int(parse_ns))
+        if serialize_ns:
+            self.record_timer("json_serialize_ns", serialize_ns)
+            self.incr("json_serialize_calls")
+            with self._lock:
+                self._counters["json_serialize_ns"] += max(0, int(serialize_ns))
+        b = str(backend).lower()
+        if b == "simdjson":
+            self.incr("json_simdjson_reads")
+        elif b == "orjson":
+            self.incr("json_orjson_writes")
+
     def record_spiral_event(self, kind: str, amount: int = 1) -> None:
         """Record optional Spiral-compatible pipeline activity.
 
@@ -591,6 +615,12 @@ class TelemetryManager:
                 "pool_allocator_calls": counters.get("pool_allocator_calls", 0),
                 "pool_reuse_percent": round(100.0 * counters.get("pool_reuse_count", 0) / max(1, counters.get("pool_reuse_count", 0) + counters.get("pool_allocator_calls", 0)), 2),
                 "timer_samples": sum(timer_counts.values()),
+                "json_parse_calls": counters.get("json_parse_calls", 0),
+                "json_serialize_calls": counters.get("json_serialize_calls", 0),
+                "json_simdjson_reads": counters.get("json_simdjson_reads", 0),
+                "json_orjson_writes": counters.get("json_orjson_writes", 0),
+                "avg_json_parse_ms": round((counters.get("json_parse_ns", 0) / max(1, counters.get("json_parse_calls", 0))) / 1_000_000.0, 4),
+                "avg_json_serialize_ms": round((counters.get("json_serialize_ns", 0) / max(1, counters.get("json_serialize_calls", 0))) / 1_000_000.0, 4),
             }
             native_ops = float(performance.get("native_backend_ops", 0) or 0)
             python_ops = float(performance.get("python_backend_ops", 0) or 0)

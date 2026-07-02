@@ -5,7 +5,6 @@ leaving higher-level workflow semantics to optional modules.
 """
 
 from __future__ import annotations
-import json
 import mmap
 import os
 import shutil
@@ -26,6 +25,7 @@ from staqtapp_tds.tds_filesystem import (
     _serialize_payload, _deserialize_payload, HEADER_SIZE, TDS_MAGIC,
 )
 from staqtapp_tds.manifest import ManifestPolicy, load_manifest, write_default_manifest
+from staqtapp_tds.tds_json import dumps_canonical, loads_strict
 from staqtapp_tds.telemetry import TelemetryMode
 
 try:
@@ -486,7 +486,7 @@ class TDSWriter:
             } for e in directory._entries.values()},
         }
         meta_tmp = self._meta.with_suffix(self._meta.suffix + '.tmp')
-        meta_tmp.write_text(json.dumps(meta))
+        meta_tmp.write_bytes(dumps_canonical(meta)[0])
         os.replace(str(meta_tmp), str(self._meta))
         return total
 
@@ -566,7 +566,7 @@ class TDSPersistence:
         entry_meta = {}
         if meta_path.exists():
             try:
-                meta      = json.loads(meta_path.read_text())
+                meta, _json_backend = loads_strict(meta_path.read_bytes(), expected_type=dict)
                 flags     = meta.get('flags', int(DirFlags.NONE))
                 fmt_id    = FmtID(meta.get('fmt_id', int(FmtID.RAW_BINARY)))
                 dir_id    = meta.get('dir_id')

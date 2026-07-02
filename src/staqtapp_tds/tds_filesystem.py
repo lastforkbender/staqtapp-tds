@@ -34,6 +34,7 @@ from staqtapp_tds.result import TDSResult
 from staqtapp_tds.errors import ErrorLogMode
 from staqtapp_tds.variables import VariableControl
 from staqtapp_tds.serializers import CompressionPolicy, PayloadKind, choose_variable_kind, content_hash_bytes, json_dumps_fast, json_loads_fast, kind_name
+from staqtapp_tds.tds_json import dumps_snapshot
 from staqtapp_tds.invariants import InvariantEngine
 from staqtapp_tds.provenance import ProvenanceTag, ProvenanceClass
 from staqtapp_tds.radix import RadixDirectoryRouter
@@ -757,6 +758,19 @@ class TDSEntry:
 # ////////////////////////////////////////////////////////////////////////////////
 
 
+def _native_checksum32_many(chunks: List[bytes]) -> Tuple[List[int], str]:
+    """Return per-chunk FNV-1a checksums, batching in native code when present."""
+    if not chunks:
+        return [], "empty"
+    try:
+        from staqtapp_tds import _native_index  # type: ignore
+        if hasattr(_native_index, "checksum32_many"):
+            return [int(v) for v in _native_index.checksum32_many(chunks)], "native"
+    except Exception:
+        pass
+    return [zlib.crc32(c) & 0xFFFFFFFF for c in chunks], "python"
+
+
 def _split_utf8_chunks(raw: bytes, chunk_size: int) -> List[bytes]:
     """Split UTF-8 encoded bytes without cutting through a code point.
 
@@ -926,7 +940,12 @@ class TDSDirectory:
         raw_fmt = FmtID(fmt_id & ~FmtID.COMPRESSED)
         if codec == '':
             codec = cfg.compression
+        _json_start_ns = time.perf_counter_ns() if raw_fmt == FmtID.JSON_UTF8 else 0
         raw = _serialize_payload(value, raw_fmt, codec)
+        if raw_fmt == FmtID.JSON_UTF8:
+            # _serialize_payload delegates to tds_json/orjson when available; record
+            # only timing here so JSON telemetry stays payload-free and thread-safe.
+            self.telemetry_manager.record_json(serialize_ns=time.perf_counter_ns() - _json_start_ns)
         do_compress = self.compression_policy.should_compress(len(raw), force=compress)
         final_fmt = FmtID(raw_fmt | FmtID.COMPRESSED) if do_compress else raw_fmt
         stored = CompressorRegistry.compress(raw, codec) if do_compress else raw
@@ -1010,6 +1029,10 @@ class TDSDirectory:
         prefix = self._text_chunk_prefix(name)
         chunk_scan_start = time.perf_counter_ns()
         chunks_raw = _split_utf8_chunks(raw, int(chunk_size)) or [b'']
+        chunk_checksums, chunk_checksum_backend = _native_checksum32_many(chunks_raw)
+        if len(chunk_checksums) != len(chunks_raw):
+            self.telemetry_manager.record_chunk_transition("quarantined")
+            return TDSResult.fail('TEXT_CHUNK_CHECKSUM_ERROR', 'Chunk checksum batch returned inconsistent length.', name=name, path=self.path())
         chunk_names = []
         self.telemetry_manager.record_chunk_transition("pending", len(chunks_raw))
         for i, chunk_raw in enumerate(chunks_raw):
@@ -1029,16 +1052,30 @@ class TDSDirectory:
             'chunk_size': int(chunk_size), 'chunk_size_unit': 'utf8_bytes',
             'chunks': chunk_names, 'content_hash': content_hash_bytes(raw),
             'raw_size': len(raw), 'chunk_count': len(chunk_names),
+            'chunk_checksums32': chunk_checksums, 'chunk_checksum_backend': chunk_checksum_backend,
         }
         self.write(name, manifest, fmt_id=FmtID.JSON_UTF8, compress=False)
         self.telemetry_manager.record_chunk(len(chunk_names), time.perf_counter_ns() - chunk_scan_start)
-        return TDSResult.success('TEXT_CHUNKED_WRITTEN' if not exists else 'TEXT_CHUNKED_OVERWRITTEN', 'Chunked text entry stored.', name=name, path=self.path(), meta={'chunks': len(chunk_names), 'content_hash': manifest['content_hash'], 'raw_size': len(raw)})
+        return TDSResult.success('TEXT_CHUNKED_WRITTEN' if not exists else 'TEXT_CHUNKED_OVERWRITTEN', 'Chunked text entry stored.', name=name, path=self.path(), meta={'chunks': len(chunk_names), 'content_hash': manifest['content_hash'], 'raw_size': len(raw), 'chunk_checksum_backend': chunk_checksum_backend})
 
     def read_text(self, name: str) -> str:
         value = self.read(name)
         if isinstance(value, dict) and value.get('kind') == 'TEXT_CHUNKED_UTF8':
-            parts = [self.read(chunk_name) for chunk_name in value.get('chunks', [])]
-            return ''.join(parts)
+            chunk_names = list(value.get('chunks', []) or [])
+            parts = [self.read(chunk_name) for chunk_name in chunk_names]
+            expected = value.get('chunk_checksums32')
+            if expected is not None:
+                raw_parts = [str(part).encode('utf-8') for part in parts]
+                actual, _backend = _native_checksum32_many(raw_parts)
+                if [int(v) for v in expected] != [int(v) for v in actual]:
+                    self.telemetry_manager.record_chunk_transition("quarantined")
+                    raise ValueError(f"Chunk checksum mismatch for {name!r}")
+            out = ''.join(parts)
+            expected_hash = value.get('content_hash')
+            if expected_hash and content_hash_bytes(out.encode('utf-8')) != expected_hash:
+                self.telemetry_manager.record_chunk_transition("quarantined")
+                raise ValueError(f"Chunk content hash mismatch for {name!r}")
+            return out
         if not isinstance(value, str):
             raise TypeError(f"Entry {name!r} is not a UTF-8 text entry")
         return value

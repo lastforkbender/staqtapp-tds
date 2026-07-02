@@ -8,8 +8,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from typing import Any, Mapping
+
+from staqtapp_tds.tds_json import dumps_canonical
 import hashlib
-import json
 import time
 
 
@@ -85,7 +86,7 @@ class RuntimeConfig:
         return cfg
 
     def fingerprint(self) -> str:
-        payload = json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":")).encode("utf-8")
+        payload, _backend = dumps_canonical(self.to_dict())
         return hashlib.sha256(payload).hexdigest()
 
     def next_generation(self, **changes: Any) -> "RuntimeConfig":

@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import hashlib
-import json
 from dataclasses import dataclass
 from enum import IntEnum
 from typing import Any, Tuple
+
+from staqtapp_tds import tds_json
 
 import numpy as np
 
@@ -46,36 +47,14 @@ def content_hash_bytes(raw: bytes, algorithm: str = "sha256") -> str:
     return h.hexdigest()
 
 
-def _json_dumps_std(value: Any) -> bytes:
-    return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")
-
-
-def _json_loads_std(raw: bytes) -> Any:
-    return json.loads(raw.decode("utf-8"))
-
-
 def json_dumps_fast(value: Any) -> Tuple[bytes, str]:
-    """Return JSON bytes and backend name.
-
-    orjson is excellent for dumping if installed.  simdjson is primarily a fast
-    parser, so it is used on loads where available but never required.
-    """
-    try:
-        import orjson  # type: ignore
-        return orjson.dumps(value, option=orjson.OPT_SORT_KEYS), "orjson"
-    except Exception:
-        return _json_dumps_std(value), "stdlib"
+    """Return canonical JSON bytes and backend name via the centralized JSON layer."""
+    return tds_json.dumps_canonical(value)
 
 
 def json_loads_fast(raw: bytes) -> Tuple[Any, str]:
-    try:
-        import simdjson  # type: ignore
-        parser = simdjson.Parser()
-        parsed = parser.parse(raw, recursive=True)
-        return parsed, "simdjson"
-    except Exception:
-        return _json_loads_std(raw), "stdlib"
-
+    """Parse JSON bytes through the centralized simdjson-aware layer."""
+    return tds_json.loads_fast(raw)
 
 def is_json_safe_value(value: Any) -> bool:
     # Keep this conservative so Python variable types are preserved.  Tuples,
