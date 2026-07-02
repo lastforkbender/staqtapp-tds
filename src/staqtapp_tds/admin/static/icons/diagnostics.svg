@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Native diagnostics">
+  <defs>
+    <linearGradient id="g" x1="10" y1="54" x2="54" y2="10" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2f7bff"/>
+      <stop offset="0.55" stop-color="#8a5cff"/>
+      <stop offset="1" stop-color="#ff9a3c"/>
+    </linearGradient>
+  </defs>
+  <path d="M14 18a8 8 0 0 1 8-8h20a8 8 0 0 1 8 8v28a8 8 0 0 1-8 8H22a8 8 0 0 1-8-8V18Z" fill="none" stroke="url(#g)" stroke-width="4"/>
+  <path d="M23 40h5V28h-5v12Zm9 0h5V20h-5v20Zm9 0h5V32h-5v8Z" fill="url(#g)"/>
+  <circle cx="24" cy="18" r="2.5" fill="#2f7bff"/>
+  <circle cx="32" cy="18" r="2.5" fill="#8a5cff"/>
+  <circle cx="40" cy="18" r="2.5" fill="#ff9a3c"/>
+</svg>
