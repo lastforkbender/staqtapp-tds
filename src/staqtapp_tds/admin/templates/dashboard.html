@@ -15,22 +15,33 @@
       <div class="brand-block">
         <img class="brand-logo" src="/static/icons/logo.svg" alt="Staqtapp-TDS">
         <div>
-          <div class="brand-name">STAQTAPP-TDS</div>
+          <div class="brand-name">TDS</div>
           <div class="brand-sub">VFS Observability <span>v{version}</span></div>
         </div>
       </div>
-      <nav class="nav-list">
-        <a class="nav-pill active" href="#overview"><img src="/static/icons/overview.svg" alt="">Overview</a>
-        <a class="nav-pill" href="#architecture"><img src="/static/icons/architecture.svg" alt="">Architecture</a>
-        <a class="nav-pill" href="#performance"><img src="/static/icons/performance.svg" alt="">Performance</a>
-        <a class="nav-pill" href="#storage"><img src="/static/icons/storage.svg" alt="">Storage</a>
-        <a class="nav-pill" href="#indexes"><img src="/static/icons/indexes.svg" alt="">Indexes</a>
-        <a class="nav-pill" href="#behavior"><img src="/static/icons/behavior.svg" alt="">Behavior</a>
-        <a class="nav-pill" href="#pressure"><img src="/static/icons/pressure.svg" alt="">Pressure</a>
+      <nav class="nav-list diagnostic-nav">
+        <div class="nav-section-label">Overview</div>
+        <a class="nav-pill active" href="#overview"><img src="/static/icons/overview.svg" alt="">Dashboard</a>
+        <a class="nav-pill" href="#architecture"><img src="/static/icons/architecture.svg" alt="">Engine Health</a>
+        <a class="nav-pill" href="#performance"><img src="/static/icons/performance.svg" alt="">Real-time Metrics</a>
+        <div class="nav-section-label">Diagnostics</div>
+        <a class="nav-pill" href="#timeline"><img src="/static/icons/timeline.svg" alt="">Transition Timeline</a>
+        <a class="nav-pill" href="#diagnostics"><img src="/static/icons/diagnostics.svg" alt="">Event Ring Monitor</a>
+        <a class="nav-pill" href="#pressure"><img src="/static/icons/pressure.svg" alt="">Pressure Diagnostics</a>
+        <a class="nav-pill" href="#snapshots"><img src="/static/icons/snapshot.svg" alt="">Snapshot Explorer</a>
+        <a class="nav-pill" href="#locks"><img src="/static/icons/clock.svg" alt="">Lock Contention</a>
+        <div class="nav-section-label">Analytics</div>
+        <a class="nav-pill" href="#behavior"><img src="/static/icons/behavior.svg" alt="">Workload Analytics</a>
+        <a class="nav-pill" href="#indexes"><img src="/static/icons/indexes.svg" alt="">Index Analytics</a>
+        <a class="nav-pill" href="#storage"><img src="/static/icons/storage.svg" alt="">Storage Analytics</a>
+        <a class="nav-pill" href="#comparison"><img src="/static/icons/radix.svg" alt="">Comparative Views</a>
+        <div class="nav-section-label">Operations</div>
+        <a class="nav-pill" href="#recovery"><img src="/static/icons/recovery.svg" alt="">Recovery Planner</a>
+        <a class="nav-pill" href="#recommendations"><img src="/static/icons/recommendations.svg" alt="">Policy Proposals</a>
+        <a class="nav-pill" href="#alerts"><img src="/static/icons/quarantine.svg" alt="">Alerts &amp; Events</a>
         <a class="nav-pill" href="#security"><img src="/static/icons/security.svg" alt="">Security</a>
-        <a class="nav-pill" href="#recommendations"><img src="/static/icons/recommendations.svg" alt="">Recommendations</a>
-        <a class="nav-pill" href="#configuration"><img src="/static/icons/configuration.svg" alt="">Configuration</a>
-        <a class="nav-pill" href="#timeline"><img src="/static/icons/timeline.svg" alt="">Timeline</a>
+        <div class="nav-section-label">Configuration</div>
+        <a class="nav-pill" href="#configuration"><img src="/static/icons/configuration.svg" alt="">Settings</a>
       </nav>
       <section class="side-card">
         <div class="side-label">Control Plane</div>
@@ -44,7 +55,7 @@
     <main class="main-panel">
       <header class="topbar">
         <div>
-          <p class="eyebrow">Professional Dashboard</p>
+          <p class="eyebrow">Professional Engineering Console</p>
           <h1>Telemetry &amp; Observability Dashboard</h1>
         </div>
         <div class="top-actions">
@@ -96,6 +107,8 @@
           <div class="arch-rail"></div>
           <div class="arch-node" data-component="chunks"><img src="/static/icons/chunks.svg" alt=""><b>Chunk Manager</b><small id="chunk-status">Healthy</small></div>
           <div class="arch-rail"></div>
+          <div class="arch-node" data-component="diagnostics"><img src="/static/icons/diagnostics.svg" alt=""><b>Diagnostics</b><small id="diagnostics-status">Observer</small></div>
+          <div class="arch-rail"></div>
           <div class="arch-node" data-component="compression"><img src="/static/icons/compression.svg" alt=""><b>Compression</b><small id="compression-status">Enabled</small></div>
           <div class="arch-rail"></div>
           <div class="arch-node" data-component="persistence"><img src="/static/icons/persistence.svg" alt=""><b>Persistence</b><small id="persistence-status">Healthy</small></div>
@@ -130,7 +143,7 @@
       </section>
 
 
-      <section id="pressure" class="pressure-grid">
+      <section id="pressure" class="pressure-grid pressure-diagnostics-page">
         <article class="panel-card glass pressure-card">
           <div class="section-head"><div><p class="eyebrow">ASI STORM READINESS</p><h2>Adaptive pressure monitor</h2></div><span class="chip orange-chip" id="pressure-chip">NORMAL</span></div>
           <div class="pressure-gauge"><img src="/static/icons/storm.svg" alt=""><div><b><span id="pressure-score-large">0</span>%</b><p id="vfs-state">active</p></div></div>
@@ -147,6 +160,24 @@
             <p><span>GIL Reacquire Rate</span><b id="gil-reacquire-rate">0</b></p>
             <p><span>Swiss Probe Pressure</span><b id="swiss-probe-pressure">0</b></p>
           </div>
+        </article>
+        <article class="panel-card glass pressure-components-card">
+          <div class="section-head"><div><p class="eyebrow">PRESSURE CALCULATIONS ENGINE</p><h2>Component pressure</h2></div><span class="chip blue-chip" id="pressure-dominant">stable</span></div>
+          <div class="kv-list pressure-components">
+            <p><span>Engine</span><b><em class="bar"><i id="engine-pressure-bar" style="width:0%"></i></em><span id="engine-pressure">0%</span></b></p>
+            <p><span>Storage</span><b><em class="bar"><i id="storage-pressure-bar" style="width:0%"></i></em><span id="storage-pressure">0%</span></b></p>
+            <p><span>Index</span><b><em class="bar"><i id="index-pressure-bar" style="width:0%"></i></em><span id="index-pressure">0%</span></b></p>
+            <p><span>Lock</span><b><em class="bar"><i id="lock-pressure-bar" style="width:0%"></i></em><span id="lock-pressure">0%</span></b></p>
+            <p><span>Diagnostic Ring</span><b><em class="bar"><i id="ring-pressure-bar" style="width:0%"></i></em><span id="ring-pressure">0%</span></b></p>
+            <p><span>Memory</span><b><em class="bar"><i id="memory-pressure-bar" style="width:0%"></i></em><span id="memory-pressure">0%</span></b></p>
+            <p><span>Python Bridge</span><b><em class="bar"><i id="bridge-pressure-bar" style="width:0%"></i></em><span id="bridge-pressure">0%</span></b></p>
+            <p><span>Dashboard</span><b><em class="bar"><i id="dashboard-pressure-bar" style="width:0%"></i></em><span id="dashboard-pressure">0%</span></b></p>
+          </div>
+        </article>
+        <article class="panel-card glass pressure-causes-card">
+          <div class="section-head"><h2>Pressure causes</h2><span class="chip">derived</span></div>
+          <div id="pressure-causes" class="diag-event-list"></div>
+          <p class="panel-note">Scores are derived from copied counters, transition-ring metadata, and immutable telemetry snapshots only.</p>
         </article>
         <article class="panel-card glass">
           <div class="section-head"><h2>Chunk lifecycle</h2><span class="chip blue-chip">sealed-first</span></div>
@@ -220,6 +251,51 @@
             <p><span>Deep Diagnostics</span><b>manual only</b></p>
           </div>
         </article>
+      </section>
+
+      <section id="diagnostics" class="quad-grid">
+        <article class="panel-card glass">
+          <div class="section-head"><div><p class="eyebrow">NATIVE DIAGNOSTICS ENGINE</p><h2>Observer subsystem</h2></div><span class="chip blue-chip" id="native-diag-status">DISABLED</span></div>
+          <div class="kv-list">
+            <p><span>Sequence</span><b id="native-diag-seq">0</b></p>
+            <p><span>Snapshot Build</span><b><span id="native-diag-build">0</span> ns</b></p>
+            <p><span>Events Dropped</span><b id="native-diag-dropped">0</b></p>
+            <p><span>Ring Occupancy</span><b><span id="native-diag-ring-occ">0</span>/<span id="native-diag-ring-cap">0</span></b></p>
+            <p><span>GIL Released Calls</span><b id="native-diag-gil">0</b></p>
+            <p><span>Python↔Native</span><b id="native-diag-transitions">0</b></p>
+            <p><span>Slot Transitions</span><b id="native-diag-slot-transitions">0</b></p>
+            <p><span>Index Transitions</span><b id="native-diag-index-transitions">0</b></p>
+            <p><span>Memory Transitions</span><b id="native-diag-memory-transitions">0</b></p>
+          </div>
+          <div class="diag-ring-meter"><i id="native-diag-ring-meter"></i></div>
+          <p class="panel-note">Diagnostics owns no storage objects and mutates no VFS, chunk, or index state. It consumes copied counters and emits immutable snapshots only.</p>
+        </article>
+        <article class="panel-card glass diagnostics-events-card">
+          <div class="section-head"><div><p class="eyebrow">TRANSITION RING</p><h2>Recent native events</h2></div><span class="chip orange-chip">loss tolerant</span></div>
+          <div id="native-diag-events" class="diag-event-list"></div>
+        </article>
+      </section>
+
+      <section id="snapshots" class="console-page-grid">
+        <article class="panel-card glass wide-panel"><div class="section-head"><div><p class="eyebrow">SNAPSHOT EXPLORER</p><h2>Immutable telemetry snapshots</h2></div><span class="chip blue-chip">observer-safe</span></div><div class="page-placeholder"><img src="/static/icons/snapshot.svg" alt=""><p>Snapshot sequence, build cost, ring position, and pressure-state comparison use the same glass panel system as Pressure Diagnostics.</p></div></article>
+        <article id="locks" class="panel-card glass wide-panel"><div class="section-head"><div><p class="eyebrow">LOCK CONTENTION</p><h2>Native wait-state diagnostics</h2></div><span class="chip">transition-fed</span></div><div class="page-placeholder"><img src="/static/icons/clock.svg" alt=""><p>Lock pressure, wait transitions, and contention spikes are reserved for the v2.7.3/v2.8 diagnostic expansion without changing the hot path.</p></div></article>
+      </section>
+
+      <section id="comparison" class="console-page-grid">
+        <article class="panel-card glass wide-panel"><div class="section-head"><div><p class="eyebrow">COMPARATIVE VIEWS</p><h2>Radix, Swiss, storage, and bridge comparison</h2></div><span class="chip orange-chip">trend-ready</span></div><div class="page-placeholder"><img src="/static/icons/radix.svg" alt=""><p>Comparative panels share the same spacing, typography, and card hierarchy as Pressure Diagnostics so every page feels native to the console.</p></div></article>
+        <article id="recovery" class="panel-card glass wide-panel recovery-planner-page">
+          <div class="section-head"><div><p class="eyebrow">RECOVERY PLANNER</p><h2>Advisory recovery state</h2></div><span class="chip orange-chip" id="recovery-status">Stable</span></div>
+          <div class="recovery-summary-grid">
+            <div class="recovery-command-card"><img src="/static/icons/recovery.svg" alt=""><div><span>Primary subsystem</span><b id="recovery-primary">System</b><small id="recovery-summary">Recovery Planner is observing pressure snapshots and no action is currently required.</small></div></div>
+            <div class="recovery-confidence-card"><span>Plan confidence</span><b id="recovery-confidence">0%</b><p>advisory only</p></div>
+          </div>
+          <div id="recovery-actions" class="recovery-actions"></div>
+          <div id="recovery-guardrails" class="security-list recovery-guardrails"></div>
+        </article>
+      </section>
+
+      <section id="alerts" class="console-page-grid">
+        <article class="panel-card glass wide-panel"><div class="section-head"><div><p class="eyebrow">ALERTS & EVENTS</p><h2>Operational event stream</h2></div><span class="chip">ring-buffer aware</span></div><div class="page-placeholder"><img src="/static/icons/quarantine.svg" alt=""><p>Pressure warnings, lost-event notices, bridge lag, and transition-ring wrap events are styled as high-signal operational cards.</p></div></article>
       </section>
 
       <section class="lower-grid">
