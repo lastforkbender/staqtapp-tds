@@ -12,7 +12,7 @@ from staqtapp_tds.config import RuntimeConfig
 
 
 def test_version_v251():
-    assert __version__ == "2.6.1"
+    assert __version__ == "2.7.4"
 
 
 def test_telemetry_levels_gate_engineering_samplers():
