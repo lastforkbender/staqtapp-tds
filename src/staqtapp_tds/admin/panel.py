@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import html
-import json
 import mimetypes
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -117,7 +116,7 @@ class AdminPanelServer:
 
             def do_GET(self):
                 if self.path == "/status.json":
-                    self._send(200, json.dumps(outer._status_snapshot(), indent=2), "application/json")
+                    self._send(200, dumps_pretty(outer._status_snapshot())[0], "application/json")
                     return
                 if self.path.startswith("/static/"):
                     asset = outer._static_asset(self.path)
