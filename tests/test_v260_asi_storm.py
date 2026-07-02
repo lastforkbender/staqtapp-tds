@@ -3,7 +3,7 @@ from staqtapp_tds.admin.panel import render_dashboard_html
 
 
 def test_version_v260():
-    assert __version__ == "2.6.0"
+    assert __version__ == "2.6.1"
 
 
 def test_pressure_model_modes_and_vfs_state():
@@ -41,7 +41,7 @@ def test_chunked_text_records_lifecycle_and_round_trips():
 
 
 def test_dashboard_contains_pressure_panel_and_custom_svg_assets():
-    html = render_dashboard_html(version="2.6.0")
+    html = render_dashboard_html(version="2.6.1")
     assert "ASI Pressure" in html
     assert "/static/icons/pressure.svg" in html
     assert "/static/icons/storm.svg" in html
