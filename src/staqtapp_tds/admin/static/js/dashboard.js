@@ -24,7 +24,9 @@ function normalize(data){
     pressure:obs.pressure||data.pressure||{},
     created:obs.created_at||data.server_time,
     uptime:obs.uptime_seconds||0,
-    panel:data.panel||{}
+    panel:data.panel||{},
+    nativeDiagnostics:obs.native_diagnostics||data.native_diagnostics||{},
+    recovery:obs.recovery||data.recovery||{}
   };
 }
 function updateNav(){document.querySelectorAll('.nav-pill').forEach(a=>{a.addEventListener('click',()=>{document.querySelectorAll('.nav-pill').forEach(n=>n.classList.remove('active'));a.classList.add('active');});});}
@@ -85,6 +87,19 @@ function renderTimeline(data){
   ];
   rows.forEach(([t,title,body])=>{const item=document.createElement('div'); item.className='timeline-item'; item.innerHTML=`<time>${t}</time><div><b>${title}</b><span>${body}</span></div>`; host.appendChild(item);});
 }
+
+function renderNativeDiagEvents(nativeDiag){
+  const host=$('native-diag-events'); if(!host)return; host.innerHTML='';
+  const events=Array.isArray(nativeDiag.recent_events)?nativeDiag.recent_events.slice(-8).reverse():[];
+  if(!events.length){const empty=document.createElement('div'); empty.className='diag-event-row'; empty.innerHTML='<b>No native transition events yet</b><span>Start native operations or enable diagnostics.</span>'; host.appendChild(empty); return;}
+  events.forEach(ev=>{
+    const row=document.createElement('div'); row.className='diag-event-row';
+    const name=titleCase(ev.event_name||`event ${ev.code||0}`);
+    const sub=titleCase(ev.subsystem_name||'native diagnostics');
+    row.innerHTML=`<b>${name}</b><span>${sub} · seq ${fmt(ev.seq,0)} · obj ${fmt(ev.object_id,0)} · ${fmt(ev.value_a,0)}/${fmt(ev.value_b,0)}</span>`;
+    host.appendChild(row);
+  });
+}
 function applyComponentStatus(components, storage){
   const map={api:'tds_api',swiss:'swiss_index',radix:'radix_router',chunks:'chunk_manager',compression:'compression',persistence:'persistence'};
   Object.entries(map).forEach(([ui,key])=>{
@@ -95,9 +110,53 @@ function applyComponentStatus(components, storage){
     el.style.color = String(v).includes('disabled') ? 'var(--orange)' : 'var(--green)';
   });
 }
+function renderPressureEngine(pressure){
+  const pairs=[
+    ['engine','engine_pressure'],['storage','storage_pressure'],['index','index_pressure'],['lock','lock_pressure'],
+    ['ring','ring_buffer_pressure'],['memory','memory_pressure'],['bridge','bridge_pressure'],['dashboard','dashboard_pressure']
+  ];
+  pairs.forEach(([id,key])=>{const v=Number(pressure[key]||0); setText(`${id}-pressure`, `${fmt(v,0)}%`); setWidth(`${id}-pressure-bar`, v);});
+  setText('pressure-dominant', titleCase(pressure.dominant_component||'stable'));
+  const host=$('pressure-causes'); if(!host)return; host.innerHTML='';
+  const causes=Array.isArray(pressure.causes)?pressure.causes.slice(0,5):[];
+  if(!causes.length){const row=document.createElement('div'); row.className='diag-event-row'; row.innerHTML='<b>Stable</b><span>No elevated pressure detected from current snapshots.</span>'; host.appendChild(row); return;}
+  causes.forEach((cause,i)=>{const row=document.createElement('div'); row.className='diag-event-row'; row.innerHTML=`<b>${i===0?'Dominant signal':'Supporting signal'}</b><span>${cause}</span>`; host.appendChild(row);});
+}
+
+function renderRecoveryPlanner(recovery){
+  recovery = recovery || {};
+  setText('recovery-status', titleCase(recovery.status || 'stable'));
+  setText('recovery-primary', titleCase(recovery.primary_subsystem || 'system'));
+  setText('recovery-confidence', `${fmt(Number(recovery.confidence || 0),0)}%`);
+  setText('recovery-summary', recovery.summary || 'Recovery Planner is observing pressure snapshots and no action is currently required.');
+  const host=$('recovery-actions'); if(host){
+    host.innerHTML='';
+    const actions=Array.isArray(recovery.actions)?recovery.actions.slice(0,5):[];
+    if(!actions.length){
+      const row=document.createElement('div'); row.className='recovery-action';
+      row.innerHTML='<b>Observe only</b><span>No recovery action is recommended from the current snapshot.</span><small>automatic: no</small>';
+      host.appendChild(row);
+    } else {
+      actions.forEach(action=>{
+        const row=document.createElement('div'); row.className=`recovery-action ${action.severity||'info'}`;
+        const evidence=Array.isArray(action.evidence)?action.evidence.slice(0,3).join(' '):'';
+        row.innerHTML=`<b>${action.title||action.code||'Recovery action'}</b><span>${action.recommendation||''}</span><small>${titleCase(action.subsystem||'system')} · confidence ${fmt(action.confidence||0,0)}% · automatic: ${action.automatic?'yes':'no'}</small><em>${evidence}</em>`;
+        host.appendChild(row);
+      });
+    }
+  }
+  const guards=$('recovery-guardrails'); if(guards){
+    guards.innerHTML='';
+    const list=Array.isArray(recovery.guardrails)?recovery.guardrails:[];
+    (list.length?list:['Planner consumes copied snapshots only.','No automatic storage mutation is allowed.']).slice(0,4).forEach(g=>{
+      const row=document.createElement('p'); row.innerHTML=`<img src="/static/icons/security.svg" alt="">${g}`; guards.appendChild(row);
+    });
+  }
+}
+
 function render(data){
   try{
-    const n=normalize(data), active=n.active, perf=n.perf, storage=n.storage, indexes=n.indexes, behavior=n.behavior, pressure=n.pressure||{};
+    const n=normalize(data), active=n.active, perf=n.perf, storage=n.storage, indexes=n.indexes, behavior=n.behavior, pressure=n.pressure||{}, nativeDiag=n.nativeDiagnostics||{}, recovery=n.recovery||{};
     const swiss=indexes.swiss||{}, radix=indexes.radix||{};
     const health=(data.system_health||'HEALTHY').toString().toUpperCase();
     setText('last-update', new Date().toLocaleTimeString()); setText('side-health', titleCase(health)); setText('health-main', health); setText('health-score', health==='HEALTHY'?'99%':'72%'); setText('health-sub', health==='HEALTHY'?'All systems operational':'Review recommendations and audit events');
@@ -111,6 +170,7 @@ function render(data){
     setText('chunk-pending', fmt(pressure.chunk_pending_count ?? storage.chunk_pending ?? 0,0)); setText('chunk-quarantined', fmt(pressure.chunk_quarantined_count ?? storage.chunk_quarantined ?? 0,0));
     setText('snapshot-lag', fmt(pressure.snapshot_lag ?? 0,0)); setText('telemetry-dropped', fmt(pressure.telemetry_dropped_rate ?? storage.telemetry_dropped ?? 0,0));
     setText('gil-reacquire-rate', fmt(pressure.gil_reacquire_rate ?? perf.python_native_transitions ?? 0,0)); setText('swiss-probe-pressure', fmt(pressure.swiss_probe_pressure ?? 0,0));
+    renderPressureEngine(pressure); renderRecoveryPlanner(recovery);
     setText('chunk-sealed', fmt(storage.chunk_sealed ?? 0,0)); setText('chunk-verified', fmt(storage.chunk_verified ?? 0,0)); setText('chunk-indexed', fmt(storage.chunk_indexed ?? 0,0)); setText('chunk-exposed', fmt(storage.chunk_exposed ?? 0,0));
     const reads=Number(perf.read_count||perf.reads_per_sec||0), writes=Number(perf.write_count||perf.writes_per_sec||0), total=Math.max(1,reads+writes);
     const readPct=Math.round(reads/total*100), writePct=Math.round(writes/total*100), idlePct=(reads+writes)===0?100:0;
@@ -124,7 +184,7 @@ function render(data){
     setText('swiss-entries', fmt(swiss.entries||swiss.size,0)); setText('swiss-load', `${fmt(percent(swiss.load_factor),0)}%`); setWidth('swiss-load-bar', percent(swiss.load_factor)); setText('avg-probe', fmt(swiss.average_probe||swiss.avg_probe,0)); setText('max-probe', fmt(swiss.max_probe,0)); setText('tombstones', fmt(swiss.tombstones,0));
     setText('radix-nodes', fmt(radix.routers||radix.nodes,0)); setText('radix-depth', fmt(radix.average_lookup_steps||radix.average_depth,0)); setText('radix-max-depth', fmt(radix.max_depth,0));
     setText('storage-entries', fmt(storage.entries,0)); setText('chunks-created', fmt(storage.chunks_created,0)); setText('active-chunks', fmt(storage.active_chunks||storage.chunks_created,0)); setText('avg-chunk-size', bytesLabel(storage.avg_chunk_size)); setText('largest-chunk', bytesLabel(storage.largest_chunk)); setText('compression-enabled', active.compression_enabled===false||storage.compression_enabled===false?'Disabled':'Enabled'); setText('total-data-size', bytesLabel(storage.total_data_size)); setText('on-disk-size', bytesLabel(storage.on_disk_size));
-    setText('uptime', secondsToHMS(n.uptime)); setText('side-uptime', secondsToHMS(n.uptime)); setText('backend', String(swiss.backend||'native').includes('python')?'Python':'Native'); setText('native-exec-pct', `${fmt(perf.native_execution_percent,0)}%`); setWidth('native-exec-bar', perf.native_execution_percent||0); setText('python-exec-pct', `${fmt(perf.python_execution_percent,0)}%`); setText('gil-released-pct', `${fmt(perf.gil_released_percent,0)}%`); setText('native-transitions', fmt(perf.python_native_transitions_per_sec ?? perf.python_native_transitions,0)); setText('native-batch-ops', fmt(perf.native_batch_ops_per_sec ?? perf.native_batch_ops,0)); setText('pool-reuse', `${fmt(perf.pool_reuse_percent,0)}%`); setText('allocator-calls', fmt(perf.pool_allocator_calls,0)); setText('gil-ops', fmt(perf.gil_released_ops_per_sec ?? perf.gil_released_ops ?? perf.native_backend_ops,0)); setText('py-fallback', fmt(perf.python_backend_ops,0)); setText('snapshot-age', snapshotAge(n.created));
+    const ndc=nativeDiag.counters||{}; setText('native-diag-status', nativeDiag.degraded?'DEGRADED':(nativeDiag.enabled?'ENABLED':'DISABLED')); setText('native-diag-seq', fmt(nativeDiag.sequence,0)); setText('native-diag-build', fmt(nativeDiag.snapshot_build_ns,0)); setText('native-diag-dropped', fmt(ndc.events_dropped,0)); setText('native-diag-ring-occ', fmt(ndc.ring_occupancy,0)); setText('native-diag-ring-cap', fmt(ndc.ring_capacity,0)); setWidth('native-diag-ring-meter', (Number(ndc.ring_occupancy||0)/Math.max(1,Number(ndc.ring_capacity||1)))*100); setText('native-diag-gil', fmt(ndc.gil_released_calls,0)); setText('native-diag-transitions', fmt(ndc.python_native_transitions,0)); setText('native-diag-slot-transitions', fmt(ndc.slot_transitions,0)); setText('native-diag-index-transitions', fmt(ndc.index_transitions,0)); setText('native-diag-memory-transitions', fmt(ndc.memory_transitions,0)); renderNativeDiagEvents(nativeDiag); setText('diagnostics-status', nativeDiag.degraded?'Degraded':(nativeDiag.enabled?'Enabled':'Disabled')); setText('uptime', secondsToHMS(n.uptime)); setText('side-uptime', secondsToHMS(n.uptime)); setText('backend', String(swiss.backend||'native').includes('python')?'Python':'Native'); setText('native-exec-pct', `${fmt(perf.native_execution_percent,0)}%`); setWidth('native-exec-bar', perf.native_execution_percent||0); setText('python-exec-pct', `${fmt(perf.python_execution_percent,0)}%`); setText('gil-released-pct', `${fmt(perf.gil_released_percent,0)}%`); setText('native-transitions', fmt(perf.python_native_transitions_per_sec ?? perf.python_native_transitions,0)); setText('native-batch-ops', fmt(perf.native_batch_ops_per_sec ?? perf.native_batch_ops,0)); setText('pool-reuse', `${fmt(perf.pool_reuse_percent,0)}%`); setText('allocator-calls', fmt(perf.pool_allocator_calls,0)); setText('gil-ops', fmt(perf.gil_released_ops_per_sec ?? perf.gil_released_ops ?? perf.native_backend_ops,0)); setText('py-fallback', fmt(perf.python_backend_ops,0)); setText('snapshot-age', snapshotAge(n.created));
     applyComponentStatus(n.components, storage); renderRecommendations(data); renderTimeline(data);
   }catch(err){ setText('health-main','PANEL ERROR'); console.error(err); }
 }
