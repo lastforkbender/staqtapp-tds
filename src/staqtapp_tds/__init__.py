@@ -62,6 +62,9 @@ from staqtapp_tds.crypto import CryptoProvider, NoopCryptoProvider, XorCryptoPro
 from staqtapp_tds.spiral import TraceRecord, TraceSetManifest, AggregationRecord, SpiralRun, SpiralRunMetadata, create_spiral_run
 from staqtapp_tds.verify import HealthCheck, HealthReport, HealthVerifier, verify
 from staqtapp_tds.asi import PressureMode, VFSState, ChunkState, PressureSnapshot, estimate_pressure
+from staqtapp_tds.pressure import calculate_pressure_snapshot, PressureComponent, PressureCalculationSnapshot
+from staqtapp_tds.recovery import RecoveryAction, RecoveryPlan, build_recovery_plan
+from staqtapp_tds.diagnostics import DiagnosticEvent, NativeDiagnosticSnapshot, native_diagnostics_available, native_diag_snapshot, native_diag_reset, native_diag_set_enabled, native_diag_mark_degraded, native_diag_emit
 
 from staqtapp_tds.version import __version__, VERSION
 __all__ = [
@@ -89,5 +92,5 @@ __all__ = [
     "ProvenanceTag", "ProvenanceClass", "PROVENANCE_DTYPE",
     "TDSClusterIdentity", "CLUSTER_DTYPE", "query_requires_selector", "RadixDirectoryRouter",
     "RuntimeConfig", "AdminConfig", "ConfigRegistry", "SecureParams", "CryptoProvider", "NoopCryptoProvider", "XorCryptoProvider",
-    "TraceRecord", "TraceSetManifest", "AggregationRecord", "SpiralRun", "SpiralRunMetadata", "create_spiral_run", "HealthCheck", "HealthReport", "HealthVerifier", "verify", "VERSION", "PressureMode", "VFSState", "ChunkState", "PressureSnapshot", "estimate_pressure",
+    "TraceRecord", "TraceSetManifest", "AggregationRecord", "SpiralRun", "SpiralRunMetadata", "create_spiral_run", "HealthCheck", "HealthReport", "HealthVerifier", "verify", "VERSION", "PressureMode", "VFSState", "ChunkState", "PressureSnapshot", "estimate_pressure", "DiagnosticEvent", "NativeDiagnosticSnapshot", "native_diagnostics_available", "native_diag_snapshot", "native_diag_reset", "native_diag_set_enabled", "native_diag_mark_degraded", "native_diag_emit", "calculate_pressure_snapshot", "PressureComponent", "PressureCalculationSnapshot", "RecoveryAction", "RecoveryPlan", "build_recovery_plan",
 ]

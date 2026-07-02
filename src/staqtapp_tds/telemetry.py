@@ -12,6 +12,9 @@ import numpy as np
 
 from staqtapp_tds.latency import LatencyBucket, LatencyPolicy
 from staqtapp_tds.asi import estimate_pressure
+from staqtapp_tds.diagnostics import native_diag_snapshot, native_diagnostics_available
+from staqtapp_tds.pressure import calculate_pressure_snapshot
+from staqtapp_tds.recovery import build_recovery_plan
 
 
 class TelemetryMode(IntEnum):
@@ -591,6 +594,18 @@ class TelemetryManager:
                     indexes[name] = value
             except Exception as exc:  # samplers should never break dashboard status
                 components[f"sampler:{name}"] = {"status": "degraded", "error": str(exc), "updated_at": now}
+        native_diag = native_diag_snapshot(event_limit=16)
+        native_diag_dict = native_diag.to_dict()
+        components["native_diagnostics"] = {
+            "status": "degraded" if native_diag.degraded else ("enabled" if native_diag.enabled else "disabled"),
+            "available": native_diagnostics_available(),
+            "sequence": native_diag.sequence,
+            "snapshot_build_ns": native_diag.snapshot_build_ns,
+            "events_dropped": int(native_diag.counters.get("events_dropped", 0)),
+            "gil_released_calls": int(native_diag.counters.get("gil_released_calls", 0)),
+            "python_native_transitions": int(native_diag.counters.get("python_native_transitions", 0)),
+            "updated_at": now,
+        }
         with self._lock:
             performance: Dict[str, float | int | str] = {
                 "reads_per_sec": round(counters.get("reads", 0) / uptime, 3),
@@ -621,6 +636,10 @@ class TelemetryManager:
                 "json_orjson_writes": counters.get("json_orjson_writes", 0),
                 "avg_json_parse_ms": round((counters.get("json_parse_ns", 0) / max(1, counters.get("json_parse_calls", 0))) / 1_000_000.0, 4),
                 "avg_json_serialize_ms": round((counters.get("json_serialize_ns", 0) / max(1, counters.get("json_serialize_calls", 0))) / 1_000_000.0, 4),
+                "native_diag_sequence": native_diag.sequence,
+                "native_diag_snapshot_build_ns": native_diag.snapshot_build_ns,
+                "native_diag_events_dropped": int(native_diag.counters.get("events_dropped", 0)),
+                "native_diag_gil_released_calls": int(native_diag.counters.get("gil_released_calls", 0)),
             }
             native_ops = float(performance.get("native_backend_ops", 0) or 0)
             python_ops = float(performance.get("python_backend_ops", 0) or 0)
@@ -662,7 +681,25 @@ class TelemetryManager:
             snapshot_lag = max(0, self._snapshot_epoch - self._publisher_updates)
             swiss_stats = indexes.get("swiss", {}) if isinstance(indexes.get("swiss"), dict) else {}
             swiss_probe_pressure = int(min(12, max(0.0, float(swiss_stats.get("average_probe", swiss_stats.get("avg_probe", 0.0)) or 0.0) * 3)))
-            pressure_snapshot = estimate_pressure(counters, snapshot_lag=snapshot_lag, swiss_probe_pressure=swiss_probe_pressure).to_dict()
+            legacy_pressure = estimate_pressure(counters, snapshot_lag=snapshot_lag, swiss_probe_pressure=swiss_probe_pressure).to_dict()
+            calculated_pressure = calculate_pressure_snapshot(
+                counters,
+                native_counters=native_diag.counters,
+                performance=performance,
+                storage=storage,
+                indexes=indexes,
+                snapshot_lag=snapshot_lag,
+            ).to_dict()
+            pressure_snapshot = dict(legacy_pressure)
+            pressure_snapshot.update(calculated_pressure)
+            pressure_snapshot.setdefault("vfs_state", legacy_pressure.get("vfs_state", "active"))
+            pressure_snapshot.setdefault("queue_depth", legacy_pressure.get("queue_depth", 0))
+            pressure_snapshot.setdefault("chunk_pending_count", legacy_pressure.get("chunk_pending_count", 0))
+            pressure_snapshot.setdefault("chunk_quarantined_count", legacy_pressure.get("chunk_quarantined_count", 0))
+            pressure_snapshot.setdefault("snapshot_lag", legacy_pressure.get("snapshot_lag", snapshot_lag))
+            pressure_snapshot.setdefault("telemetry_dropped_rate", legacy_pressure.get("telemetry_dropped_rate", 0))
+            pressure_snapshot.setdefault("gil_reacquire_rate", legacy_pressure.get("gil_reacquire_rate", 0))
+            pressure_snapshot.setdefault("swiss_probe_pressure", legacy_pressure.get("swiss_probe_pressure", swiss_probe_pressure))
             self._last_pressure_snapshot = dict(pressure_snapshot)
             health = self.health_state(snapshot_age_seconds=0.0, counters=counters, components=components)
             snap = TelemetrySnapshot(
@@ -678,7 +715,14 @@ class TelemetryManager:
                 health=health,
             ).to_dict()
             snap["system_health"] = str(health.get("state", "healthy")).upper()
+            snap["native_diagnostics"] = native_diag_dict
             snap["pressure"] = pressure_snapshot
+            snap["recovery"] = build_recovery_plan(
+                pressure_snapshot,
+                native_diagnostics=native_diag_dict,
+                performance=performance,
+                storage=storage,
+            ).to_dict()
             snap["snapshot_epoch"] = self._snapshot_epoch
             self._last_snapshot_at = now
             self._last_snapshot = snap

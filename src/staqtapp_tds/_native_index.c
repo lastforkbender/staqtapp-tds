@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <time.h>
 
 typedef struct {
     char *key;
@@ -48,6 +49,290 @@ typedef struct {
     TinyKeyPool key_pool;
     pthread_rwlock_t lock;
 } NativeHandleIndex;
+
+
+/* =============================================================================
+ * v2.7.1 Native Diagnostic Engine transition ring
+ *
+ * This subsystem owns no storage objects and never mutates storage state.  Hot
+ * paths update only bounded atomic counters and tiny transition-event copies.
+ * Snapshot assembly is performed only from module-level diagnostic state while
+ * the Python caller already owns the GIL; no storage locks or Python callbacks
+ * are used by diagnostic hot-path hooks.
+ * ============================================================================= */
+
+typedef enum {
+    DIAG_EVENT_GIL_RELEASED = 1,
+    DIAG_EVENT_GIL_REACQUIRED = 2,
+    DIAG_EVENT_CHUNK_SEALED = 3,
+    DIAG_EVENT_CHUNK_VERIFIED = 4,
+    DIAG_EVENT_CHUNK_QUARANTINED = 5,
+    DIAG_EVENT_PRESSURE_MODE_CHANGED = 6,
+    DIAG_EVENT_SNAPSHOT_DROPPED = 7,
+    DIAG_EVENT_RECOVERY_STARTED = 8,
+    DIAG_EVENT_RECOVERY_COMPLETED = 9,
+    DIAG_EVENT_NATIVE_OPERATION = 10,
+    DIAG_EVENT_RING_OVERFLOW = 11,
+    DIAG_EVENT_SLOT_ALLOCATED = 20,
+    DIAG_EVENT_SLOT_WRITTEN = 21,
+    DIAG_EVENT_SLOT_UPDATED = 22,
+    DIAG_EVENT_SLOT_DELETED = 23,
+    DIAG_EVENT_SLOT_VISIBLE = 24,
+    DIAG_EVENT_INDEX_RESIZED = 30,
+    DIAG_EVENT_INDEX_LOOKUP_HIT = 31,
+    DIAG_EVENT_INDEX_LOOKUP_MISS = 32,
+    DIAG_EVENT_LOCK_WAIT = 40,
+    DIAG_EVENT_LOCK_ACQUIRED = 41,
+    DIAG_EVENT_LOCK_RELEASED = 42,
+    DIAG_EVENT_MEMORY_POOL_REUSED = 50,
+    DIAG_EVENT_MEMORY_POOL_ALLOCATED = 51,
+    DIAG_EVENT_MEMORY_POOL_FREED = 52,
+    DIAG_EVENT_SNAPSHOT_MARKER = 60
+} DiagEventCode;
+
+typedef enum {
+    DIAG_COUNTER_GIL_RELEASED_CALLS = 0,
+    DIAG_COUNTER_PYTHON_NATIVE_TRANSITIONS = 1,
+    DIAG_COUNTER_NATIVE_PUT_CALLS = 2,
+    DIAG_COUNTER_NATIVE_BATCH_PUT_CALLS = 3,
+    DIAG_COUNTER_NATIVE_LOOKUP_CALLS = 4,
+    DIAG_COUNTER_NATIVE_BATCH_LOOKUP_CALLS = 5,
+    DIAG_COUNTER_NATIVE_POP_CALLS = 6,
+    DIAG_COUNTER_NATIVE_BATCH_POP_CALLS = 7,
+    DIAG_COUNTER_NATIVE_STATS_CALLS = 8,
+    DIAG_COUNTER_NATIVE_CHECKSUM_CALLS = 9,
+    DIAG_COUNTER_NATIVE_CHECKSUM_BATCH_CALLS = 10,
+    DIAG_COUNTER_NATIVE_CHUNK_SCAN_CALLS = 11,
+    DIAG_COUNTER_SNAPSHOT_REQUESTS = 12,
+    DIAG_COUNTER_SNAPSHOT_BUILT = 13,
+    DIAG_COUNTER_EVENTS_EMITTED = 14,
+    DIAG_COUNTER_EVENTS_DROPPED = 15,
+    DIAG_COUNTER_DEGRADED = 16,
+    DIAG_COUNTER_RING_CAPACITY = 17,
+    DIAG_COUNTER_RING_OCCUPANCY = 18,
+    DIAG_COUNTER_SLOT_TRANSITIONS = 19,
+    DIAG_COUNTER_INDEX_TRANSITIONS = 20,
+    DIAG_COUNTER_LOCK_TRANSITIONS = 21,
+    DIAG_COUNTER_MEMORY_TRANSITIONS = 22,
+    DIAG_COUNTER_SNAPSHOT_MARKERS = 23,
+    DIAG_COUNTER_EVENT_RING_WRAPAROUNDS = 24,
+    DIAG_COUNTER_MAX = 40
+} DiagCounter;
+
+typedef struct {
+    uint64_t seq;
+    uint64_t timestamp_ns;
+    uint32_t code;
+    uint32_t flags;
+    uint32_t subsystem;
+    uint32_t object_id;
+    uint64_t value_a;
+    uint64_t value_b;
+} TDSDiagEvent;
+
+#define TDS_DIAG_RING_CAPACITY 4096
+
+static volatile uint64_t g_diag_enabled = 1;
+static volatile uint64_t g_diag_degraded = 0;
+static volatile uint64_t g_diag_sequence = 0;
+static volatile uint64_t g_diag_counters[DIAG_COUNTER_MAX];
+static TDSDiagEvent g_diag_ring[TDS_DIAG_RING_CAPACITY];
+
+static uint64_t diag_now_ns(void) {
+#if defined(CLOCK_MONOTONIC)
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
+        return ((uint64_t)ts.tv_sec * 1000000000ULL) + (uint64_t)ts.tv_nsec;
+    }
+#endif
+    return (uint64_t)time(NULL) * 1000000000ULL;
+}
+
+static inline uint64_t diag_atomic_add(volatile uint64_t *ptr, uint64_t value) {
+#if defined(__GNUC__) || defined(__clang__)
+    return __sync_fetch_and_add(ptr, value);
+#else
+    uint64_t old = *ptr;
+    *ptr += value;
+    return old;
+#endif
+}
+
+static inline uint64_t diag_atomic_get(volatile uint64_t *ptr) {
+#if defined(__GNUC__) || defined(__clang__)
+    return __sync_fetch_and_add(ptr, 0);
+#else
+    return *ptr;
+#endif
+}
+
+static inline void diag_counter_add(DiagCounter counter, uint64_t value) {
+    if (!diag_atomic_get(&g_diag_enabled)) return;
+    if (counter >= 0 && counter < DIAG_COUNTER_MAX) diag_atomic_add(&g_diag_counters[counter], value);
+}
+
+static inline void diag_emit_transition(DiagEventCode code, uint32_t subsystem, uint32_t object_id, uint64_t value_a, uint64_t value_b, uint32_t flags) {
+    if (!diag_atomic_get(&g_diag_enabled)) return;
+    uint64_t seq = diag_atomic_add(&g_diag_sequence, 1) + 1;
+    uint64_t idx = (seq - 1) % TDS_DIAG_RING_CAPACITY;
+    g_diag_ring[idx].seq = seq;
+    g_diag_ring[idx].timestamp_ns = diag_now_ns();
+    g_diag_ring[idx].code = (uint32_t)code;
+    g_diag_ring[idx].flags = flags;
+    g_diag_ring[idx].subsystem = subsystem;
+    g_diag_ring[idx].object_id = object_id;
+    g_diag_ring[idx].value_a = value_a;
+    g_diag_ring[idx].value_b = value_b;
+    diag_counter_add(DIAG_COUNTER_EVENTS_EMITTED, 1);
+    if (seq > TDS_DIAG_RING_CAPACITY) {
+        diag_counter_add(DIAG_COUNTER_EVENTS_DROPPED, 1);
+        diag_counter_add(DIAG_COUNTER_EVENT_RING_WRAPAROUNDS, 1);
+    }
+}
+
+static inline void diag_emit_event(DiagEventCode code, uint64_t value_a, uint64_t value_b) {
+    diag_emit_transition(code, 0, 0, value_a, value_b, 0);
+}
+
+static inline void diag_count_transition(DiagEventCode code) {
+    if (code >= DIAG_EVENT_SLOT_ALLOCATED && code <= DIAG_EVENT_SLOT_VISIBLE) diag_counter_add(DIAG_COUNTER_SLOT_TRANSITIONS, 1);
+    else if (code >= DIAG_EVENT_INDEX_RESIZED && code <= DIAG_EVENT_INDEX_LOOKUP_MISS) diag_counter_add(DIAG_COUNTER_INDEX_TRANSITIONS, 1);
+    else if (code >= DIAG_EVENT_LOCK_WAIT && code <= DIAG_EVENT_LOCK_RELEASED) diag_counter_add(DIAG_COUNTER_LOCK_TRANSITIONS, 1);
+    else if (code >= DIAG_EVENT_MEMORY_POOL_REUSED && code <= DIAG_EVENT_MEMORY_POOL_FREED) diag_counter_add(DIAG_COUNTER_MEMORY_TRANSITIONS, 1);
+    else if (code == DIAG_EVENT_SNAPSHOT_MARKER) diag_counter_add(DIAG_COUNTER_SNAPSHOT_MARKERS, 1);
+}
+
+static inline void diag_note_gil_released(DiagCounter op_counter) {
+    diag_counter_add(DIAG_COUNTER_GIL_RELEASED_CALLS, 1);
+    diag_counter_add(DIAG_COUNTER_PYTHON_NATIVE_TRANSITIONS, 1);
+    diag_counter_add(op_counter, 1);
+    diag_emit_transition(DIAG_EVENT_GIL_RELEASED, 1, 0, (uint64_t)op_counter, 0, 0);
+}
+
+static PyObject *diag_counter_dict(void) {
+    PyObject *d = PyDict_New();
+    if (!d) return NULL;
+#define SETU64(name, idx) do { PyObject *_o = PyLong_FromUnsignedLongLong((unsigned long long)diag_atomic_get(&g_diag_counters[(idx)])); if (!_o || PyDict_SetItemString(d, (name), _o) < 0) { Py_XDECREF(_o); Py_DECREF(d); return NULL; } Py_DECREF(_o); } while(0)
+    SETU64("gil_released_calls", DIAG_COUNTER_GIL_RELEASED_CALLS);
+    SETU64("python_native_transitions", DIAG_COUNTER_PYTHON_NATIVE_TRANSITIONS);
+    SETU64("native_put_calls", DIAG_COUNTER_NATIVE_PUT_CALLS);
+    SETU64("native_batch_put_calls", DIAG_COUNTER_NATIVE_BATCH_PUT_CALLS);
+    SETU64("native_lookup_calls", DIAG_COUNTER_NATIVE_LOOKUP_CALLS);
+    SETU64("native_batch_lookup_calls", DIAG_COUNTER_NATIVE_BATCH_LOOKUP_CALLS);
+    SETU64("native_pop_calls", DIAG_COUNTER_NATIVE_POP_CALLS);
+    SETU64("native_batch_pop_calls", DIAG_COUNTER_NATIVE_BATCH_POP_CALLS);
+    SETU64("native_stats_calls", DIAG_COUNTER_NATIVE_STATS_CALLS);
+    SETU64("native_checksum_calls", DIAG_COUNTER_NATIVE_CHECKSUM_CALLS);
+    SETU64("native_checksum_batch_calls", DIAG_COUNTER_NATIVE_CHECKSUM_BATCH_CALLS);
+    SETU64("native_chunk_scan_calls", DIAG_COUNTER_NATIVE_CHUNK_SCAN_CALLS);
+    SETU64("snapshot_requests", DIAG_COUNTER_SNAPSHOT_REQUESTS);
+    SETU64("snapshot_built", DIAG_COUNTER_SNAPSHOT_BUILT);
+    SETU64("events_emitted", DIAG_COUNTER_EVENTS_EMITTED);
+    SETU64("events_dropped", DIAG_COUNTER_EVENTS_DROPPED);
+    SETU64("degraded_count", DIAG_COUNTER_DEGRADED);
+    SETU64("ring_capacity", DIAG_COUNTER_RING_CAPACITY);
+    SETU64("ring_occupancy", DIAG_COUNTER_RING_OCCUPANCY);
+    SETU64("slot_transitions", DIAG_COUNTER_SLOT_TRANSITIONS);
+    SETU64("index_transitions", DIAG_COUNTER_INDEX_TRANSITIONS);
+    SETU64("lock_transitions", DIAG_COUNTER_LOCK_TRANSITIONS);
+    SETU64("memory_transitions", DIAG_COUNTER_MEMORY_TRANSITIONS);
+    SETU64("snapshot_markers", DIAG_COUNTER_SNAPSHOT_MARKERS);
+    SETU64("event_ring_wraparounds", DIAG_COUNTER_EVENT_RING_WRAPAROUNDS);
+#undef SETU64
+    return d;
+}
+
+static PyObject *diag_event_list(Py_ssize_t limit) {
+    uint64_t seq = diag_atomic_get(&g_diag_sequence);
+    Py_ssize_t available = (Py_ssize_t)((seq < TDS_DIAG_RING_CAPACITY) ? seq : TDS_DIAG_RING_CAPACITY);
+    if (limit < 0 || limit > available) limit = available;
+    PyObject *list = PyList_New(0);
+    if (!list) return NULL;
+    uint64_t start = seq >= (uint64_t)limit ? seq - (uint64_t)limit + 1 : 1;
+    for (Py_ssize_t i = 0; i < limit; ++i) {
+        uint64_t wanted = start + (uint64_t)i;
+        TDSDiagEvent ev = g_diag_ring[(wanted - 1) % TDS_DIAG_RING_CAPACITY];
+        if (ev.seq != wanted) continue;
+        PyObject *d = Py_BuildValue("{s:K,s:K,s:I,s:I,s:I,s:I,s:K,s:K}",
+                                    "seq", (unsigned long long)ev.seq,
+                                    "timestamp_ns", (unsigned long long)ev.timestamp_ns,
+                                    "code", (unsigned int)ev.code,
+                                    "flags", (unsigned int)ev.flags,
+                                    "subsystem", (unsigned int)ev.subsystem,
+                                    "object_id", (unsigned int)ev.object_id,
+                                    "value_a", (unsigned long long)ev.value_a,
+                                    "value_b", (unsigned long long)ev.value_b);
+        if (!d) { Py_DECREF(list); return NULL; }
+        if (PyList_Append(list, d) < 0) { Py_DECREF(d); Py_DECREF(list); return NULL; }
+        Py_DECREF(d);
+    }
+    return list;
+}
+
+static PyObject *module_diag_snapshot(PyObject *self, PyObject *args, PyObject *kwargs) {
+    Py_ssize_t event_limit = 32;
+    static char *kwlist[] = {"event_limit", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|n", kwlist, &event_limit)) return NULL;
+    if (event_limit < 0) event_limit = 0;
+    if (event_limit > TDS_DIAG_RING_CAPACITY) event_limit = TDS_DIAG_RING_CAPACITY;
+    diag_counter_add(DIAG_COUNTER_SNAPSHOT_REQUESTS, 1);
+    uint64_t started = diag_now_ns();
+    uint64_t seq_for_occ = diag_atomic_get(&g_diag_sequence);
+    g_diag_counters[DIAG_COUNTER_RING_CAPACITY] = TDS_DIAG_RING_CAPACITY;
+    g_diag_counters[DIAG_COUNTER_RING_OCCUPANCY] = seq_for_occ < TDS_DIAG_RING_CAPACITY ? seq_for_occ : TDS_DIAG_RING_CAPACITY;
+    PyObject *counters = diag_counter_dict();
+    if (!counters) return NULL;
+    PyObject *events = diag_event_list(event_limit);
+    if (!events) { Py_DECREF(counters); return NULL; }
+    diag_counter_add(DIAG_COUNTER_SNAPSHOT_BUILT, 1);
+    if ((diag_atomic_get(&g_diag_counters[DIAG_COUNTER_SNAPSHOT_BUILT]) % 8ULL) == 0ULL) diag_emit_transition(DIAG_EVENT_SNAPSHOT_MARKER, 6, 0, seq_for_occ, (uint64_t)event_limit, 0);
+    uint64_t elapsed = diag_now_ns() - started;
+    PyObject *d = Py_BuildValue("{s:i,s:s,s:O,s:O,s:K,s:K,s:O,s:O}",
+                                "schema_version", 1,
+                                "subsystem", "native_diagnostics",
+                                "enabled", diag_atomic_get(&g_diag_enabled) ? Py_True : Py_False,
+                                "degraded", diag_atomic_get(&g_diag_degraded) ? Py_True : Py_False,
+                                "sequence", (unsigned long long)diag_atomic_get(&g_diag_sequence),
+                                "snapshot_build_ns", (unsigned long long)elapsed,
+                                "counters", counters,
+                                "recent_events", events);
+    Py_DECREF(counters);
+    Py_DECREF(events);
+    return d;
+}
+
+static PyObject *module_diag_reset(PyObject *self, PyObject *Py_UNUSED(ignored)) {
+    for (int i = 0; i < DIAG_COUNTER_MAX; ++i) g_diag_counters[i] = 0;
+    g_diag_sequence = 0;
+    g_diag_degraded = 0;
+    memset(g_diag_ring, 0, sizeof(g_diag_ring));
+    g_diag_counters[DIAG_COUNTER_RING_CAPACITY] = TDS_DIAG_RING_CAPACITY;
+    Py_RETURN_NONE;
+}
+
+static PyObject *module_diag_set_enabled(PyObject *self, PyObject *args) {
+    int enabled = 1;
+    if (!PyArg_ParseTuple(args, "p", &enabled)) return NULL;
+    g_diag_enabled = enabled ? 1 : 0;
+    Py_RETURN_NONE;
+}
+
+static PyObject *module_diag_mark_degraded(PyObject *self, PyObject *args) {
+    int degraded = 1;
+    if (!PyArg_ParseTuple(args, "|p", &degraded)) return NULL;
+    g_diag_degraded = degraded ? 1 : 0;
+    if (degraded) diag_counter_add(DIAG_COUNTER_DEGRADED, 1);
+    Py_RETURN_NONE;
+}
+
+static PyObject *module_diag_emit(PyObject *self, PyObject *args) {
+    unsigned int code; unsigned long long a = 0, b = 0;
+    if (!PyArg_ParseTuple(args, "I|KK", &code, &a, &b)) return NULL;
+    diag_count_transition((DiagEventCode)code);
+    diag_emit_transition((DiagEventCode)code, 0, 0, (uint64_t)a, (uint64_t)b, 0);
+    Py_RETURN_NONE;
+}
+
 
 static uint64_t fnv1a64(const char *data, Py_ssize_t len) {
     uint64_t h = 1469598103934665603ULL;
@@ -191,6 +476,8 @@ static int resize_index(NativeHandleIndex *self, Py_ssize_t newcap) {
     self->capacity = newcap;
     self->tombstones = 0;
     self->resize_count++;
+    diag_count_transition(DIAG_EVENT_INDEX_RESIZED);
+    diag_emit_transition(DIAG_EVENT_INDEX_RESIZED, 3, 0, (uint64_t)newcap, self->resize_count, 0);
     return 0;
 }
 
@@ -211,6 +498,8 @@ static int put_handle_locked(NativeHandleIndex *self, const char *key, Py_ssize_
     if (found) {
         if (handle > 0) self->slots[idx].handle = handle;
         *out_handle = self->slots[idx].handle;
+        diag_count_transition(DIAG_EVENT_SLOT_UPDATED);
+        diag_emit_transition(DIAG_EVENT_SLOT_UPDATED, 2, (uint32_t)(idx & 0xffffffffU), (uint64_t)*out_handle, (uint64_t)len, 0);
         return 0;
     }
     char *copy = key_alloc(self, len);
@@ -226,6 +515,12 @@ static int put_handle_locked(NativeHandleIndex *self, const char *key, Py_ssize_
     self->slots[idx].state = 1;
     self->size++;
     *out_handle = handle;
+    diag_count_transition(DIAG_EVENT_SLOT_ALLOCATED);
+    diag_emit_transition(DIAG_EVENT_SLOT_ALLOCATED, 2, (uint32_t)(idx & 0xffffffffU), (uint64_t)handle, (uint64_t)len, 0);
+    diag_count_transition(DIAG_EVENT_SLOT_WRITTEN);
+    diag_emit_transition(DIAG_EVENT_SLOT_WRITTEN, 2, (uint32_t)(idx & 0xffffffffU), (uint64_t)handle, (uint64_t)self->size, 0);
+    diag_count_transition(DIAG_EVENT_SLOT_VISIBLE);
+    diag_emit_transition(DIAG_EVENT_SLOT_VISIBLE, 2, (uint32_t)(idx & 0xffffffffU), (uint64_t)handle, (uint64_t)self->size, 0);
     return 0;
 }
 
@@ -252,7 +547,10 @@ static int64_t lookup_handle_locked(NativeHandleIndex *self, const char *key, Py
     uint64_t hash = fnv1a64(key, len);
     int found = 0;
     Py_ssize_t idx = find_slot(self->slots, self->capacity, key, len, hash, &found);
-    return (idx >= 0 && found) ? self->slots[idx].handle : -1;
+    int64_t result = (idx >= 0 && found) ? self->slots[idx].handle : -1;
+    diag_count_transition(result >= 0 ? DIAG_EVENT_INDEX_LOOKUP_HIT : DIAG_EVENT_INDEX_LOOKUP_MISS);
+    diag_emit_transition(result >= 0 ? DIAG_EVENT_INDEX_LOOKUP_HIT : DIAG_EVENT_INDEX_LOOKUP_MISS, 3, (uint32_t)((idx >= 0 ? idx : 0) & 0xffffffffU), (uint64_t)(result >= 0 ? result : 0), (uint64_t)len, 0);
+    return result;
 }
 
 static int64_t lookup_handle_nogil(NativeHandleIndex *self, const char *key, Py_ssize_t len) {
@@ -284,6 +582,8 @@ static int64_t pop_handle_locked(NativeHandleIndex *self, const char *key, Py_ss
     self->slots[idx].state = 2;
     self->size--;
     self->tombstones++;
+    diag_count_transition(DIAG_EVENT_SLOT_DELETED);
+    diag_emit_transition(DIAG_EVENT_SLOT_DELETED, 2, (uint32_t)(idx & 0xffffffffU), (uint64_t)out, (uint64_t)self->tombstones, 0);
     return out;
 }
 
@@ -336,7 +636,7 @@ static PyObject *NativeHandleIndex_put(NativeHandleIndex *self, PyObject *args) 
     if (!PyArg_ParseTuple(args, "s#|L", &key, &len, &handle)) return NULL;
     if (len <= 0) { PyErr_SetString(PyExc_ValueError, "key must be non-empty bytes/str"); return NULL; }
     int rc; int64_t out_handle = -1;
-    bump_u64(&self->python_native_transitions); bump_u64(&self->gil_released_calls); bump_u64(&self->native_put_calls);
+    diag_note_gil_released(DIAG_COUNTER_NATIVE_PUT_CALLS); bump_u64(&self->python_native_transitions); bump_u64(&self->gil_released_calls); bump_u64(&self->native_put_calls);
     Py_BEGIN_ALLOW_THREADS
     rc = put_handle_nogil(self, key, len, handle, &out_handle);
     Py_END_ALLOW_THREADS
@@ -388,7 +688,7 @@ static PyObject *NativeHandleIndex_put_many(NativeHandleIndex *self, PyObject *a
     int64_t *out = (int64_t*)calloc((size_t)n, sizeof(int64_t));
     if (!out) { free((void*)keys); free(lens); Py_DECREF(fast); PyErr_NoMemory(); return NULL; }
     int rc;
-    bump_u64(&self->python_native_transitions); bump_u64(&self->gil_released_calls); bump_u64(&self->native_batch_put_calls);
+    diag_note_gil_released(DIAG_COUNTER_NATIVE_BATCH_PUT_CALLS); bump_u64(&self->python_native_transitions); bump_u64(&self->gil_released_calls); bump_u64(&self->native_batch_put_calls);
     Py_BEGIN_ALLOW_THREADS
     rc = put_handles_nogil(self, keys, lens, n, out);
     Py_END_ALLOW_THREADS
@@ -404,7 +704,7 @@ static PyObject *NativeHandleIndex_get_handle(NativeHandleIndex *self, PyObject 
     const char *key; Py_ssize_t len;
     if (!PyArg_ParseTuple(args, "s#", &key, &len)) return NULL;
     int64_t out;
-    bump_u64(&self->python_native_transitions); bump_u64(&self->gil_released_calls); bump_u64(&self->native_lookup_calls);
+    diag_note_gil_released(DIAG_COUNTER_NATIVE_LOOKUP_CALLS); bump_u64(&self->python_native_transitions); bump_u64(&self->gil_released_calls); bump_u64(&self->native_lookup_calls);
     Py_BEGIN_ALLOW_THREADS
     out = lookup_handle_nogil(self, key, len);
     Py_END_ALLOW_THREADS
@@ -415,7 +715,7 @@ static PyObject *NativeHandleIndex_contains(NativeHandleIndex *self, PyObject *a
     const char *key; Py_ssize_t len;
     if (!PyArg_ParseTuple(args, "s#", &key, &len)) return NULL;
     int64_t out;
-    bump_u64(&self->python_native_transitions); bump_u64(&self->gil_released_calls); bump_u64(&self->native_lookup_calls);
+    diag_note_gil_released(DIAG_COUNTER_NATIVE_LOOKUP_CALLS); bump_u64(&self->python_native_transitions); bump_u64(&self->gil_released_calls); bump_u64(&self->native_lookup_calls);
     Py_BEGIN_ALLOW_THREADS
     out = lookup_handle_nogil(self, key, len);
     Py_END_ALLOW_THREADS
@@ -427,7 +727,7 @@ static PyObject *NativeHandleIndex_pop(NativeHandleIndex *self, PyObject *args) 
     const char *key; Py_ssize_t len;
     if (!PyArg_ParseTuple(args, "s#", &key, &len)) return NULL;
     int64_t out;
-    bump_u64(&self->python_native_transitions); bump_u64(&self->gil_released_calls); bump_u64(&self->native_pop_calls);
+    diag_note_gil_released(DIAG_COUNTER_NATIVE_POP_CALLS); bump_u64(&self->python_native_transitions); bump_u64(&self->gil_released_calls); bump_u64(&self->native_pop_calls);
     Py_BEGIN_ALLOW_THREADS
     out = pop_handle_nogil(self, key, len);
     Py_END_ALLOW_THREADS
@@ -441,7 +741,7 @@ static PyObject *NativeHandleIndex_get_handles(NativeHandleIndex *self, PyObject
     if (extract_key_sequence(seq, &fast, &keys, &lens, &n) < 0) return NULL;
     int64_t *out = (int64_t*)calloc((size_t)n, sizeof(int64_t));
     if (!out) { free((void*)keys); free(lens); Py_DECREF(fast); PyErr_NoMemory(); return NULL; }
-    bump_u64(&self->python_native_transitions); bump_u64(&self->gil_released_calls); bump_u64(&self->native_batch_lookup_calls);
+    diag_note_gil_released(DIAG_COUNTER_NATIVE_BATCH_LOOKUP_CALLS); bump_u64(&self->python_native_transitions); bump_u64(&self->gil_released_calls); bump_u64(&self->native_batch_lookup_calls);
     Py_BEGIN_ALLOW_THREADS
     lookup_handles_nogil(self, keys, lens, n, out);
     Py_END_ALLOW_THREADS
@@ -457,7 +757,7 @@ static PyObject *NativeHandleIndex_pop_many(NativeHandleIndex *self, PyObject *a
     if (extract_key_sequence(seq, &fast, &keys, &lens, &n) < 0) return NULL;
     int64_t *out = (int64_t*)calloc((size_t)n, sizeof(int64_t));
     if (!out) { free((void*)keys); free(lens); Py_DECREF(fast); PyErr_NoMemory(); return NULL; }
-    bump_u64(&self->python_native_transitions); bump_u64(&self->gil_released_calls); bump_u64(&self->native_batch_pop_calls);
+    diag_note_gil_released(DIAG_COUNTER_NATIVE_BATCH_POP_CALLS); bump_u64(&self->python_native_transitions); bump_u64(&self->gil_released_calls); bump_u64(&self->native_batch_pop_calls);
     Py_BEGIN_ALLOW_THREADS
     pop_handles_nogil(self, keys, lens, n, out);
     Py_END_ALLOW_THREADS
@@ -495,7 +795,7 @@ static PyObject *NativeHandleIndex_stats(NativeHandleIndex *self, PyObject *Py_U
     Py_ssize_t size = 0, capacity = 0, tombstones = 0, max_probe = 0;
     int64_t next_handle = 0;
     double avg_probe = 0.0;
-    bump_u64(&self->python_native_transitions); bump_u64(&self->gil_released_calls); bump_u64(&self->native_stats_calls);
+    diag_note_gil_released(DIAG_COUNTER_NATIVE_STATS_CALLS); bump_u64(&self->python_native_transitions); bump_u64(&self->gil_released_calls); bump_u64(&self->native_stats_calls);
     Py_BEGIN_ALLOW_THREADS
     stats_scan_nogil(self, &size, &capacity, &tombstones, &next_handle, &max_probe, &avg_probe);
     Py_END_ALLOW_THREADS
@@ -543,6 +843,7 @@ static uint32_t checksum32_nogil(const char *data, Py_ssize_t len) { return fnv1
 static PyObject *module_checksum32(PyObject *self, PyObject *args) {
     const char *data; Py_ssize_t len; uint32_t out;
     if (!PyArg_ParseTuple(args, "y#", &data, &len)) return NULL;
+    diag_note_gil_released(DIAG_COUNTER_NATIVE_CHECKSUM_CALLS);
     Py_BEGIN_ALLOW_THREADS
     out = checksum32_nogil(data, len);
     Py_END_ALLOW_THREADS
@@ -552,6 +853,7 @@ static PyObject *module_checksum32(PyObject *self, PyObject *args) {
 static PyObject *module_checksum32_many(PyObject *self, PyObject *args) {
     PyObject *seq;
     if (!PyArg_ParseTuple(args, "O", &seq)) return NULL;
+    diag_note_gil_released(DIAG_COUNTER_NATIVE_CHECKSUM_BATCH_CALLS);
     PyObject *fast = PySequence_Fast(seq, "checksum32_many expects an iterable of bytes-like objects");
     if (!fast) return NULL;
     Py_ssize_t n = PySequence_Fast_GET_SIZE(fast);
@@ -610,6 +912,7 @@ static Py_ssize_t utf8_safe_cut_nogil(const unsigned char *buf, Py_ssize_t n, Py
 static PyObject *module_utf8_chunk_bounds(PyObject *self, PyObject *args) {
     const char *data; Py_ssize_t len; Py_ssize_t chunk;
     if (!PyArg_ParseTuple(args, "y#n", &data, &len, &chunk)) return NULL;
+    diag_note_gil_released(DIAG_COUNTER_NATIVE_CHUNK_SCAN_CALLS);
     if (chunk <= 0) { PyErr_SetString(PyExc_ValueError, "chunk size must be positive"); return NULL; }
     Py_ssize_t cap = (len / chunk) + 2;
     Py_ssize_t *bounds = (Py_ssize_t*)calloc((size_t)cap, sizeof(Py_ssize_t));
@@ -667,6 +970,11 @@ static PyMethodDef module_methods[] = {
     {"checksum32", module_checksum32, METH_VARARGS, "FNV-1a 32-bit checksum with GIL released."},
     {"checksum32_many", module_checksum32_many, METH_VARARGS, "Batch FNV-1a 32-bit checksums with the GIL released."},
     {"utf8_chunk_bounds", module_utf8_chunk_bounds, METH_VARARGS, "Return UTF-8 safe chunk end offsets with GIL released."},
+    {"diag_snapshot", (PyCFunction)module_diag_snapshot, METH_VARARGS | METH_KEYWORDS, "Return immutable native diagnostic snapshot."},
+    {"diag_reset", module_diag_reset, METH_NOARGS, "Reset native diagnostic counters and event ring."},
+    {"diag_set_enabled", module_diag_set_enabled, METH_VARARGS, "Enable or disable native diagnostics."},
+    {"diag_mark_degraded", module_diag_mark_degraded, METH_VARARGS, "Mark native diagnostics degraded without affecting storage."},
+    {"diag_emit", module_diag_emit, METH_VARARGS, "Emit a tiny diagnostic transition event."},
     {NULL, NULL, 0, NULL}
 };
 

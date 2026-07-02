@@ -1,6 +1,6 @@
 """Central JSON backend for Staqtapp-TDS.
 
-v2.6.1 keeps JSON parsing and emission behind one stateless module so
+v2.7.0 keeps JSON parsing and emission behind one stateless module so
 simdjson/orjson can be used without thread-shared parser objects or scattered
 fallback logic.  The functions never read live engine state and never retain
 references to backend parser documents.
