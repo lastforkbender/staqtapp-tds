@@ -4,9 +4,10 @@
 
 - Image seen above may not reflect the current Staqtapp-TDS Dashboard's features applied
 
-# 🟦🟪🟧 Staqtapp-TDS v2.6.0
 
-Staqtapp-TDS is a substantial content-neutral unique Temporal Directory System(TDS): a directory-first virtual storage engine with radix routing, Swiss-table-style indexing, chunking, persistence, admin control, and an observation dashboard.
+# 🟦🟪🟧 Staqtapp-TDS v2.6.1
+
+Staqtapp-TDS is a content-neutral Temporal Directory System: a directory-first virtual storage engine with radix routing, Swiss-table-style indexing, chunking, persistence, admin control, and an observation dashboard.
 
 The core principle remains unchanged:
 
@@ -25,9 +26,9 @@ The core principle remains unchanged:
 - Execution-mode telemetry: native %, Python %, GIL-released %, batch ops, and Python↔native transitions.
 - Optional Spiral-compatible trace/provenance module for trace-shaped workflows.
 
-## What is new in v2.6.0
+## What is new in v2.6.1
 
-v2.6.0 is the ASI-storm observability and backpressure foundation release. It keeps the v2.5.1 hardening line, then adds explicit pressure modes, semantic VFS states, chunk lifecycle telemetry, snapshot pressure scoring, custom SVG dashboard panels for ASI pressure, and a deeper GIL-release path for UTF-8 chunk boundary scanning through the optional native extension. Spiral support remains optional and neutral: trace ranking metadata is stored for provenance, but TDS does not perform ranking or aggregation.
+v2.6.1 is a hardening/performance release on top of the v2.6 ASI-storm foundation. It centralizes JSON through a stateless `tds_json` boundary, uses simdjson for fast reads when installed, keeps orjson as the preferred canonical writer, adds native batch checksum verification for chunked UTF-8 payloads, and exposes JSON/GIL performance counters for the browser operations console. Spiral (Sequential-Parallel-Aggregative-Reinforcement-Learning) support remains optional and neutral: trace ranking metadata is stored for provenance, but TDS does not perform ranking or aggregation.
 
 ### Hardening and one-way telemetry
 

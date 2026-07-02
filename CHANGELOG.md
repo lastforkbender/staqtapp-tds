@@ -1,3 +1,11 @@
+# v2.6.1
+
+- Centralized JSON parsing and emission in `staqtapp_tds.tds_json` with simdjson-aware reads, orjson canonical writes, strict manifest/snapshot/policy loaders, and stdlib fallback.
+- Added native `checksum32_many()` for batch chunk checksum verification with the GIL released when the optional extension is available.
+- Added per-chunk checksum metadata for chunked UTF-8 text and read-time checksum/content-hash validation before reconstructed text is returned.
+- Added telemetry counters for JSON parse/serialize calls, simdjson reads, orjson writes, and average JSON boundary timing.
+- Added v2.6.1 tests for JSON centralization, malformed/strict loaders, native batch checksum parity, chunk corruption detection, and telemetry counters.
+
 # v2.6.0
 
 - Added ASI Storm pressure model with explicit pressure modes and semantic VFS states.
