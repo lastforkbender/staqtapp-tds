@@ -10,6 +10,7 @@ from urllib.parse import parse_qs, unquote
 
 from staqtapp_tds import __version__
 from staqtapp_tds.admin.control import AdminControl
+from staqtapp_tds.tds_json import dumps_pretty
 
 PANEL_REFRESH_SECONDS = 2.0
 
