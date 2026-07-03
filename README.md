@@ -1,3 +1,10 @@
+<p align="center">
+    <img src="docs/dashboard-2.7.4.png" alt="Staqtapp-TDS v2.7.4 Dashboard" width="100%"/>
+</p>
+
+- Image seen above may not reflect the current Staqtapp-TDS Dashboard's features applied
+
+
 # 🟦🟪🟧 Staqtapp-TDS v2.7.8
 
 Staqtapp-TDS is a content-neutral Temporal Directory System: a directory-first virtual storage engine with radix routing, Swiss-table-style indexing, chunking, persistence, admin control, and an observation dashboard.
