@@ -3,11 +3,11 @@ from staqtapp_tds.admin.panel import AdminPanelServer, render_dashboard_html
 
 
 def test_v278_version():
-    assert __version__ == "2.7.8"
+    assert __version__ == "2.8.0"
 
 
 def test_v278_settings_page_and_about_dialog_render():
-    html = render_dashboard_html(version="2.7.8")
+    html = render_dashboard_html(version="2.8.0")
     assert "settings-page" in html
     assert "tds-language-select" in html
     assert "tds-startup-select" in html
@@ -22,8 +22,8 @@ def test_v278_browser_localization_assets_are_packaged():
     assert asset is not None
     data, ctype = asset
     assert ctype == "application/javascript"
-    assert b"Portugu" in data
-    assert b"Italiano" in data
+    assert b"PACK_BASE" in data
+    assert b"static/i18n" in data
     assert b"getRefreshMS" in data
 
 
