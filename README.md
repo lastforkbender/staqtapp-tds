@@ -1,5 +1,5 @@
 <p align="center">
-    <img src="docs/dashboard-v2.7.4.png" alt="Staqtapp-TDS v2.7.4 Dashboard" width="100%"/>
+    <img src="docs/dashboard-2.7.4.png" alt="Staqtapp-TDS v2.7.4 Dashboard" width="100%"/>
 </p>
 
 - Image seen above may not reflect the current Staqtapp-TDS Dashboard's features applied
