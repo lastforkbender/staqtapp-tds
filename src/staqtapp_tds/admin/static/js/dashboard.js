@@ -1,5 +1,6 @@
 const $ = (id) => document.getElementById(id);
-const setText = (id, value) => { const el = $(id); if (el) el.textContent = value ?? '—'; };
+const tr = (value) => window.TDSI18N ? window.TDSI18N.t(value) : value;
+const setText = (id, value) => { const el = $(id); if (el) el.textContent = tr(value ?? '—'); };
 const setWidth = (id, value) => { const el = $(id); if (el) el.style.width = `${Math.max(0, Math.min(100, Number(value) || 0))}%`; };
 const fmt = (value, fallback = 0) => {
   if (value === undefined || value === null || value === '') return fallback;
@@ -43,6 +44,7 @@ function renderNamespaces(behavior){
     row.innerHTML=`<span title="${String(item.name)}">${String(item.name)}</span><i style="width:${pct}%"></i><b>${Number(item.ops||0).toLocaleString()}</b>`;
     host.appendChild(row);
   });
+  if (window.TDSI18N) window.TDSI18N.applyTranslations(host);
 }
 function renderRecommendations(data){
   const host=$('recommendations-list'); if(!host)return; host.innerHTML='';
@@ -59,6 +61,7 @@ function renderRecommendations(data){
   [...list.map(x=>[x.title||x.name||'Recommendation',x.detail||x.message||String(x)]),...synthetic].slice(0,4).forEach(([title,body])=>{
     const row=document.createElement('div'); row.className='reco'; row.innerHTML=`<div><b>${title}</b><span>${body}</span></div>`; host.appendChild(row);
   });
+  if (window.TDSI18N) window.TDSI18N.applyTranslations(host);
 }
 function renderTimeline(data){
   const host=$('timeline-list'); if(!host)return; host.innerHTML='';
@@ -85,6 +88,7 @@ function renderTimeline(data){
     ['-8s','RuntimeConfig active',`${active.config_id||'rc-000'} generation ${active.generation??0} is serving new operations.`]
   ];
   rows.forEach(([t,title,body])=>{const item=document.createElement('div'); item.className='timeline-item'; item.innerHTML=`<time>${t}</time><div><b>${title}</b><span>${body}</span></div>`; host.appendChild(item);});
+  if (window.TDSI18N) window.TDSI18N.applyTranslations(host);
 }
 
 function renderNativeDiagEvents(nativeDiag){
@@ -98,6 +102,7 @@ function renderNativeDiagEvents(nativeDiag){
     row.innerHTML=`<b>${name}</b><span>${sub} · seq ${fmt(ev.seq,0)} · obj ${fmt(ev.object_id,0)} · ${fmt(ev.value_a,0)}/${fmt(ev.value_b,0)}</span>`;
     host.appendChild(row);
   });
+  if (window.TDSI18N) window.TDSI18N.applyTranslations(host);
 }
 function applyComponentStatus(components, storage){
   const map={api:'tds_api',swiss:'swiss_index',radix:'radix_router',chunks:'chunk_manager',compression:'compression',persistence:'persistence'};
@@ -120,6 +125,7 @@ function renderPressureEngine(pressure){
   const causes=Array.isArray(pressure.causes)?pressure.causes.slice(0,5):[];
   if(!causes.length){const row=document.createElement('div'); row.className='diag-event-row'; row.innerHTML='<b>Stable</b><span>No elevated pressure detected from current snapshots.</span>'; host.appendChild(row); return;}
   causes.forEach((cause,i)=>{const row=document.createElement('div'); row.className='diag-event-row'; row.innerHTML=`<b>${i===0?'Dominant signal':'Supporting signal'}</b><span>${cause}</span>`; host.appendChild(row);});
+  if (window.TDSI18N) window.TDSI18N.applyTranslations(host);
 }
 
 function renderRecoveryPlanner(recovery){
@@ -143,6 +149,7 @@ function renderRecoveryPlanner(recovery){
         host.appendChild(row);
       });
     }
+    if (window.TDSI18N) window.TDSI18N.applyTranslations(host);
   }
   const guards=$('recovery-guardrails'); if(guards){
     guards.innerHTML='';
@@ -150,7 +157,61 @@ function renderRecoveryPlanner(recovery){
     (list.length?list:['Planner consumes copied snapshots only.','No automatic storage mutation is allowed.']).slice(0,4).forEach(g=>{
       const row=document.createElement('p'); row.innerHTML=`<img src="/static/icons/security.svg" alt="">${g}`; guards.appendChild(row);
     });
+    if (window.TDSI18N) window.TDSI18N.applyTranslations(guards);
   }
+}
+
+
+function renderCompletedTelemetryPages(data){
+  const n=normalize(data), perf=n.perf||{}, storage=n.storage||{}, indexes=n.indexes||{}, pressure=n.pressure||{}, nativeDiag=n.nativeDiagnostics||{};
+  const ndc=nativeDiag.counters||{}, swiss=indexes.swiss||{}, radix=indexes.radix||{};
+  const ringCap=Math.max(1,Number(ndc.ring_capacity||0)||1), ringOcc=Number(ndc.ring_occupancy||0)||0, ringFill=Math.min(100,(ringOcc/ringCap)*100);
+  setText('snapshot-sequence', fmt(nativeDiag.sequence ?? data.sequence ?? 0,0));
+  setText('snapshot-created', n.created ? new Date(Number(n.created)*1000).toLocaleString() : 'waiting for cached status');
+  setText('snapshot-age-large', snapshotAge(n.created));
+  setText('snapshot-build-cost', fmt(nativeDiag.snapshot_build_ns,0));
+  setText('snapshot-ring-fill', fmt(ringFill,0));
+  setText('snapshot-events-dropped', fmt(ndc.events_dropped,0));
+  setText('snapshot-server-time', data.server_time ? new Date(Number(data.server_time)*1000).toLocaleTimeString() : '—');
+  const lockPressure=Number(pressure.lock_pressure||0)||0, bridgePressure=Number(pressure.bridge_pressure||0)||0, ringPressure=Number(pressure.ring_buffer_pressure||0)||0;
+  setText('lock-page-pressure', `${fmt(lockPressure,0)}%`); setWidth('lock-page-pressure-bar', lockPressure);
+  setText('bridge-page-pressure', `${fmt(bridgePressure,0)}%`); setWidth('bridge-page-pressure-bar', bridgePressure);
+  setText('ring-page-pressure', `${fmt(ringPressure,0)}%`); setWidth('ring-page-pressure-bar', ringPressure);
+  setText('lock-contention-chip', lockPressure>70?'elevated':(lockPressure>35?'watch':'transition-fed'));
+  setText('lock-page-transitions', fmt(ndc.python_native_transitions ?? perf.python_native_transitions,0));
+  setText('lock-page-gil', fmt(ndc.gil_released_calls ?? perf.gil_released_ops,0));
+  setText('lock-page-slot-transitions', fmt(ndc.slot_transitions,0));
+  setText('lock-page-index-transitions', fmt(ndc.index_transitions,0));
+  setText('compare-swiss-load', `${fmt(percent(swiss.load_factor),0)}%`);
+  setText('compare-radix-depth', fmt(radix.average_lookup_steps||radix.average_depth,0));
+  setText('compare-storage-entries', fmt(storage.entries,0));
+  setText('compare-native-exec', `${fmt(perf.native_execution_percent,0)}%`);
+  setText('compare-probe-pressure', fmt(pressure.swiss_probe_pressure ?? 0,0));
+  setText('compare-active-chunks', fmt(storage.active_chunks||storage.chunks_created,0));
+  setText('compare-memory-pressure', `${fmt(pressure.memory_pressure ?? storage.memory_percent ?? 0,0)}%`);
+  setText('compare-dashboard-pressure', `${fmt(pressure.dashboard_pressure ?? 0,0)}%`);
+  renderAlertsPage(data);
+}
+function renderAlertsPage(data){
+  const host=$('alerts-list'); if(!host) return; host.innerHTML='';
+  const n=normalize(data), pressure=n.pressure||{}, nativeDiag=n.nativeDiagnostics||{}, recovery=n.recovery||{}, ndc=nativeDiag.counters||{};
+  const alerts=[];
+  const pressureScore=Number(pressure.score||0)||0;
+  if(pressureScore>=70) alerts.push(['critical','High pressure',`Pressure score is ${fmt(pressureScore,0)}%; dominant component ${titleCase(pressure.dominant_component||'unknown')}.`]);
+  else if(pressureScore>=35) alerts.push(['warning','Pressure watch',`Pressure score is ${fmt(pressureScore,0)}%; monitor component pressures.`]);
+  if(Number(ndc.events_dropped||0)>0) alerts.push(['warning','Diagnostic events dropped',`${fmt(ndc.events_dropped,0)} native diagnostic events were dropped by the loss-tolerant ring.`]);
+  if(nativeDiag.degraded) alerts.push(['critical','Diagnostics degraded','Native diagnostics reported degraded state in the current snapshot.']);
+  if(recovery.status && String(recovery.status).toLowerCase()!=='stable') alerts.push(['warning','Recovery planner advisory',recovery.summary||'Recovery planner recommends reviewing advisory actions.']);
+  const causes=Array.isArray(pressure.causes)?pressure.causes.slice(0,3):[];
+  causes.forEach(c=>alerts.push(['info','Pressure signal',String(c)]));
+  if(!alerts.length) alerts.push(['info','No active alerts','Current telemetry snapshot does not contain elevated operational events.']);
+  alerts.slice(0,7).forEach(([level,title,body])=>{
+    const row=document.createElement('div'); row.className=`diag-event-row alert-row ${level}`;
+    row.innerHTML=`<b>${title}</b><span>${body}</span>`;
+    host.appendChild(row);
+  });
+  if (window.TDSI18N) window.TDSI18N.applyTranslations(host);
+  setText('alerts-chip', alerts.length && alerts[0][0]!=='info' ? 'attention' : 'ring-buffer aware');
 }
 
 function render(data){
@@ -191,7 +252,7 @@ function render(data){
     setText('radix-nodes', fmt(radix.routers||radix.nodes,0)); setText('radix-depth', fmt(radix.average_lookup_steps||radix.average_depth,0)); setText('radix-max-depth', fmt(radix.max_depth,0));
     setText('storage-entries', fmt(storage.entries,0)); setText('chunks-created', fmt(storage.chunks_created,0)); setText('active-chunks', fmt(storage.active_chunks||storage.chunks_created,0)); setText('avg-chunk-size', bytesLabel(storage.avg_chunk_size)); setText('largest-chunk', bytesLabel(storage.largest_chunk)); setText('compression-enabled', active.compression_enabled===false||storage.compression_enabled===false?'Disabled':'Enabled'); setText('total-data-size', bytesLabel(storage.total_data_size)); setText('on-disk-size', bytesLabel(storage.on_disk_size));
     const ndc=nativeDiag.counters||{}; setText('native-diag-status', nativeDiag.degraded?'DEGRADED':(nativeDiag.enabled?'ENABLED':'DISABLED')); setText('native-diag-seq', fmt(nativeDiag.sequence,0)); setText('native-diag-build', fmt(nativeDiag.snapshot_build_ns,0)); setText('native-diag-dropped', fmt(ndc.events_dropped,0)); setText('native-diag-ring-occ', fmt(ndc.ring_occupancy,0)); setText('native-diag-ring-cap', fmt(ndc.ring_capacity,0)); setWidth('native-diag-ring-meter', (Number(ndc.ring_occupancy||0)/Math.max(1,Number(ndc.ring_capacity||1)))*100); setText('native-diag-gil', fmt(ndc.gil_released_calls,0)); setText('native-diag-transitions', fmt(ndc.python_native_transitions,0)); setText('native-diag-slot-transitions', fmt(ndc.slot_transitions,0)); setText('native-diag-index-transitions', fmt(ndc.index_transitions,0)); setText('native-diag-memory-transitions', fmt(ndc.memory_transitions,0)); renderNativeDiagEvents(nativeDiag); setText('diagnostics-status', nativeDiag.degraded?'Degraded':(nativeDiag.enabled?'Enabled':'Disabled')); setText('uptime', secondsToHMS(n.uptime)); setText('side-uptime', secondsToHMS(n.uptime)); setText('backend', String(swiss.backend||'native').includes('python')?'Python':'Native'); setText('native-exec-pct', `${fmt(perf.native_execution_percent,0)}%`); setWidth('native-exec-bar', perf.native_execution_percent||0); setText('python-exec-pct', `${fmt(perf.python_execution_percent,0)}%`); setText('gil-released-pct', `${fmt(perf.gil_released_percent,0)}%`); setText('native-transitions', fmt(perf.python_native_transitions_per_sec ?? perf.python_native_transitions,0)); setText('native-batch-ops', fmt(perf.native_batch_ops_per_sec ?? perf.native_batch_ops,0)); setText('pool-reuse', `${fmt(perf.pool_reuse_percent,0)}%`); setText('allocator-calls', fmt(perf.pool_allocator_calls,0)); setText('gil-ops', fmt(perf.gil_released_ops_per_sec ?? perf.gil_released_ops ?? perf.native_backend_ops,0)); setText('py-fallback', fmt(perf.python_backend_ops,0)); setText('snapshot-age', snapshotAge(n.created));
-    applyComponentStatus(n.components, storage); renderRecommendations(data); renderTimeline(data);
+    applyComponentStatus(n.components, storage); renderCompletedTelemetryPages(data); renderRecommendations(data); renderTimeline(data);
   }catch(err){ setText('health-main','PANEL ERROR'); console.error(err); }
 }
 async function refreshDashboard(){try{const resp=await fetch('/status.json',{cache:'no-store'}); if(!resp.ok) throw new Error(`status ${resp.status}`); render(await resp.json());}catch(err){setText('health-main','DISCONNECTED'); setText('health-sub','Waiting for local admin server'); console.error(err);}}

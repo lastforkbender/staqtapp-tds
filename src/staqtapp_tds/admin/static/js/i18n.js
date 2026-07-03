@@ -1,42 +1,161 @@
 (function(){
   'use strict';
-  const STORAGE_KEY='tds.browser.settings.v278';
-  const DEFAULTS={language:'en',startupPage:'overview',refreshMs:window.STAQTAPP_REFRESH_MS||2000};
-  const languages=[
-    ['en','English'],['es','Español'],['pt','Português'],['ja','日本語'],['de','Deutsch'],['fr','Français'],['it','Italiano']
+  const SETTINGS_KEY = 'tds.browser.settings.v278';
+  const PACK_BASE = '/static/i18n/';
+  const DEFAULTS = { language: 'en', startupPage: 'overview', refreshMs: window.STAQTAPP_REFRESH_MS || 2000 };
+  const FALLBACK_LANGUAGES = [
+    {code:'en', nativeName:'English', englishName:'English'},
+    {code:'es', nativeName:'Español', englishName:'Spanish'},
+    {code:'pt', nativeName:'Português', englishName:'Portuguese'},
+    {code:'ja', nativeName:'日本語', englishName:'Japanese'},
+    {code:'de', nativeName:'Deutsch', englishName:'German'},
+    {code:'fr', nativeName:'Français', englishName:'French'},
+    {code:'it', nativeName:'Italiano', englishName:'Italian'}
   ];
-  const packs={
-    en:{
-      'nav.configuration':'Configuration','nav.settings':'Settings','settings.eyebrow':'Browser Settings','settings.title':'General Settings','settings.localOnly':'browser local','settings.language':'Language','settings.startupPage':'Startup Page','settings.refreshInterval':'Refresh Interval','settings.manualRefresh':'Manual','settings.about':'About TDS Browser','settings.note':'These browser preferences are stored locally and do not alter the native storage engine.','page.dashboard':'Dashboard','page.engineHealth':'Engine Health','page.realtimeMetrics':'Real-time Metrics','page.eventRingMonitor':'Event Ring Monitor','page.pressureDiagnostics':'Pressure Diagnostics','page.recoveryPlanner':'Recovery Planner','page.security':'Security','about.eyebrow':'About','about.title':'TDS Browser','about.browserVersion':'Browser Version','about.nativeEngine':'Native Engine','about.visualSystem':'Visual System','about.customSvg':'Custom SVG Operations Console','about.storageFocus':'Storage Focus','about.storageFocusValue':'local deterministic observability','about.copy':'Staqtapp-TDS Browser is a professional, language-ready operations console for observing TDS without mutating the storage hot path.','about.close':'Close'
-    },
-    es:{
-      'nav.configuration':'Configuración','nav.settings':'Ajustes','settings.eyebrow':'Ajustes del navegador','settings.title':'Ajustes generales','settings.localOnly':'local del navegador','settings.language':'Idioma','settings.startupPage':'Página inicial','settings.refreshInterval':'Intervalo de actualización','settings.manualRefresh':'Manual','settings.about':'Acerca de TDS Browser','settings.note':'Estas preferencias del navegador se guardan localmente y no modifican el motor nativo de almacenamiento.','page.dashboard':'Panel','page.engineHealth':'Salud del motor','page.realtimeMetrics':'Métricas en tiempo real','page.eventRingMonitor':'Monitor del anillo de eventos','page.pressureDiagnostics':'Diagnóstico de presión','page.recoveryPlanner':'Planificador de recuperación','page.security':'Seguridad','about.eyebrow':'Acerca de','about.title':'TDS Browser','about.browserVersion':'Versión del navegador','about.nativeEngine':'Motor nativo','about.visualSystem':'Sistema visual','about.customSvg':'Consola de operaciones con SVG personalizado','about.storageFocus':'Enfoque de almacenamiento','about.storageFocusValue':'observabilidad local determinista','about.copy':'Staqtapp-TDS Browser es una consola profesional de operaciones, preparada para idiomas, que observa TDS sin modificar la ruta caliente de almacenamiento.','about.close':'Cerrar'
-    },
-    pt:{
-      'nav.configuration':'Configuração','nav.settings':'Definições','settings.eyebrow':'Definições do navegador','settings.title':'Definições gerais','settings.localOnly':'local do navegador','settings.language':'Idioma','settings.startupPage':'Página inicial','settings.refreshInterval':'Intervalo de atualização','settings.manualRefresh':'Manual','settings.about':'Sobre o TDS Browser','settings.note':'Estas preferências do navegador são guardadas localmente e não alteram o motor nativo de armazenamento.','page.dashboard':'Painel','page.engineHealth':'Saúde do motor','page.realtimeMetrics':'Métricas em tempo real','page.eventRingMonitor':'Monitor do anel de eventos','page.pressureDiagnostics':'Diagnóstico de pressão','page.recoveryPlanner':'Planeador de recuperação','page.security':'Segurança','about.eyebrow':'Sobre','about.title':'TDS Browser','about.browserVersion':'Versão do navegador','about.nativeEngine':'Motor nativo','about.visualSystem':'Sistema visual','about.customSvg':'Consola de operações com SVG personalizado','about.storageFocus':'Foco de armazenamento','about.storageFocusValue':'observabilidade local determinística','about.copy':'O Staqtapp-TDS Browser é uma consola profissional de operações, preparada para vários idiomas, para observar o TDS sem modificar o caminho quente de armazenamento.','about.close':'Fechar'
-    },
-    ja:{
-      'nav.configuration':'設定','nav.settings':'設定','settings.eyebrow':'ブラウザー設定','settings.title':'一般設定','settings.localOnly':'ブラウザー内のみ','settings.language':'言語','settings.startupPage':'起動ページ','settings.refreshInterval':'更新間隔','settings.manualRefresh':'手動','settings.about':'TDS Browser について','settings.note':'これらのブラウザー設定はローカルに保存され、ネイティブストレージエンジンは変更しません。','page.dashboard':'ダッシュボード','page.engineHealth':'エンジン状態','page.realtimeMetrics':'リアルタイム指標','page.eventRingMonitor':'イベントリング監視','page.pressureDiagnostics':'圧力診断','page.recoveryPlanner':'復旧プランナー','page.security':'セキュリティ','about.eyebrow':'情報','about.title':'TDS Browser','about.browserVersion':'ブラウザー版','about.nativeEngine':'ネイティブエンジン','about.visualSystem':'ビジュアルシステム','about.customSvg':'カスタムSVG運用コンソール','about.storageFocus':'ストレージの焦点','about.storageFocusValue':'ローカルで決定的な可観測性','about.copy':'Staqtapp-TDS Browser は、ストレージのホットパスを変更せずに TDS を観測する、言語対応のプロフェッショナル運用コンソールです。','about.close':'閉じる'
-    },
-    de:{
-      'nav.configuration':'Konfiguration','nav.settings':'Einstellungen','settings.eyebrow':'Browser-Einstellungen','settings.title':'Allgemeine Einstellungen','settings.localOnly':'browserlokal','settings.language':'Sprache','settings.startupPage':'Startseite','settings.refreshInterval':'Aktualisierungsintervall','settings.manualRefresh':'Manuell','settings.about':'Über TDS Browser','settings.note':'Diese Browser-Einstellungen werden lokal gespeichert und verändern die native Speicher-Engine nicht.','page.dashboard':'Dashboard','page.engineHealth':'Engine-Zustand','page.realtimeMetrics':'Echtzeitmetriken','page.eventRingMonitor':'Ereignisring-Monitor','page.pressureDiagnostics':'Druckdiagnose','page.recoveryPlanner':'Wiederherstellungsplaner','page.security':'Sicherheit','about.eyebrow':'Über','about.title':'TDS Browser','about.browserVersion':'Browser-Version','about.nativeEngine':'Native Engine','about.visualSystem':'Visuelles System','about.customSvg':'Betriebskonsole mit benutzerdefiniertem SVG','about.storageFocus':'Speicherfokus','about.storageFocusValue':'lokale deterministische Beobachtbarkeit','about.copy':'Staqtapp-TDS Browser ist eine professionelle, sprachfähige Betriebskonsole zur Beobachtung von TDS, ohne den heißen Speicherpfad zu verändern.','about.close':'Schließen'
-    },
-    fr:{
-      'nav.configuration':'Configuration','nav.settings':'Paramètres','settings.eyebrow':'Paramètres du navigateur','settings.title':'Paramètres généraux','settings.localOnly':'local au navigateur','settings.language':'Langue','settings.startupPage':'Page de démarrage','settings.refreshInterval':'Intervalle d’actualisation','settings.manualRefresh':'Manuel','settings.about':'À propos de TDS Browser','settings.note':'Ces préférences du navigateur sont stockées localement et ne modifient pas le moteur de stockage natif.','page.dashboard':'Tableau de bord','page.engineHealth':'État du moteur','page.realtimeMetrics':'Métriques en temps réel','page.eventRingMonitor':'Moniteur de l’anneau d’événements','page.pressureDiagnostics':'Diagnostic de pression','page.recoveryPlanner':'Planificateur de récupération','page.security':'Sécurité','about.eyebrow':'À propos','about.title':'TDS Browser','about.browserVersion':'Version du navigateur','about.nativeEngine':'Moteur natif','about.visualSystem':'Système visuel','about.customSvg':'Console d’exploitation avec SVG personnalisé','about.storageFocus':'Orientation stockage','about.storageFocusValue':'observabilité locale déterministe','about.copy':'Staqtapp-TDS Browser est une console d’exploitation professionnelle, prête pour plusieurs langues, qui observe TDS sans modifier le chemin critique du stockage.','about.close':'Fermer'
-    },
-    it:{
-      'nav.configuration':'Configurazione','nav.settings':'Impostazioni','settings.eyebrow':'Impostazioni del browser','settings.title':'Impostazioni generali','settings.localOnly':'locale del browser','settings.language':'Lingua','settings.startupPage':'Pagina iniziale','settings.refreshInterval':'Intervallo di aggiornamento','settings.manualRefresh':'Manuale','settings.about':'Informazioni su TDS Browser','settings.note':'Queste preferenze del browser sono salvate localmente e non modificano il motore nativo di archiviazione.','page.dashboard':'Dashboard','page.engineHealth':'Stato del motore','page.realtimeMetrics':'Metriche in tempo reale','page.eventRingMonitor':'Monitor dell’anello eventi','page.pressureDiagnostics':'Diagnostica della pressione','page.recoveryPlanner':'Pianificatore di ripristino','page.security':'Sicurezza','about.eyebrow':'Informazioni','about.title':'TDS Browser','about.browserVersion':'Versione del browser','about.nativeEngine':'Motore nativo','about.visualSystem':'Sistema visivo','about.customSvg':'Console operativa con SVG personalizzato','about.storageFocus':'Focus di archiviazione','about.storageFocusValue':'osservabilità locale deterministica','about.copy':'Staqtapp-TDS Browser è una console operativa professionale, pronta per più lingue, che osserva TDS senza modificare il percorso caldo dello storage.','about.close':'Chiudi'
+  let manifest = { default: 'en', languages: FALLBACK_LANGUAGES };
+  let packs = {};
+  const originalText = new WeakMap();
+  const originalAttrs = new WeakMap();
+
+  function loadSettings(){
+    try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); }
+    catch (_) { return Object.assign({}, DEFAULTS); }
+  }
+  function saveSettings(settings){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
+  function currentLanguage(){ return loadSettings().language || manifest.default || 'en'; }
+  function packFor(code){ return packs[code] || packs.en || {}; }
+  function translate(value, code){
+    if (value === undefined || value === null) return value;
+    const key = String(value).trim();
+    if (!key) return value;
+    const selected = packFor(code || currentLanguage());
+    const fallback = packFor('en');
+    return selected[key] || fallback[key] || value;
+  }
+  function translatePattern(value, code){
+    const text = translate(value, code);
+    const settings = loadSettings();
+    return String(text).replaceAll('{refresh}', Math.round((Number(settings.refreshMs) || 0) / 1000));
+  }
+
+  async function fetchJson(url){
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`${url} ${response.status}`);
+    return response.json();
+  }
+  async function loadPacks(){
+    try { manifest = await fetchJson(PACK_BASE + 'manifest.json'); }
+    catch (_) { manifest = { default: 'en', languages: FALLBACK_LANGUAGES }; }
+    await Promise.all((manifest.languages || FALLBACK_LANGUAGES).map(async (lang) => {
+      try { packs[lang.code] = await fetchJson(`${PACK_BASE}${lang.code}.json`); }
+      catch (_) { packs[lang.code] = packs[lang.code] || {}; }
+    }));
+  }
+
+  function rememberTextNode(node){
+    if (!originalText.has(node)) originalText.set(node, node.nodeValue);
+    return originalText.get(node);
+  }
+  function rememberAttr(el, attr){
+    let attrs = originalAttrs.get(el);
+    if (!attrs) { attrs = {}; originalAttrs.set(el, attrs); }
+    if (!(attr in attrs)) attrs[attr] = el.getAttribute(attr);
+    return attrs[attr];
+  }
+  function translateNodeTree(root, code){
+    const doc = root || document.body;
+    const walker = document.createTreeWalker(doc, NodeFilter.SHOW_TEXT, {
+      acceptNode(node){
+        if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+        const parent = node.parentElement;
+        if (!parent || ['SCRIPT','STYLE','NOSCRIPT'].includes(parent.tagName)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach((node) => {
+      const original = rememberTextNode(node);
+      const leading = original.match(/^\s*/)[0];
+      const trailing = original.match(/\s*$/)[0];
+      const core = original.trim();
+      if (core) node.nodeValue = leading + translatePattern(core, code) + trailing;
+    });
+    doc.querySelectorAll('[title], [aria-label], [data-i18n-title]').forEach((el) => {
+      ['title','aria-label'].forEach((attr) => {
+        if (el.hasAttribute(attr)) el.setAttribute(attr, translatePattern(rememberAttr(el, attr), code));
+      });
+      const titleKey = el.getAttribute('data-i18n-title');
+      if (titleKey) el.setAttribute('title', translatePattern(titleKey, code));
+    });
+  }
+
+  function populateLanguageSelect(){
+    const select = document.getElementById('tds-language-select');
+    if (!select) return;
+    const settings = loadSettings();
+    select.innerHTML = '';
+    (manifest.languages || FALLBACK_LANGUAGES).forEach((lang) => {
+      const option = document.createElement('option');
+      option.value = lang.code;
+      option.textContent = lang.nativeName === lang.englishName ? lang.nativeName : `${lang.nativeName} (${lang.englishName})`;
+      select.appendChild(option);
+    });
+    select.value = settings.language;
+    select.onchange = () => {
+      const next = loadSettings();
+      next.language = select.value;
+      saveSettings(next);
+      applyTranslations();
+    };
+  }
+  function initSettingsControls(){
+    const settings = loadSettings();
+    const startup = document.getElementById('tds-startup-select');
+    const refresh = document.getElementById('tds-refresh-select');
+    if (startup) {
+      startup.value = settings.startupPage;
+      startup.onchange = () => { const next = loadSettings(); next.startupPage = startup.value; saveSettings(next); };
     }
-  };
-  function load(){try{return Object.assign({},DEFAULTS,JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}'));}catch(_){return Object.assign({},DEFAULTS);}}
-  function save(s){localStorage.setItem(STORAGE_KEY,JSON.stringify(s));}
-  function t(key){const s=load(); return (packs[s.language]&&packs[s.language][key]) || packs.en[key] || key;}
-  function applyLanguage(){const s=load(); const pack=packs[s.language]||packs.en; document.documentElement.lang=s.language; document.querySelectorAll('[data-i18n]').forEach(el=>{const key=el.getAttribute('data-i18n'); if(pack[key]||packs.en[key]) el.textContent=pack[key]||packs.en[key];}); document.querySelectorAll('[data-i18n-title]').forEach(el=>{const key=el.getAttribute('data-i18n-title'); const val=pack[key]||packs.en[key]; if(val){el.setAttribute('title',val); el.setAttribute('aria-label',val);}}); document.querySelectorAll('option[data-i18n]').forEach(el=>{const key=el.getAttribute('data-i18n'); if(pack[key]||packs.en[key]) el.textContent=pack[key]||packs.en[key];});}
-  function refreshLabel(ms){if(ms==='manual')return t('settings.manualRefresh'); const sec=Number(ms)/1000; return sec===1?'1 second':`${sec} seconds`;}
-  function applyRefreshLabels(){const s=load(); const label=refreshLabel(s.refreshMs); const side=document.getElementById('side-refresh-policy'); if(side) side.textContent=s.refreshMs==='manual'?label:`${label} snapshot`; const system=document.getElementById('system-refresh-policy'); if(system) system.textContent=label;}
-  function populate(){const s=load(); const lang=document.getElementById('tds-language-select'); if(lang&&!lang.dataset.ready){languages.forEach(([code,name])=>{const o=document.createElement('option'); o.value=code; o.textContent=name; lang.appendChild(o);}); lang.dataset.ready='1';} if(lang) lang.value=s.language; const startup=document.getElementById('tds-startup-select'); if(startup) startup.value=s.startupPage; const refresh=document.getElementById('tds-refresh-select'); if(refresh) refresh.value=String(s.refreshMs);}
-  function wire(){const lang=document.getElementById('tds-language-select'); if(lang) lang.addEventListener('change',()=>{const s=load(); s.language=lang.value; save(s); applyLanguage(); applyRefreshLabels();}); const startup=document.getElementById('tds-startup-select'); if(startup) startup.addEventListener('change',()=>{const s=load(); s.startupPage=startup.value; save(s);}); const refresh=document.getElementById('tds-refresh-select'); if(refresh) refresh.addEventListener('change',()=>{const s=load(); s.refreshMs=refresh.value==='manual'?'manual':Number(refresh.value); save(s); applyRefreshLabels(); if(window.TDSDashboardRefresh&&window.TDSDashboardRefresh.restart) window.TDSDashboardRefresh.restart();}); const about=document.getElementById('tds-about-button'), dialog=document.getElementById('tds-about-dialog'), close=document.getElementById('tds-about-close'); if(about&&dialog) about.addEventListener('click',()=>{dialog.classList.add('open'); dialog.setAttribute('aria-hidden','false');}); if(close&&dialog) close.addEventListener('click',()=>{dialog.classList.remove('open'); dialog.setAttribute('aria-hidden','true');}); if(dialog) dialog.addEventListener('click',(e)=>{if(e.target===dialog){dialog.classList.remove('open'); dialog.setAttribute('aria-hidden','true');}}); document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&dialog&&dialog.classList.contains('open')){dialog.classList.remove('open');dialog.setAttribute('aria-hidden','true');}});}
-  function applyStartup(){const s=load(); if(!location.hash && s.startupPage && s.startupPage!=='overview') location.hash=s.startupPage;}
-  window.TDSBrowserSettings={load,save,t,applyLanguage,applyRefreshLabels,getRefreshMS(){const v=load().refreshMs; return v==='manual'?0:Number(v||DEFAULTS.refreshMs);},init(){populate(); applyLanguage(); applyRefreshLabels(); wire(); applyStartup();}};
-  document.addEventListener('DOMContentLoaded',()=>window.TDSBrowserSettings.init());
+    if (refresh) {
+      refresh.value = settings.refreshMs > 0 ? String(settings.refreshMs) : 'manual';
+      refresh.onchange = () => {
+        const next = loadSettings();
+        next.refreshMs = refresh.value === 'manual' ? 0 : Number(refresh.value);
+        saveSettings(next);
+        applyTranslations();
+        if (window.TDSDashboardRefresh) window.TDSDashboardRefresh.restart();
+      };
+    }
+    const about = document.getElementById('tds-about-button');
+    const dialog = document.getElementById('tds-about-dialog');
+    const close = document.getElementById('tds-about-close');
+    if (about && dialog) about.onclick = () => { dialog.setAttribute('aria-hidden','false'); };
+    if (close && dialog) close.onclick = () => { dialog.setAttribute('aria-hidden','true'); };
+    if (dialog) dialog.addEventListener('click', (ev) => { if (ev.target === dialog) dialog.setAttribute('aria-hidden','true'); });
+  }
+  function applyTranslations(root){
+    const code = currentLanguage();
+    document.documentElement.lang = code;
+    translateNodeTree(root || document.body, code);
+    populateLanguageSelect();
+  }
+  function getRefreshMS(){ return Number(loadSettings().refreshMs) || 0; }
+  function goToStartupPage(){
+    const startup = loadSettings().startupPage;
+    if (startup && startup !== 'overview') {
+      setTimeout(() => { const el = document.getElementById(startup); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 120);
+    }
+  }
+
+  window.TDSI18N = { t: translatePattern, applyTranslations, loadPacks };
+  window.TDSBrowserSettings = { load: loadSettings, save: saveSettings, getRefreshMS };
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    await loadPacks();
+    populateLanguageSelect();
+    initSettingsControls();
+    applyTranslations();
+    goToStartupPage();
+  });
 })();
