@@ -195,4 +195,6 @@ function render(data){
   }catch(err){ setText('health-main','PANEL ERROR'); console.error(err); }
 }
 async function refreshDashboard(){try{const resp=await fetch('/status.json',{cache:'no-store'}); if(!resp.ok) throw new Error(`status ${resp.status}`); render(await resp.json());}catch(err){setText('health-main','DISCONNECTED'); setText('health-sub','Waiting for local admin server'); console.error(err);}}
-updateNav(); refreshDashboard(); setInterval(refreshDashboard, window.STAQTAPP_REFRESH_MS || 2000);
+updateNav(); refreshDashboard();
+window.TDSDashboardRefresh = { timer:null, restart(){ if(this.timer){ clearInterval(this.timer); this.timer=null; } const ms = window.TDSBrowserSettings ? window.TDSBrowserSettings.getRefreshMS() : (window.STAQTAPP_REFRESH_MS || 2000); if(ms>0){ this.timer=setInterval(refreshDashboard, ms); } } };
+window.TDSDashboardRefresh.restart();
