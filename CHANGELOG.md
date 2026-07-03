@@ -1,3 +1,14 @@
+# Changelog
+
+## v2.8.1 — Admin Browser Security Hotfix
+
+- Added per-server CSRF tokens for browser/admin state-changing POST routes.
+- Added Origin/Referer rejection for admin POST mutations.
+- Reworked dynamic dashboard renderers to use DOM nodes/textContent instead of innerHTML.
+- Hardened malformed Content-Length handling in the admin panel.
+- Hardened browser settings parsing and exposed language-pack fallback status.
+- Preserved the native storage engine and all storage hot-path behavior.
+
 ## 2.8.0
 
 - Added external TDS Browser language packs under `static/i18n/` for English, Spanish, Portuguese, Japanese, German, French, and Italian.
@@ -5,7 +16,7 @@
 - Preserved stable native telemetry keys and engine payloads; only browser presentation text is translated.
 - Added language-pack manifest loading with English fallback and localStorage-backed language selection.
 - Added tests that verify language-pack packaging, complete key coverage across all seven languages, and key technical terminology translations.
-- Left the native storage engine unchanged; v2.8.0 is a browser localization and language-pack quality release.
+- Left the native storage engine unchanged; v2.8.1 is a browser localization and language-pack quality release.
 
 ## 2.7.9
 
