@@ -277,13 +277,52 @@
         </article>
       </section>
 
-      <section id="snapshots" class="console-page-grid">
-        <article class="panel-card glass wide-panel"><div class="section-head"><div><p class="eyebrow">SNAPSHOT EXPLORER</p><h2>Immutable telemetry snapshots</h2></div><span class="chip blue-chip">observer-safe</span></div><div class="page-placeholder"><img src="/static/icons/snapshot.svg" alt=""><p>Snapshot sequence, build cost, ring position, and pressure-state comparison use the same glass panel system as Pressure Diagnostics.</p></div></article>
-        <article id="locks" class="panel-card glass wide-panel"><div class="section-head"><div><p class="eyebrow">LOCK CONTENTION</p><h2>Native wait-state diagnostics</h2></div><span class="chip">transition-fed</span></div><div class="page-placeholder"><img src="/static/icons/clock.svg" alt=""><p>Lock pressure, wait transitions, and contention spikes are reserved for the v2.7.3/v2.8 diagnostic expansion without changing the hot path.</p></div></article>
+      <section id="snapshots" class="console-page-grid telemetry-page telemetry-snapshots-page">
+        <article class="panel-card glass wide-panel telemetry-card">
+          <div class="section-head"><div><p class="eyebrow">SNAPSHOT EXPLORER</p><h2>Immutable telemetry snapshots</h2></div><span class="chip blue-chip">observer-safe</span></div>
+          <div class="telemetry-summary-grid">
+            <div class="telemetry-command-card"><img src="/static/icons/snapshot.svg" alt=""><div><span>Snapshot sequence</span><b id="snapshot-sequence">0</b><small id="snapshot-created">waiting for cached status</small></div></div>
+            <div class="telemetry-command-card"><img src="/static/icons/clock.svg" alt=""><div><span>Snapshot age</span><b id="snapshot-age-large">—</b><small>browser-side freshness estimate</small></div></div>
+          </div>
+          <div class="kv-list telemetry-kv">
+            <p><span>Native build cost</span><b><span id="snapshot-build-cost">0</span> ns</b></p>
+            <p><span>Diagnostic ring fill</span><b><span id="snapshot-ring-fill">0</span>%</b></p>
+            <p><span>Events dropped</span><b id="snapshot-events-dropped">0</b></p>
+            <p><span>Server time</span><b id="snapshot-server-time">—</b></p>
+          </div>
+          <p class="panel-note">Snapshot Explorer shows copied status payloads only. It never walks native storage state from the browser.</p>
+        </article>
+        <article id="locks" class="panel-card glass wide-panel telemetry-card">
+          <div class="section-head"><div><p class="eyebrow">LOCK CONTENTION</p><h2>Native wait-state diagnostics</h2></div><span class="chip" id="lock-contention-chip">transition-fed</span></div>
+          <div class="pressure-breakdown compact-breakdown">
+            <p><span>Lock pressure</span><b><em class="bar"><i id="lock-page-pressure-bar" style="width:0%"></i></em><span id="lock-page-pressure">0%</span></b></p>
+            <p><span>Python bridge pressure</span><b><em class="bar"><i id="bridge-page-pressure-bar" style="width:0%"></i></em><span id="bridge-page-pressure">0%</span></b></p>
+            <p><span>Ring pressure</span><b><em class="bar"><i id="ring-page-pressure-bar" style="width:0%"></i></em><span id="ring-page-pressure">0%</span></b></p>
+          </div>
+          <div class="kv-list telemetry-kv">
+            <p><span>Python↔Native transitions</span><b id="lock-page-transitions">0</b></p>
+            <p><span>GIL released calls</span><b id="lock-page-gil">0</b></p>
+            <p><span>Slot transitions</span><b id="lock-page-slot-transitions">0</b></p>
+            <p><span>Index transitions</span><b id="lock-page-index-transitions">0</b></p>
+          </div>
+        </article>
       </section>
 
-      <section id="comparison" class="console-page-grid">
-        <article class="panel-card glass wide-panel"><div class="section-head"><div><p class="eyebrow">COMPARATIVE VIEWS</p><h2>Radix, Swiss, storage, and bridge comparison</h2></div><span class="chip orange-chip">trend-ready</span></div><div class="page-placeholder"><img src="/static/icons/radix.svg" alt=""><p>Comparative panels share the same spacing, typography, and card hierarchy as Pressure Diagnostics so every page feels native to the console.</p></div></article>
+      <section id="comparison" class="console-page-grid telemetry-page comparison-page">
+        <article class="panel-card glass wide-panel telemetry-card"><div class="section-head"><div><p class="eyebrow">COMPARATIVE VIEWS</p><h2>Radix, Swiss, storage, and bridge comparison</h2></div><span class="chip orange-chip">trend-ready</span></div>
+          <div class="comparison-grid">
+            <div class="comparison-tile"><img src="/static/icons/swiss.svg" alt=""><span>Swiss index</span><b id="compare-swiss-load">0%</b><small>load factor</small></div>
+            <div class="comparison-tile"><img src="/static/icons/radix.svg" alt=""><span>Radix router</span><b id="compare-radix-depth">0</b><small>avg steps</small></div>
+            <div class="comparison-tile"><img src="/static/icons/storage.svg" alt=""><span>Storage</span><b id="compare-storage-entries">0</b><small>entries</small></div>
+            <div class="comparison-tile"><img src="/static/icons/runtime.svg" alt=""><span>Native bridge</span><b id="compare-native-exec">0%</b><small>native execution</small></div>
+          </div>
+          <div class="kv-list telemetry-kv">
+            <p><span>Swiss probe pressure</span><b id="compare-probe-pressure">0</b></p>
+            <p><span>Active chunks</span><b id="compare-active-chunks">0</b></p>
+            <p><span>Memory pressure</span><b id="compare-memory-pressure">0%</b></p>
+            <p><span>Dashboard pressure</span><b id="compare-dashboard-pressure">0%</b></p>
+          </div>
+        </article>
         <article id="recovery" class="panel-card glass wide-panel recovery-planner-page">
           <div class="section-head"><div><p class="eyebrow">RECOVERY PLANNER</p><h2>Advisory recovery state</h2></div><span class="chip orange-chip" id="recovery-status">Stable</span></div>
           <div class="recovery-summary-grid">
@@ -295,8 +334,11 @@
         </article>
       </section>
 
-      <section id="alerts" class="console-page-grid">
-        <article class="panel-card glass wide-panel"><div class="section-head"><div><p class="eyebrow">ALERTS & EVENTS</p><h2>Operational event stream</h2></div><span class="chip">ring-buffer aware</span></div><div class="page-placeholder"><img src="/static/icons/quarantine.svg" alt=""><p>Pressure warnings, lost-event notices, bridge lag, and transition-ring wrap events are styled as high-signal operational cards.</p></div></article>
+      <section id="alerts" class="console-page-grid telemetry-page alerts-page">
+        <article class="panel-card glass wide-panel telemetry-card"><div class="section-head"><div><p class="eyebrow">ALERTS &amp; EVENTS</p><h2>Operational event stream</h2></div><span class="chip" id="alerts-chip">ring-buffer aware</span></div>
+          <div id="alerts-list" class="diag-event-list alerts-list"></div>
+          <p class="panel-note">Alerts are derived from pressure, native diagnostics, recovery planner, and dropped-event counters. They are informational and do not mutate TDS state.</p>
+        </article>
       </section>
 
       <section class="lower-grid">
@@ -347,8 +389,8 @@
         <div class="about-card glass">
           <div class="about-head"><img src="/static/icons/logo.svg" alt=""><div><p class="eyebrow" data-i18n="about.eyebrow">ABOUT</p><h2 id="tds-about-title" data-i18n="about.title">TDS Browser</h2></div></div>
           <div class="about-grid">
-            <p><span data-i18n="about.browserVersion">Browser Version</span><b>2.7.8</b></p>
-            <p><span data-i18n="about.nativeEngine">Native Engine</span><b>2.7.8</b></p>
+            <p><span data-i18n="about.browserVersion">Browser Version</span><b>2.8.0</b></p>
+            <p><span data-i18n="about.nativeEngine">Native Engine</span><b>2.8.0</b></p>
             <p><span data-i18n="about.visualSystem">Visual System</span><b data-i18n="about.customSvg">Custom SVG Operations Console</b></p>
             <p><span data-i18n="about.storageFocus">Storage Focus</span><b data-i18n="about.storageFocusValue">local deterministic observability</b></p>
           </div>
