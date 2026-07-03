@@ -5,11 +5,11 @@ from staqtapp_tds.admin.panel import AdminPanelServer, render_dashboard_html
 
 
 def test_v273_version():
-    assert __version__ == "2.7.4"
+    assert __version__ == "2.7.5"
 
 
 def test_v273_dashboard_has_categorized_engineering_navigation():
-    html = render_dashboard_html(version="2.7.4")
+    html = render_dashboard_html(version="2.7.5")
     assert "Pressure Diagnostics" in html
     assert "Snapshot Explorer" in html
     assert "Lock Contention" in html
