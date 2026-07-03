@@ -1,3 +1,15 @@
+## 2.7.5
+
+- Fixed `/status.json` live telemetry by importing `dumps_pretty` in `admin/panel.py`.
+- Fixed diagnostics page grid alignment by using a dedicated diagnostics grid.
+- Fixed the Health Ring so its conic-gradient reflects the current health score.
+- Wired the workload Maintenance legend to live telemetry and adjusted the donut rendering.
+- Eliminated workload percentage rounding drift by deriving the final bucket from the remaining percentage.
+- Added `title` and `aria-label` metadata to left navigation links for the collapsed sidebar.
+- Removed hidden leftover dashboard markup and unused JavaScript helper code.
+- Cleaned fragile CSS leftovers, including stale sidebar variables and shadowed pressure-grid column rules.
+- Kept Recovery Planner advisory-only and preserved snapshot-only dashboard data flow.
+
 ## 2.7.4
 
 - Added advisory Recovery Planner observer module.
