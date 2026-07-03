@@ -41,13 +41,13 @@
         <a class="nav-pill" href="#recommendations" aria-label="Policy Proposals" title="Policy Proposals"><img src="/static/icons/recommendations.svg" alt="">Policy Proposals</a>
         <a class="nav-pill" href="#alerts" aria-label="Alerts & Events" title="Alerts & Events"><img src="/static/icons/quarantine.svg" alt="">Alerts &amp; Events</a>
         <a class="nav-pill" href="#security" aria-label="Security" title="Security"><img src="/static/icons/security.svg" alt="">Security</a>
-        <div class="nav-section-label">Configuration</div>
-        <a class="nav-pill" href="#configuration" aria-label="Settings" title="Settings"><img src="/static/icons/configuration.svg" alt="">Settings</a>
+        <div class="nav-section-label" data-i18n="nav.configuration">Configuration</div>
+        <a class="nav-pill" href="#configuration" aria-label="Settings" title="Settings" data-i18n-title="nav.settings"><img src="/static/icons/configuration.svg" alt=""><span data-i18n="nav.settings">Settings</span></a>
       </nav>
       <section class="side-card">
         <div class="side-label">Control Plane</div>
         <div class="side-status"><span class="pulse-dot"></span><strong id="side-health">Healthy</strong></div>
-        <div class="mini-stat"><span>Refresh</span><b>{refresh}s snapshot</b></div>
+        <div class="mini-stat"><span data-i18n="settings.refreshInterval">Refresh Interval</span><b id="side-refresh-policy">{refresh}s snapshot</b></div>
         <div class="mini-stat"><span>Mode</span><b>local-only</b></div>
         <div class="mini-stat"><span>Uptime</span><b id="side-uptime">00:00:00</b></div>
       </section>
@@ -248,7 +248,7 @@
             <p><span>Python Fallback / sec</span><b id="py-fallback">0</b></p>
             <p><span>Snapshot Age</span><b id="snapshot-age">—</b></p>
             <p><span>Dashboard Load</span><b>&lt;1%</b></p>
-            <p><span>Refresh Policy</span><b>{refresh}s</b></p>
+            <p><span data-i18n="settings.refreshInterval">Refresh Interval</span><b id="system-refresh-policy">{refresh}s</b></p>
             <p><span>Deep Diagnostics</span><b>manual only</b></p>
           </div>
         </article>
@@ -315,16 +315,47 @@
         </article>
       </section>
 
-      <section id="configuration" class="config-card glass">
-        <div class="section-head"><div><p class="eyebrow">CONFIGURATION</p><h2>Stage, promote, or rollback RuntimeConfig</h2></div><span class="chip orange-chip">admin actions audited</span></div>
-        <form class="config-form" method="post" action="/stage">
-          <label>Chunk bytes <input name="chunk_bytes" type="number" min="1024" step="1024" value="65536"></label>
-          <label>Compression <select name="compression"><option value="zlib">zlib</option><option value="none">none</option><option value="lz4">lz4</option><option value="zstd">zstd</option></select></label>
-          <label class="check"><input name="compression_enabled" type="checkbox" checked> Compression enabled</label>
-          <button type="submit">Stage next generation</button>
-        </form>
-        <div class="button-row"><form method="post" action="/promote"><button class="promote" type="submit">Promote staged RC</button></form><form method="post" action="/rollback"><button class="rollback" type="submit">Rollback active RC</button></form></div>
+      <section id="configuration" class="config-card glass settings-page">
+        <div class="section-head"><div><p class="eyebrow" data-i18n="settings.eyebrow">BROWSER SETTINGS</p><h2 data-i18n="settings.title">General Settings</h2></div><span class="chip blue-chip" data-i18n="settings.localOnly">browser local</span></div>
+        <div class="settings-form" aria-label="TDS Browser Settings">
+          <label class="setting-field" for="tds-language-select"><span data-i18n="settings.language">Language</span><select id="tds-language-select" autocomplete="off"></select></label>
+          <label class="setting-field" for="tds-startup-select"><span data-i18n="settings.startupPage">Startup Page</span><select id="tds-startup-select" autocomplete="off">
+            <option value="overview" data-i18n="page.dashboard">Dashboard</option>
+            <option value="architecture" data-i18n="page.engineHealth">Engine Health</option>
+            <option value="performance" data-i18n="page.realtimeMetrics">Real-time Metrics</option>
+            <option value="diagnostics" data-i18n="page.eventRingMonitor">Event Ring Monitor</option>
+            <option value="pressure" data-i18n="page.pressureDiagnostics">Pressure Diagnostics</option>
+            <option value="recovery" data-i18n="page.recoveryPlanner">Recovery Planner</option>
+            <option value="security" data-i18n="page.security">Security</option>
+            <option value="configuration" data-i18n="nav.settings">Settings</option>
+          </select></label>
+          <label class="setting-field" for="tds-refresh-select"><span data-i18n="settings.refreshInterval">Refresh Interval</span><select id="tds-refresh-select" autocomplete="off">
+            <option value="1000">1 second</option>
+            <option value="2000">2 seconds</option>
+            <option value="5000">5 seconds</option>
+            <option value="10000">10 seconds</option>
+            <option value="manual" data-i18n="settings.manualRefresh">Manual</option>
+          </select></label>
+        </div>
+        <div class="settings-actions">
+          <button id="tds-about-button" type="button" class="settings-button"><img src="/static/icons/about.svg" alt=""><span data-i18n="settings.about">About TDS Browser</span></button>
+          <p class="settings-note" data-i18n="settings.note">These browser preferences are stored locally and do not alter the native storage engine.</p>
+        </div>
       </section>
+
+      <div id="tds-about-dialog" class="about-dialog" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="tds-about-title">
+        <div class="about-card glass">
+          <div class="about-head"><img src="/static/icons/logo.svg" alt=""><div><p class="eyebrow" data-i18n="about.eyebrow">ABOUT</p><h2 id="tds-about-title" data-i18n="about.title">TDS Browser</h2></div></div>
+          <div class="about-grid">
+            <p><span data-i18n="about.browserVersion">Browser Version</span><b>2.7.8</b></p>
+            <p><span data-i18n="about.nativeEngine">Native Engine</span><b>2.7.8</b></p>
+            <p><span data-i18n="about.visualSystem">Visual System</span><b data-i18n="about.customSvg">Custom SVG Operations Console</b></p>
+            <p><span data-i18n="about.storageFocus">Storage Focus</span><b data-i18n="about.storageFocusValue">local deterministic observability</b></p>
+          </div>
+          <p class="about-copy" data-i18n="about.copy">Staqtapp-TDS Browser is a professional, language-ready operations console for observing TDS without mutating the storage hot path.</p>
+          <div class="about-actions"><button id="tds-about-close" type="button" class="settings-button" data-i18n="about.close">Close</button></div>
+        </div>
+      </div>
 
       <section id="timeline" class="timeline-card glass">
         <div class="section-head"><div><p class="eyebrow">TIMELINE</p><h2>Operational storyline</h2></div><span class="chip">recent events</span></div>
@@ -332,7 +363,8 @@
       </section>
     </main>
   </div>
-  <script>window.STAQTAPP_REFRESH_MS = {refresh}000;</script>
+  <script>window.STAQTAPP_REFRESH_MS = {refresh}000; window.STAQTAPP_VERSION = "{version}";</script>
+  <script src="/static/js/i18n.js"></script>
   <script src="/static/js/dashboard.js"></script>
 </body>
 </html>
