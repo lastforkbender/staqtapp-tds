@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import mimetypes
+import secrets
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
@@ -25,7 +26,7 @@ def _resource_bytes(relative: str) -> bytes:
     return (package_root / relative).read_bytes()
 
 
-def render_dashboard_html(*, version: str = __version__, refresh_seconds: float = PANEL_REFRESH_SECONDS) -> str:
+def render_dashboard_html(*, version: str = __version__, refresh_seconds: float = PANEL_REFRESH_SECONDS, csrf_token: str = "") -> str:
     """Render the packaged dashboard shell.
 
     The visual dashboard is intentionally stored as template/CSS/JS/SVG assets
@@ -38,6 +39,7 @@ def render_dashboard_html(*, version: str = __version__, refresh_seconds: float 
     return (
         template.replace("{version}", html.escape(str(version)))
         .replace("{refresh}", f"{refresh_seconds:.0f}")
+        .replace("{csrf_token}", html.escape(str(csrf_token), quote=True))
     )
 
 
@@ -57,6 +59,7 @@ class AdminPanelServer:
         self.control = control or AdminControl()
         self.host = host
         self.port = port
+        self.csrf_token = secrets.token_urlsafe(32)
         auth = getattr(self.control, "auth", None)
         if hasattr(auth, "assert_safe_for_bind"):
             auth.assert_safe_for_bind(host)
@@ -70,6 +73,7 @@ class AdminPanelServer:
             snap["system_health"] = "HEALTHY"
         snap["panel"] = {
             "mode": "local-only",
+            "csrf_required": True,
             "refresh_seconds": PANEL_REFRESH_SECONDS,
             "snapshot_only": True,
             "deep_diagnostics_manual_only": True,
@@ -128,15 +132,38 @@ class AdminPanelServer:
                     self._send(200, data, ctype)
                     return
                 if self.path in {"/", "/index.html", "/dashboard"}:
-                    self._send(200, render_dashboard_html(version=__version__, refresh_seconds=PANEL_REFRESH_SECONDS))
+                    self._send(200, render_dashboard_html(version=__version__, refresh_seconds=PANEL_REFRESH_SECONDS, csrf_token=outer.csrf_token))
                     return
                 self._send(404, "not found", "text/plain")
 
+            def _same_origin_request(self) -> bool:
+                expected = f"http://{outer.host}:{outer.port}"
+                for header in ("Origin", "Referer"):
+                    value = self.headers.get(header)
+                    if value and not value.startswith(expected):
+                        return False
+                return True
+
+            def _csrf_ok(self, form: dict[str, list[str]]) -> bool:
+                supplied = self.headers.get("x-tds-csrf") or form.get("csrf_token", [""])[0]
+                return secrets.compare_digest(str(supplied), outer.csrf_token)
+
             def do_POST(self):
-                length = int(self.headers.get("content-length", "0"))
-                raw = self.rfile.read(length).decode("utf-8")
-                form = parse_qs(raw)
                 try:
+                    length = int(self.headers.get("content-length", "0"))
+                except (TypeError, ValueError):
+                    self._send(400, "invalid content-length", "text/plain")
+                    return
+                try:
+                    raw = self.rfile.read(max(0, length)).decode("utf-8")
+                    form = parse_qs(raw)
+                    if self.path in {"/stage", "/promote", "/rollback"}:
+                        if not self._same_origin_request():
+                            self._send(403, "forbidden origin", "text/plain")
+                            return
+                        if not self._csrf_ok(form):
+                            self._send(403, "missing or invalid csrf token", "text/plain")
+                            return
                     if self.path == "/stage":
                         active = control.registry.active()
                         cand = active.next_generation(
