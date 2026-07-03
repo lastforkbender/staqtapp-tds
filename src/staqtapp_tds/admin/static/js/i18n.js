@@ -14,14 +14,24 @@
   ];
   let manifest = { default: 'en', languages: FALLBACK_LANGUAGES };
   let packs = {};
+  let packLoadErrors = [];
   const originalText = new WeakMap();
   const originalAttrs = new WeakMap();
 
+  function sanitizeSettings(settings){
+    const clean = Object.assign({}, DEFAULTS, settings || {});
+    const allowedRefresh = new Set([0,250,500,1000,2000,5000]);
+    clean.refreshMs = Number(clean.refreshMs);
+    if (!allowedRefresh.has(clean.refreshMs)) clean.refreshMs = DEFAULTS.refreshMs;
+    const codes = new Set((manifest.languages || FALLBACK_LANGUAGES).map((lang) => lang.code));
+    if (!codes.has(clean.language)) clean.language = manifest.default || 'en';
+    return clean;
+  }
   function loadSettings(){
-    try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); }
+    try { return sanitizeSettings(JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); }
     catch (_) { return Object.assign({}, DEFAULTS); }
   }
-  function saveSettings(settings){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
+  function saveSettings(settings){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(sanitizeSettings(settings))); }
   function currentLanguage(){ return loadSettings().language || manifest.default || 'en'; }
   function packFor(code){ return packs[code] || packs.en || {}; }
   function translate(value, code){
@@ -44,12 +54,14 @@
     return response.json();
   }
   async function loadPacks(){
+    packLoadErrors = [];
     try { manifest = await fetchJson(PACK_BASE + 'manifest.json'); }
-    catch (_) { manifest = { default: 'en', languages: FALLBACK_LANGUAGES }; }
+    catch (err) { manifest = { default: 'en', languages: FALLBACK_LANGUAGES }; packLoadErrors.push('manifest'); }
     await Promise.all((manifest.languages || FALLBACK_LANGUAGES).map(async (lang) => {
       try { packs[lang.code] = await fetchJson(`${PACK_BASE}${lang.code}.json`); }
-      catch (_) { packs[lang.code] = packs[lang.code] || {}; }
+      catch (err) { packs[lang.code] = packs[lang.code] || {}; packLoadErrors.push(lang.code); }
     }));
+    document.documentElement.dataset.i18nStatus = packLoadErrors.length ? 'fallback' : 'ready';
   }
 
   function rememberTextNode(node){
@@ -140,7 +152,7 @@
     translateNodeTree(root || document.body, code);
     populateLanguageSelect();
   }
-  function getRefreshMS(){ return Number(loadSettings().refreshMs) || 0; }
+  function getRefreshMS(){ const ms = Number(loadSettings().refreshMs); return ms > 0 ? ms : 0; }
   function goToStartupPage(){
     const startup = loadSettings().startupPage;
     if (startup && startup !== 'overview') {
@@ -148,7 +160,7 @@
     }
   }
 
-  window.TDSI18N = { t: translatePattern, applyTranslations, loadPacks };
+  window.TDSI18N = { t: translatePattern, applyTranslations, loadPacks, packLoadErrors: () => packLoadErrors.slice() };
   window.TDSBrowserSettings = { load: loadSettings, save: saveSettings, getRefreshMS };
 
   document.addEventListener('DOMContentLoaded', async () => {

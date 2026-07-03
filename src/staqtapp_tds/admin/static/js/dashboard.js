@@ -2,6 +2,11 @@ const $ = (id) => document.getElementById(id);
 const tr = (value) => window.TDSI18N ? window.TDSI18N.t(value) : value;
 const setText = (id, value) => { const el = $(id); if (el) el.textContent = tr(value ?? '—'); };
 const setWidth = (id, value) => { const el = $(id); if (el) el.style.width = `${Math.max(0, Math.min(100, Number(value) || 0))}%`; };
+const clear = (el) => { if (el) el.replaceChildren(); };
+const node = (tag, text, className) => { const el = document.createElement(tag); if (className) el.className = className; el.textContent = tr(text ?? ''); return el; };
+function appendPairRow(host, className, title, body){ const row=document.createElement('div'); row.className=className; row.appendChild(node('b', title)); row.appendChild(node('span', body)); host.appendChild(row); return row; }
+function appendTimelineRow(host, t, title, body){ const item=document.createElement('div'); item.className='timeline-item'; item.appendChild(node('time', t)); const div=document.createElement('div'); div.appendChild(node('b', title)); div.appendChild(node('span', body)); item.appendChild(div); host.appendChild(item); return item; }
+function appendRecoveryAction(host, className, title, recommendation, small, evidence){ const row=document.createElement('div'); row.className=className; row.appendChild(node('b', title)); row.appendChild(node('span', recommendation)); row.appendChild(node('small', small)); if(evidence) row.appendChild(node('em', evidence)); host.appendChild(row); return row; }
 const fmt = (value, fallback = 0) => {
   if (value === undefined || value === null || value === '') return fallback;
   if (typeof value === 'number') return Number.isInteger(value) ? value.toLocaleString() : value.toFixed(value < 10 ? 2 : 1);
@@ -31,7 +36,7 @@ function normalize(data){
 }
 function updateNav(){document.querySelectorAll('.nav-pill').forEach(a=>{a.addEventListener('click',()=>{document.querySelectorAll('.nav-pill').forEach(n=>n.classList.remove('active'));a.classList.add('active');});});}
 function renderNamespaces(behavior){
-  const host=$('namespaces'); if(!host)return; host.innerHTML='';
+  const host=$('namespaces'); if(!host)return; clear(host);
   const raw=behavior.hot_namespaces||behavior.namespaces||[];
   let items=[];
   if(Array.isArray(raw)) items=raw.map((x,i)=> typeof x==='string'? {name:x,ops:Math.max(1,5-i)} : {name:x.name||x.namespace||`ns-${i+1}`,ops:x.ops||x.count||x.value||1});
@@ -41,13 +46,16 @@ function renderNamespaces(behavior){
   items.slice(0,5).forEach(item=>{
     const pct=Math.max(4,Math.round((Number(item.ops)||0)/max*100));
     const row=document.createElement('div'); row.className='namespace-row';
-    row.innerHTML=`<span title="${String(item.name)}">${String(item.name)}</span><i style="width:${pct}%"></i><b>${Number(item.ops||0).toLocaleString()}</b>`;
+    const label=node('span', String(item.name)); label.title=String(item.name);
+    const bar=document.createElement('i'); bar.style.width=`${pct}%`;
+    const count=node('b', Number(item.ops||0).toLocaleString());
+    row.append(label, bar, count);
     host.appendChild(row);
   });
   if (window.TDSI18N) window.TDSI18N.applyTranslations(host);
 }
 function renderRecommendations(data){
-  const host=$('recommendations-list'); if(!host)return; host.innerHTML='';
+  const host=$('recommendations-list'); if(!host)return; clear(host);
   const n=normalize(data), perf=n.perf, storage=n.storage, indexes=n.indexes, behavior=n.behavior;
   const swiss=indexes.swiss||{};
   let list=behavior.recommendations||data.recommendations||[];
@@ -59,18 +67,19 @@ function renderRecommendations(data){
   if((Number(perf.python_backend_ops)||0)>(Number(perf.native_backend_ops)||0)) synthetic.push(['Python fallback dominates','Check native extension availability and benchmark native index mode.']);
   if(!list.length && !synthetic.length) synthetic.push(['System operating normally','No measured tuning action is currently recommended.']);
   [...list.map(x=>[x.title||x.name||'Recommendation',x.detail||x.message||String(x)]),...synthetic].slice(0,4).forEach(([title,body])=>{
-    const row=document.createElement('div'); row.className='reco'; row.innerHTML=`<div><b>${title}</b><span>${body}</span></div>`; host.appendChild(row);
+    const row=document.createElement('div'); row.className='reco'; const div=document.createElement('div'); div.appendChild(node('b', title)); div.appendChild(node('span', body)); row.appendChild(div); host.appendChild(row);
   });
   if (window.TDSI18N) window.TDSI18N.applyTranslations(host);
 }
 function renderTimeline(data){
-  const host=$('timeline-list'); if(!host)return; host.innerHTML='';
+  const host=$('timeline-list'); if(!host)return; clear(host);
   const n=normalize(data), active=n.active, perf=n.perf, behavior=n.behavior;
   const timeline=Array.isArray(perf.execution_timeline)?perf.execution_timeline.slice(-24):[];
   if(timeline.length){
     const graph=document.createElement('div'); graph.className='timeline-graph';
-    graph.innerHTML='<b>Native/GIL telemetry feedback</b><div class="spark"></div><small>bars show GIL-released %, labels show native execution % over cached snapshots</small>';
-    const spark=graph.querySelector('.spark');
+    graph.appendChild(node('b','Native/GIL telemetry feedback'));
+    const spark=document.createElement('div'); spark.className='spark'; graph.appendChild(spark);
+    graph.appendChild(node('small','bars show GIL-released %, labels show native execution % over cached snapshots'));
     timeline.forEach(p=>{
       const bar=document.createElement('i');
       const gil=Math.max(2,Math.min(100,Number(p.gil_released_percent)||0));
@@ -87,19 +96,19 @@ function renderTimeline(data){
     ['-5s','GIL feedback',`${fmt(perf.gil_released_percent,0)}% GIL-released native work, ${fmt(perf.python_native_transitions_per_sec,0)} Python↔native transitions/sec.`],
     ['-8s','RuntimeConfig active',`${active.config_id||'rc-000'} generation ${active.generation??0} is serving new operations.`]
   ];
-  rows.forEach(([t,title,body])=>{const item=document.createElement('div'); item.className='timeline-item'; item.innerHTML=`<time>${t}</time><div><b>${title}</b><span>${body}</span></div>`; host.appendChild(item);});
+  rows.forEach(([t,title,body])=>appendTimelineRow(host,t,title,body));
   if (window.TDSI18N) window.TDSI18N.applyTranslations(host);
 }
 
 function renderNativeDiagEvents(nativeDiag){
-  const host=$('native-diag-events'); if(!host)return; host.innerHTML='';
+  const host=$('native-diag-events'); if(!host)return; clear(host);
   const events=Array.isArray(nativeDiag.recent_events)?nativeDiag.recent_events.slice(-8).reverse():[];
-  if(!events.length){const empty=document.createElement('div'); empty.className='diag-event-row'; empty.innerHTML='<b>No native transition events yet</b><span>Start native operations or enable diagnostics.</span>'; host.appendChild(empty); return;}
+  if(!events.length){appendPairRow(host,'diag-event-row','No native transition events yet','Start native operations or enable diagnostics.'); return;}
   events.forEach(ev=>{
     const row=document.createElement('div'); row.className='diag-event-row';
     const name=titleCase(ev.event_name||`event ${ev.code||0}`);
     const sub=titleCase(ev.subsystem_name||'native diagnostics');
-    row.innerHTML=`<b>${name}</b><span>${sub} · seq ${fmt(ev.seq,0)} · obj ${fmt(ev.object_id,0)} · ${fmt(ev.value_a,0)}/${fmt(ev.value_b,0)}</span>`;
+    row.appendChild(node('b', name)); row.appendChild(node('span', `${sub} · seq ${fmt(ev.seq,0)} · obj ${fmt(ev.object_id,0)} · ${fmt(ev.value_a,0)}/${fmt(ev.value_b,0)}`));
     host.appendChild(row);
   });
   if (window.TDSI18N) window.TDSI18N.applyTranslations(host);
@@ -121,10 +130,10 @@ function renderPressureEngine(pressure){
   ];
   pairs.forEach(([id,key])=>{const v=Number(pressure[key]||0); setText(`${id}-pressure`, `${fmt(v,0)}%`); setWidth(`${id}-pressure-bar`, v);});
   setText('pressure-dominant', titleCase(pressure.dominant_component||'stable'));
-  const host=$('pressure-causes'); if(!host)return; host.innerHTML='';
+  const host=$('pressure-causes'); if(!host)return; clear(host);
   const causes=Array.isArray(pressure.causes)?pressure.causes.slice(0,5):[];
-  if(!causes.length){const row=document.createElement('div'); row.className='diag-event-row'; row.innerHTML='<b>Stable</b><span>No elevated pressure detected from current snapshots.</span>'; host.appendChild(row); return;}
-  causes.forEach((cause,i)=>{const row=document.createElement('div'); row.className='diag-event-row'; row.innerHTML=`<b>${i===0?'Dominant signal':'Supporting signal'}</b><span>${cause}</span>`; host.appendChild(row);});
+  if(!causes.length){appendPairRow(host,'diag-event-row','Stable','No elevated pressure detected from current snapshots.'); return;}
+  causes.forEach((cause,i)=>appendPairRow(host,'diag-event-row',i===0?'Dominant signal':'Supporting signal',String(cause)));
   if (window.TDSI18N) window.TDSI18N.applyTranslations(host);
 }
 
@@ -135,27 +144,23 @@ function renderRecoveryPlanner(recovery){
   setText('recovery-confidence', `${fmt(Number(recovery.confidence || 0),0)}%`);
   setText('recovery-summary', recovery.summary || 'Recovery Planner is observing pressure snapshots and no action is currently required.');
   const host=$('recovery-actions'); if(host){
-    host.innerHTML='';
+    clear(host);
     const actions=Array.isArray(recovery.actions)?recovery.actions.slice(0,5):[];
     if(!actions.length){
-      const row=document.createElement('div'); row.className='recovery-action';
-      row.innerHTML='<b>Observe only</b><span>No recovery action is recommended from the current snapshot.</span><small>automatic: no</small>';
-      host.appendChild(row);
+      appendRecoveryAction(host,'recovery-action','Observe only','No recovery action is recommended from the current snapshot.','automatic: no','');
     } else {
       actions.forEach(action=>{
-        const row=document.createElement('div'); row.className=`recovery-action ${action.severity||'info'}`;
         const evidence=Array.isArray(action.evidence)?action.evidence.slice(0,3).join(' '):'';
-        row.innerHTML=`<b>${action.title||action.code||'Recovery action'}</b><span>${action.recommendation||''}</span><small>${titleCase(action.subsystem||'system')} · confidence ${fmt(action.confidence||0,0)}% · automatic: ${action.automatic?'yes':'no'}</small><em>${evidence}</em>`;
-        host.appendChild(row);
+        appendRecoveryAction(host,`recovery-action ${action.severity||'info'}`,action.title||action.code||'Recovery action',action.recommendation||'',`${titleCase(action.subsystem||'system')} · confidence ${fmt(action.confidence||0,0)}% · automatic: ${action.automatic?'yes':'no'}`,evidence);
       });
     }
     if (window.TDSI18N) window.TDSI18N.applyTranslations(host);
   }
   const guards=$('recovery-guardrails'); if(guards){
-    guards.innerHTML='';
+    clear(guards);
     const list=Array.isArray(recovery.guardrails)?recovery.guardrails:[];
     (list.length?list:['Planner consumes copied snapshots only.','No automatic storage mutation is allowed.']).slice(0,4).forEach(g=>{
-      const row=document.createElement('p'); row.innerHTML=`<img src="/static/icons/security.svg" alt="">${g}`; guards.appendChild(row);
+      const row=document.createElement('p'); const img=document.createElement('img'); img.src='/static/icons/security.svg'; img.alt=''; row.appendChild(img); row.appendChild(node('span', g)); guards.appendChild(row);
     });
     if (window.TDSI18N) window.TDSI18N.applyTranslations(guards);
   }
@@ -193,7 +198,7 @@ function renderCompletedTelemetryPages(data){
   renderAlertsPage(data);
 }
 function renderAlertsPage(data){
-  const host=$('alerts-list'); if(!host) return; host.innerHTML='';
+  const host=$('alerts-list'); if(!host) return; clear(host);
   const n=normalize(data), pressure=n.pressure||{}, nativeDiag=n.nativeDiagnostics||{}, recovery=n.recovery||{}, ndc=nativeDiag.counters||{};
   const alerts=[];
   const pressureScore=Number(pressure.score||0)||0;
@@ -207,7 +212,7 @@ function renderAlertsPage(data){
   if(!alerts.length) alerts.push(['info','No active alerts','Current telemetry snapshot does not contain elevated operational events.']);
   alerts.slice(0,7).forEach(([level,title,body])=>{
     const row=document.createElement('div'); row.className=`diag-event-row alert-row ${level}`;
-    row.innerHTML=`<b>${title}</b><span>${body}</span>`;
+    row.appendChild(node('b', title)); row.appendChild(node('span', body));
     host.appendChild(row);
   });
   if (window.TDSI18N) window.TDSI18N.applyTranslations(host);
