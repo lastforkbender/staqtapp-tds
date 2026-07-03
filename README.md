@@ -1,10 +1,4 @@
-<p align="center">
-    <img src="docs/dashboard-2.7.4.png" alt="Staqtapp-TDS v2.7.4 Dashboard" width="100%"/>
-</p>
-
-- Image seen above may not reflect the current Staqtapp-TDS Dashboard's features applied
-
-# 🟦🟪🟧 Staqtapp-TDS v2.7.5
+# 🟦🟪🟧 Staqtapp-TDS v2.7.8
 
 Staqtapp-TDS is a content-neutral Temporal Directory System: a directory-first virtual storage engine with radix routing, Swiss-table-style indexing, chunking, persistence, admin control, and an observation dashboard.
 
@@ -25,9 +19,9 @@ The core principle remains unchanged:
 - Execution-mode telemetry: native %, Python %, GIL-released %, batch ops, and Python↔native transitions.
 - Optional Spiral-compatible trace/provenance module for trace-shaped workflows.
 
-## What is new in v2.7.5
+## What is new in v2.7.8
 
-v2.7.5 is a dashboard and diagnostics hardening release before the v2.8 Native Spiral Rank milestone. It fixes the live `/status.json` feed, corrects Operations Console alignment and live visual feedback, wires workload maintenance telemetry, removes leftover dashboard markup/dead JavaScript, improves collapsed-sidebar accessibility, and cleans fragile duplicate CSS rules identified in the v2.7.4 review.
+v2.7.8 adds the first dedicated TDS Browser Settings page: local language selection, startup-page selection, refresh-interval control, and a polished About dialog. It also introduces layout-safe localization rules so translated panel labels wrap inside fixed dashboard cards instead of overhanging horizontally. The native storage engine remains unchanged from v2.7.5 for this browser-focused release.
 
 v2.7.4 finalizes the dashboard Recovery Planner page and adds an advisory Recovery Planner observer. v2.7.3 extends the Native Diagnostics Engine foundation with named slot/index/memory transition events, ring occupancy telemetry, and browser transition-ring rendering. v2.7.0 introduced native atomic counters, a bounded diagnostic event ring, immutable diagnostic snapshots, a Python diagnostics bridge, and browser Operations Console integration. Diagnostics observes consequences only; it owns no storage objects, mutates no VFS/chunk/index state, and never blocks storage hot paths. v2.7.0 also preserves the v2.6.1 JSON centralization, native checksum batching, and chunk corruption checks.
 

@@ -1,3 +1,13 @@
+## 2.7.8
+
+- Added a dedicated TDS Browser Settings page focused on General browser preferences.
+- Added local language selection for English, Spanish, Portuguese, Japanese, German, French, and Italian.
+- Added startup page selection stored in browser localStorage.
+- Added refresh interval selection with manual refresh support.
+- Added a polished About TDS Browser dialog with version and visual-system information.
+- Added layout-safe localization CSS so long translated labels wrap inside cards/panels instead of expanding horizontally into neighboring panels.
+- Left the native storage engine unchanged; v2.7.8 is a browser settings/localization foundation release.
+
 ## 2.7.5
 
 - Fixed `/status.json` live telemetry by importing `dumps_pretty` in `admin/panel.py`.
