@@ -11,7 +11,6 @@ function percent(x){x=Number(x)||0;return x<=1?Math.round(x*1000)/10:Math.round(
 function titleCase(s){return String(s||'').replace(/[-_]/g,' ').replace(/\b\w/g,c=>c.toUpperCase());}
 function bytesLabel(v){if(typeof v==='string') return v; const n=Number(v)||0; if(n>=1073741824)return (n/1073741824).toFixed(2)+' GB'; if(n>=1048576)return (n/1048576).toFixed(1)+' MB'; if(n>=1024)return (n/1024).toFixed(1)+' KB'; return n+' B';}
 function snapshotAge(created){if(!created)return '—';return Math.max(0,((Date.now()/1000)-Number(created))).toFixed(1)+' sec';}
-function pick(data, path, fallback){let cur=data; for(const p of path.split('.')){if(cur && Object.prototype.hasOwnProperty.call(cur,p))cur=cur[p];else return fallback;} return cur ?? fallback;}
 function normalize(data){
   const obs=data.observation||data;
   return {
@@ -159,7 +158,7 @@ function render(data){
     const n=normalize(data), active=n.active, perf=n.perf, storage=n.storage, indexes=n.indexes, behavior=n.behavior, pressure=n.pressure||{}, nativeDiag=n.nativeDiagnostics||{}, recovery=n.recovery||{};
     const swiss=indexes.swiss||{}, radix=indexes.radix||{};
     const health=(data.system_health||'HEALTHY').toString().toUpperCase();
-    setText('last-update', new Date().toLocaleTimeString()); setText('side-health', titleCase(health)); setText('health-main', health); setText('health-score', health==='HEALTHY'?'99%':'72%'); setText('health-sub', health==='HEALTHY'?'All systems operational':'Review recommendations and audit events');
+    setText('last-update', new Date().toLocaleTimeString()); setText('side-health', titleCase(health)); setText('health-main', health); const scoreNum = health==='HEALTHY' ? 99 : 72; setText('health-score', `${scoreNum}%`); const healthRing=$('health-ring'); if(healthRing) healthRing.style.background=`conic-gradient(var(--green) 0 ${scoreNum}%, rgba(255,255,255,.12) ${scoreNum}% 100%)`; setText('health-sub', health==='HEALTHY'?'All systems operational':'Review recommendations and audit events');
     setText('runtime-config', active.config_id||'rc-000'); setText('runtime-gen', `Generation ${active.generation??0}`);
     setText('reads-sec', fmt(perf.reads_per_sec ?? perf.read_count,0)); setText('writes-sec', fmt(perf.writes_per_sec ?? perf.write_count,0)); setText('avg-lookup', fmt(perf.avg_lookup_ms,0));
     setText('memory-use', bytesLabel(storage.memory_bytes||storage.memory_usage||0)); setWidth('memory-meter', storage.memory_percent||38);
@@ -172,13 +171,20 @@ function render(data){
     setText('gil-reacquire-rate', fmt(pressure.gil_reacquire_rate ?? perf.python_native_transitions ?? 0,0)); setText('swiss-probe-pressure', fmt(pressure.swiss_probe_pressure ?? 0,0));
     renderPressureEngine(pressure); renderRecoveryPlanner(recovery);
     setText('chunk-sealed', fmt(storage.chunk_sealed ?? 0,0)); setText('chunk-verified', fmt(storage.chunk_verified ?? 0,0)); setText('chunk-indexed', fmt(storage.chunk_indexed ?? 0,0)); setText('chunk-exposed', fmt(storage.chunk_exposed ?? 0,0));
-    const reads=Number(perf.read_count||perf.reads_per_sec||0), writes=Number(perf.write_count||perf.writes_per_sec||0), total=Math.max(1,reads+writes);
-    const readPct=Math.round(reads/total*100), writePct=Math.round(writes/total*100), idlePct=(reads+writes)===0?100:0;
-    setText('workload-mode', behavior.workload_mode||((reads+writes)?(readPct>=writePct?'read-heavy':'write-heavy'):'idle'));
-    setText('workload-word', titleCase(behavior.workload_mode||((reads+writes)?(readPct>=writePct?'read':'write'):'idle'))); setText('workload-pct', `${Math.max(readPct,writePct,idlePct)}%`); setText('read-pct', `${readPct}%`); setText('write-pct', `${writePct}%`); setText('idle-pct', `${idlePct}%`);
-    const donut=$('donut'); if(donut) donut.style.background=`conic-gradient(var(--blue) 0 ${readPct}%, var(--orange) ${readPct}% ${readPct+writePct}%, var(--green) ${readPct+writePct}% 100%)`;
+    const reads=Number(perf.read_count||perf.reads_per_sec||0), writes=Number(perf.write_count||perf.writes_per_sec||0), maintenance=Number(perf.maintenance_count||perf.maintenance_ops||storage.maintenance_ops||0);
+    const workloadTotal=reads+writes+maintenance;
+    let readPct=0, writePct=0, maintenancePct=0, idlePct=100;
+    if(workloadTotal>0){
+      readPct=Math.round(reads/workloadTotal*100);
+      writePct=Math.round(writes/workloadTotal*100);
+      maintenancePct=Math.round(maintenance/workloadTotal*100);
+      idlePct=Math.max(0,100-readPct-writePct-maintenancePct);
+    }
+    setText('workload-mode', behavior.workload_mode||((workloadTotal)?(readPct>=writePct?'read-heavy':'write-heavy'):'idle'));
+    setText('workload-word', titleCase(behavior.workload_mode||((workloadTotal)?(readPct>=writePct?'read':'write'):'idle'))); setText('workload-pct', `${Math.max(readPct,writePct,maintenancePct,idlePct)}%`); setText('read-pct', `${readPct}%`); setText('write-pct', `${writePct}%`); setText('maintenance-pct', `${maintenancePct}%`); setText('idle-pct', `${idlePct}%`);
+    const donut=$('donut'); if(donut) donut.style.background=`conic-gradient(var(--blue) 0 ${readPct}%, var(--orange) ${readPct}% ${readPct+writePct}%, var(--purple) ${readPct+writePct}% ${readPct+writePct+maintenancePct}%, var(--green) ${readPct+writePct+maintenancePct}% 100%)`;
     renderNamespaces(behavior);
-    setText('current-op', titleCase(behavior.current_operation || ((reads+writes)?(readPct>=writePct?'lookup':'write'):'idle'))); setText('current-op-desc', (behavior.current_operation||'idle')==='idle'?'Waiting for engine activity':'Processing cached telemetry from engine operations'); setText('op-duration', fmt(perf.avg_lookup_ms,0));
+    setText('current-op', titleCase(behavior.current_operation || ((workloadTotal)?(readPct>=writePct?'lookup':'write'):'idle'))); setText('current-op-desc', (behavior.current_operation||'idle')==='idle'?'Waiting for engine activity':'Processing cached telemetry from engine operations'); setText('op-duration', fmt(perf.avg_lookup_ms,0));
     setText('queue-pending', fmt(storage.persistence_queue_pending,0)); setText('flush-rate', `${fmt(storage.persistence_flush_rate,0)} / sec`);
     setText('read-count', fmt(perf.reads_per_sec ?? perf.read_count,0)); setText('write-count', fmt(perf.writes_per_sec ?? perf.write_count,0)); setText('delete-count', fmt(storage.deletes||perf.delete_count,0)); setText('avg-lookup2', fmt(perf.avg_lookup_ms,0)); setText('avg-insert', fmt(perf.avg_write_ms,0)); setText('avg-chunk', fmt(perf.avg_chunk_ms,0)); setText('flush-ms', fmt(perf.avg_persistence_flush_ms,0)); setText('compression-ratio', `${fmt(behavior.compression_ratio||storage.compression_ratio,1)}x`);
     setText('swiss-entries', fmt(swiss.entries||swiss.size,0)); setText('swiss-load', `${fmt(percent(swiss.load_factor),0)}%`); setWidth('swiss-load-bar', percent(swiss.load_factor)); setText('avg-probe', fmt(swiss.average_probe||swiss.avg_probe,0)); setText('max-probe', fmt(swiss.max_probe,0)); setText('tombstones', fmt(swiss.tombstones,0));
