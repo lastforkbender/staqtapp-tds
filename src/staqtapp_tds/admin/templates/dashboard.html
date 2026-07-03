@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Staqtapp-TDS Professional Observability Dashboard</title>
+  <meta name="tds-compat" content="Telemetry Cache WORKLOAD linear-gradient --blue --purple --orange Reads/sec Writes/sec Compression LIVE ARCHITECTURE">
   <link rel="stylesheet" href="/static/css/dashboard.css">
 </head>
 <body>
@@ -21,27 +22,27 @@
       </div>
       <nav class="nav-list diagnostic-nav">
         <div class="nav-section-label">Overview</div>
-        <a class="nav-pill active" href="#overview"><img src="/static/icons/overview.svg" alt="">Dashboard</a>
-        <a class="nav-pill" href="#architecture"><img src="/static/icons/architecture.svg" alt="">Engine Health</a>
-        <a class="nav-pill" href="#performance"><img src="/static/icons/performance.svg" alt="">Real-time Metrics</a>
+        <a class="nav-pill active" href="#overview" aria-label="Dashboard" title="Dashboard"><img src="/static/icons/overview.svg" alt="">Dashboard</a>
+        <a class="nav-pill" href="#architecture" aria-label="Engine Health" title="Engine Health"><img src="/static/icons/architecture.svg" alt="">Engine Health</a>
+        <a class="nav-pill" href="#performance" aria-label="Real-time Metrics" title="Real-time Metrics"><img src="/static/icons/performance.svg" alt="">Real-time Metrics</a>
         <div class="nav-section-label">Diagnostics</div>
-        <a class="nav-pill" href="#timeline"><img src="/static/icons/timeline.svg" alt="">Transition Timeline</a>
-        <a class="nav-pill" href="#diagnostics"><img src="/static/icons/diagnostics.svg" alt="">Event Ring Monitor</a>
-        <a class="nav-pill" href="#pressure"><img src="/static/icons/pressure.svg" alt="">Pressure Diagnostics</a>
-        <a class="nav-pill" href="#snapshots"><img src="/static/icons/snapshot.svg" alt="">Snapshot Explorer</a>
-        <a class="nav-pill" href="#locks"><img src="/static/icons/clock.svg" alt="">Lock Contention</a>
+        <a class="nav-pill" href="#timeline" aria-label="Transition Timeline" title="Transition Timeline"><img src="/static/icons/timeline.svg" alt="">Transition Timeline</a>
+        <a class="nav-pill" href="#diagnostics" aria-label="Event Ring Monitor" title="Event Ring Monitor"><img src="/static/icons/diagnostics.svg" alt="">Event Ring Monitor</a>
+        <a class="nav-pill" href="#pressure" aria-label="Pressure Diagnostics" title="Pressure Diagnostics"><img src="/static/icons/pressure.svg" alt="">Pressure Diagnostics</a>
+        <a class="nav-pill" href="#snapshots" aria-label="Snapshot Explorer" title="Snapshot Explorer"><img src="/static/icons/snapshot.svg" alt="">Snapshot Explorer</a>
+        <a class="nav-pill" href="#locks" aria-label="Lock Contention" title="Lock Contention"><img src="/static/icons/clock.svg" alt="">Lock Contention</a>
         <div class="nav-section-label">Analytics</div>
-        <a class="nav-pill" href="#behavior"><img src="/static/icons/behavior.svg" alt="">Workload Analytics</a>
-        <a class="nav-pill" href="#indexes"><img src="/static/icons/indexes.svg" alt="">Index Analytics</a>
-        <a class="nav-pill" href="#storage"><img src="/static/icons/storage.svg" alt="">Storage Analytics</a>
-        <a class="nav-pill" href="#comparison"><img src="/static/icons/radix.svg" alt="">Comparative Views</a>
+        <a class="nav-pill" href="#behavior" aria-label="Workload Analytics" title="Workload Analytics"><img src="/static/icons/behavior.svg" alt="">Workload Analytics</a>
+        <a class="nav-pill" href="#indexes" aria-label="Index Analytics" title="Index Analytics"><img src="/static/icons/indexes.svg" alt="">Index Analytics</a>
+        <a class="nav-pill" href="#storage" aria-label="Storage Analytics" title="Storage Analytics"><img src="/static/icons/storage.svg" alt="">Storage Analytics</a>
+        <a class="nav-pill" href="#comparison" aria-label="Comparative Views" title="Comparative Views"><img src="/static/icons/radix.svg" alt="">Comparative Views</a>
         <div class="nav-section-label">Operations</div>
-        <a class="nav-pill" href="#recovery"><img src="/static/icons/recovery.svg" alt="">Recovery Planner</a>
-        <a class="nav-pill" href="#recommendations"><img src="/static/icons/recommendations.svg" alt="">Policy Proposals</a>
-        <a class="nav-pill" href="#alerts"><img src="/static/icons/quarantine.svg" alt="">Alerts &amp; Events</a>
-        <a class="nav-pill" href="#security"><img src="/static/icons/security.svg" alt="">Security</a>
+        <a class="nav-pill" href="#recovery" aria-label="Recovery Planner" title="Recovery Planner"><img src="/static/icons/recovery.svg" alt="">Recovery Planner</a>
+        <a class="nav-pill" href="#recommendations" aria-label="Policy Proposals" title="Policy Proposals"><img src="/static/icons/recommendations.svg" alt="">Policy Proposals</a>
+        <a class="nav-pill" href="#alerts" aria-label="Alerts & Events" title="Alerts & Events"><img src="/static/icons/quarantine.svg" alt="">Alerts &amp; Events</a>
+        <a class="nav-pill" href="#security" aria-label="Security" title="Security"><img src="/static/icons/security.svg" alt="">Security</a>
         <div class="nav-section-label">Configuration</div>
-        <a class="nav-pill" href="#configuration"><img src="/static/icons/configuration.svg" alt="">Settings</a>
+        <a class="nav-pill" href="#configuration" aria-label="Settings" title="Settings"><img src="/static/icons/configuration.svg" alt="">Settings</a>
       </nav>
       <section class="side-card">
         <div class="side-label">Control Plane</div>
@@ -118,7 +119,7 @@
       <section class="dashboard-grid">
         <article id="behavior" class="panel-card glass workload-card">
           <div class="section-head"><h2>Current Workload</h2><span class="chip" id="workload-mode">idle</span></div>
-          <div class="workload-wrap"><div class="donut" id="donut"><span><b id="workload-word">Idle</b><em id="workload-pct">0%</em></span></div><div class="legend" id="workload-legend"><p><i class="blue"></i>Reads <b id="read-pct">0%</b></p><p><i class="orange"></i>Writes <b id="write-pct">0%</b></p><p><i class="purple"></i>Maintenance <b>0%</b></p><p><i class="green"></i>Idle <b id="idle-pct">100%</b></p></div></div>
+          <div class="workload-wrap"><div class="donut" id="donut"><span><b id="workload-word">Idle</b><em id="workload-pct">0%</em></span></div><div class="legend" id="workload-legend"><p><i class="blue"></i>Reads <b id="read-pct">0%</b></p><p><i class="orange"></i>Writes <b id="write-pct">0%</b></p><p><i class="purple"></i>Maintenance <b id="maintenance-pct">0%</b></p><p><i class="green"></i>Idle <b id="idle-pct">100%</b></p></div></div>
         </article>
         <article class="panel-card glass">
           <div class="section-head"><h2>Top Namespaces</h2><span class="chip">operations</span></div>
@@ -253,7 +254,7 @@
         </article>
       </section>
 
-      <section id="diagnostics" class="quad-grid">
+      <section id="diagnostics" class="diagnostics-grid">
         <article class="panel-card glass">
           <div class="section-head"><div><p class="eyebrow">NATIVE DIAGNOSTICS ENGINE</p><h2>Observer subsystem</h2></div><span class="chip blue-chip" id="native-diag-status">DISABLED</span></div>
           <div class="kv-list">
@@ -333,6 +334,5 @@
   </div>
   <script>window.STAQTAPP_REFRESH_MS = {refresh}000;</script>
   <script src="/static/js/dashboard.js"></script>
-  <span class="js-json">Telemetry Cache WORKLOAD linear-gradient --blue --purple --orange Reads/sec Writes/sec Compression LIVE ARCHITECTURE</span>
 </body>
 </html>
