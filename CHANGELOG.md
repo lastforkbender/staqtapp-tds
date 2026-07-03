@@ -1,3 +1,18 @@
+## 2.8.0
+
+- Added external TDS Browser language packs under `static/i18n/` for English, Spanish, Portuguese, Japanese, German, French, and Italian.
+- Localized the Browser Operations Console pages, navigation, Settings page, telemetry labels, About dialog, advisory text, and snapshot-page labels through a shared language manager.
+- Preserved stable native telemetry keys and engine payloads; only browser presentation text is translated.
+- Added language-pack manifest loading with English fallback and localStorage-backed language selection.
+- Added tests that verify language-pack packaging, complete key coverage across all seven languages, and key technical terminology translations.
+- Left the native storage engine unchanged; v2.8.0 is a browser localization and language-pack quality release.
+
+## 2.7.9
+
+- Completed Browser Operations Console telemetry pages for Snapshot Explorer, Lock Contention, Comparative Views, and Alerts & Events.
+- Preserved the v2.7.8 Settings/i18n foundation.
+- Left the native storage engine unchanged; v2.7.9 is a browser telemetry completion release.
+
 ## 2.7.8
 
 - Added a dedicated TDS Browser Settings page focused on General browser preferences.

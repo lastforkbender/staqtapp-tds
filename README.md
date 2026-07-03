@@ -1,11 +1,11 @@
 <p align="center">
-    <img src="docs/dashboard-2.7.4.png" alt="Staqtapp-TDS v2.7.4 Dashboard" width="100%"/>
+    <img src="docs/dashboard-2.7.4.png" alt="Staqtapp-TDS v2.8.0 Dashboard" width="100%"/>
 </p>
 
 - Image seen above may not reflect the current Staqtapp-TDS Dashboard's features applied
 
 
-# 🟦🟪🟧 Staqtapp-TDS v2.7.8
+# 🟦🟪🟧 Staqtapp-TDS v2.8.0
 
 Staqtapp-TDS is a content-neutral Temporal Directory System: a directory-first virtual storage engine with radix routing, Swiss-table-style indexing, chunking, persistence, admin control, and an observation dashboard.
 
@@ -26,11 +26,13 @@ The core principle remains unchanged:
 - Execution-mode telemetry: native %, Python %, GIL-released %, batch ops, and Python↔native transitions.
 - Optional Spiral-compatible trace/provenance module for trace-shaped workflows.
 
-## What is new in v2.7.8
+## What is new in v2.8.0
 
-v2.7.8 adds the first dedicated TDS Browser Settings page: local language selection, startup-page selection, refresh-interval control, and a polished About dialog. It also introduces layout-safe localization rules so translated panel labels wrap inside fixed dashboard cards instead of overhanging horizontally. The native storage engine remains unchanged from v2.7.5 for this browser-focused release.
+v2.8.0 is the TDS Browser language-pack release. It adds external browser language packs for English, Spanish, Portuguese, Japanese, German, French, and Italian, and applies them across the Browser Operations Console: navigation, telemetry pages, Settings, About, advisory notes, snapshot labels, and static panel text.
 
-v2.7.4 finalizes the dashboard Recovery Planner page and adds an advisory Recovery Planner observer. v2.7.3 extends the Native Diagnostics Engine foundation with named slot/index/memory transition events, ring occupancy telemetry, and browser transition-ring rendering. v2.7.0 introduced native atomic counters, a bounded diagnostic event ring, immutable diagnostic snapshots, a Python diagnostics bridge, and browser Operations Console integration. Diagnostics observes consequences only; it owns no storage objects, mutates no VFS/chunk/index state, and never blocks storage hot paths. v2.7.0 also preserves the v2.6.1 JSON centralization, native checksum batching, and chunk corruption checks.
+The translation system is intentionally browser-only. Native telemetry keys, storage-engine payloads, and internal metric names remain stable and language-neutral. The language manager translates presentation text, preserves English fallback behavior, and keeps the native storage engine unchanged.
+
+v2.7.9 completed the Browser Operations Console telemetry pages for Snapshot Explorer, Lock Contention, Comparative Views, and Alerts & Events. v2.7.8 introduced the Settings page, startup-page selection, refresh-interval control, and About dialog. Together, these releases establish the browser foundation before future native intelligence work.
 
 ### Hardening and one-way telemetry
 
@@ -219,3 +221,8 @@ That keeps TDS useful underneath advanced AI workflows while preserving its dire
 ## v2.7.3 Pressure Calculations Engine
 
 Adds component-level operational pressure scoring for engine, storage, index, lock, diagnostic-ring, memory, Python bridge, and dashboard pressure. The browser Operations Console consumes these values from immutable telemetry snapshots only.
+
+
+## v2.8.0 Browser Telemetry Pages
+
+v2.8.0 completes the Browser Operations Console telemetry pages by replacing placeholder panels with snapshot-fed cards for Snapshot Explorer, Lock Contention, Comparative Views, and Alerts & Events. The update does not change the native storage engine.
