@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="tds-csrf-token" content="{csrf_token}">
   <title>Staqtapp-TDS Professional Observability Dashboard</title>
   <meta name="tds-compat" content="Telemetry Cache WORKLOAD linear-gradient --blue --purple --orange Reads/sec Writes/sec Compression LIVE ARCHITECTURE">
   <link rel="stylesheet" href="/static/css/dashboard.css">
@@ -33,6 +34,7 @@
         <a class="nav-pill" href="#locks" aria-label="Lock Contention" title="Lock Contention"><img src="/static/icons/clock.svg" alt="">Lock Contention</a>
         <div class="nav-section-label">Analytics</div>
         <a class="nav-pill" href="#behavior" aria-label="Workload Analytics" title="Workload Analytics"><img src="/static/icons/behavior.svg" alt="">Workload Analytics</a>
+        <a class="nav-pill" href="#spiral-rank" aria-label="Analytics Spiral Rank" title="Analytics · Spiral Rank"><img src="/static/icons/spiral-rank.svg" alt="">Spiral Rank</a>
         <a class="nav-pill" href="#indexes" aria-label="Index Analytics" title="Index Analytics"><img src="/static/icons/indexes.svg" alt="">Index Analytics</a>
         <a class="nav-pill" href="#storage" aria-label="Storage Analytics" title="Storage Analytics"><img src="/static/icons/storage.svg" alt="">Storage Analytics</a>
         <a class="nav-pill" href="#comparison" aria-label="Comparative Views" title="Comparative Views"><img src="/static/icons/radix.svg" alt="">Comparative Views</a>
@@ -277,6 +279,39 @@
         </article>
       </section>
 
+
+
+      <section id="spiral-rank" class="console-page-grid telemetry-page spiral-rank-page" aria-label="Analytics Spiral Rank telemetry">
+        <article class="panel-card glass wide-panel telemetry-card spiral-rank-card">
+          <div class="section-head"><div><p class="eyebrow">ANALYTICS · NATIVE SPIRAL RANK ENGINE</p><h2>Ranking feedback telemetry</h2></div><span class="chip blue-chip" id="spiral-rank-status">WAITING</span></div>
+          <div class="telemetry-summary-grid spiral-rank-summary">
+            <div class="telemetry-command-card"><img src="/static/icons/spiral-rank.svg" alt=""><div><span>Total rank runs</span><b id="spiral-rank-runs">0</b><small id="spiral-rank-path">observer-only feedback</small></div></div>
+            <div class="telemetry-command-card"><img src="/static/icons/performance.svg" alt=""><div><span>Last elapsed</span><b><span id="spiral-rank-elapsed">0</span> ms</b><small id="spiral-rank-average">rolling average 0 ms</small></div></div>
+          </div>
+          <div class="kv-list telemetry-kv">
+            <p><span>Native Path</span><b><em class="bar"><i id="spiral-rank-native-bar" style="width:0%"></i></em><span id="spiral-rank-native-pct">0%</span></b></p>
+            <p><span>Fallback Path</span><b id="spiral-rank-fallback-pct">0%</b></p>
+            <p><span>Input Count</span><b id="spiral-rank-input">0</b></p>
+            <p><span>Ranked Count</span><b id="spiral-rank-ranked">0</b></p>
+            <p><span>Limited Output</span><b id="spiral-rank-limited">0</b></p>
+            <p><span>Dropped by Limit</span><b id="spiral-rank-dropped">0</b></p>
+            <p><span>Score Range</span><b><span id="spiral-rank-min">—</span> → <span id="spiral-rank-max">—</span></b></p>
+            <p><span>Mean Score</span><b id="spiral-rank-mean">—</b></p>
+            <p><span>Scoring / Sorting / Shaping</span><b><span id="spiral-rank-scoring">0</span> / <span id="spiral-rank-sorting">0</span> / <span id="spiral-rank-shaping">0</span> ms</b></p>
+            <p><span>Config</span><b id="spiral-rank-config">—</b></p>
+          </div>
+          <p class="panel-note">Analytics view: live Spiral Rank feedback and immutable statistics are rendered from cached observer snapshots only. Ranking remains observer-safe and never controls locks, policies, payload reads, or storage mutation.</p>
+        </article>
+        <article class="panel-card glass spiral-rank-top-card">
+          <div class="section-head"><div><p class="eyebrow">TOP-N TRACE FEEDBACK</p><h2>Latest ranked traces</h2></div><span class="chip orange-chip" id="spiral-rank-top-chip">top 0</span></div>
+          <div id="spiral-rank-top" class="diag-event-list spiral-rank-list"></div>
+        </article>
+        <article class="panel-card glass spiral-rank-history-card">
+          <div class="section-head"><div><p class="eyebrow">RUN HISTORY</p><h2>Timing trend</h2></div><span class="chip">last 24</span></div>
+          <div id="spiral-rank-history" class="spiral-rank-history"></div>
+        </article>
+      </section>
+
       <section id="snapshots" class="console-page-grid telemetry-page telemetry-snapshots-page">
         <article class="panel-card glass wide-panel telemetry-card">
           <div class="section-head"><div><p class="eyebrow">SNAPSHOT EXPLORER</p><h2>Immutable telemetry snapshots</h2></div><span class="chip blue-chip">observer-safe</span></div>
@@ -389,8 +424,8 @@
         <div class="about-card glass">
           <div class="about-head"><img src="/static/icons/logo.svg" alt=""><div><p class="eyebrow" data-i18n="about.eyebrow">ABOUT</p><h2 id="tds-about-title" data-i18n="about.title">TDS Browser</h2></div></div>
           <div class="about-grid">
-            <p><span data-i18n="about.browserVersion">Browser Version</span><b>2.8.0</b></p>
-            <p><span data-i18n="about.nativeEngine">Native Engine</span><b>2.8.0</b></p>
+            <p><span data-i18n="about.browserVersion">Browser Version</span><b>2.9.0</b></p>
+            <p><span data-i18n="about.nativeEngine">Native Engine</span><b>2.9.0</b></p>
             <p><span data-i18n="about.visualSystem">Visual System</span><b data-i18n="about.customSvg">Custom SVG Operations Console</b></p>
             <p><span data-i18n="about.storageFocus">Storage Focus</span><b data-i18n="about.storageFocusValue">local deterministic observability</b></p>
           </div>
