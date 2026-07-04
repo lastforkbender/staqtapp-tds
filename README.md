@@ -3,7 +3,7 @@
 </p>
 
 
-# 🟦🟪🟧 Staqtapp-TDS v3.0.1
+# 🟦🟪🟧 Staqtapp-TDS v3.0.2
 
 🇺🇸 **English** | 🇯🇵 [日本語](README_ja.md)
 
@@ -13,9 +13,13 @@ The core rule remains simple:
 
 > TDS stores, retrieves, indexes, observes, and records provenance. It does not reason, reward, train, or mutate policy decisions on behalf of an AI system.
 
+## v3.0.2 Native Safety + Dashboard Hotfix
+
+v3.0.2 fixes a critical TinyKeyPool safety issue in `_native_index.c` by enforcing a fixed-capacity pooling invariant for small key buffers. It also fixes the wide-desktop dashboard hero graphic so the AI and TDS nodes no longer overlap. The v3.0.1 Native Engine Manager and release-pipeline architecture remain intact.
+
 ## v3.0.1 Native Engine Manager
 
-v3.0.1 adds a professional Native Engine Manager as the single authority for optional compiled native engines. TDS now detects the runtime platform, attempts native loading through one controlled boundary, verifies the expected TDS native ABI, records capability diagnostics, and can fall back to the Python backend without halting application execution.
+v3.0.1 adds a professional Native Engine Manager as the single authority for optional compiled native engines. TDS now detects the runtime platform, attempts native loading through one controlled boundary, verifies the expected TDS native ABI, records capability diagnostics, and falls back to the Python backend without halting application execution.
 
 The user application does not choose binary filenames. The library owns that responsibility.
 
