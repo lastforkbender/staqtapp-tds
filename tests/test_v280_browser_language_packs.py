@@ -13,7 +13,7 @@ def _asset(path: str):
 
 
 def test_v280_version():
-    assert __version__ == "2.8.0"
+    assert __version__ == "2.9.0"
 
 
 def test_v280_language_pack_manifest_is_packaged():
@@ -44,10 +44,10 @@ def test_v280_each_language_pack_has_complete_browser_strings():
 
 
 def test_v280_dashboard_uses_external_language_packs():
-    html = render_dashboard_html(version="2.8.0")
+    html = render_dashboard_html(version="2.8.1")
     assert "/static/js/i18n.js" in html
     assert "tds-language-select" in html
-    assert "2.8.0" in html
+    assert "2.8.1" in html
     js, ctype = _asset("/static/js/i18n.js")
     assert ctype == "application/javascript"
     assert "PACK_BASE = '/static/i18n/'" in js

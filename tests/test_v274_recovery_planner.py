@@ -7,7 +7,7 @@ from staqtapp_tds.admin.panel import AdminPanelServer, render_dashboard_html
 
 
 def test_v274_version():
-    assert __version__ == "2.8.0"
+    assert __version__ == "2.9.0"
 
 
 def test_recovery_planner_generates_advisory_actions_from_pressure_snapshot():
@@ -45,7 +45,7 @@ def test_telemetry_snapshot_includes_recovery_planner_output():
 
 
 def test_dashboard_renders_recovery_planner_console_components():
-    html = render_dashboard_html(version="2.8.0")
+    html = render_dashboard_html(version="2.8.1")
     assert "recovery-planner-page" in html
     assert "recovery-actions" in html
     assert "recovery-guardrails" in html

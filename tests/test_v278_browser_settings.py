@@ -3,11 +3,11 @@ from staqtapp_tds.admin.panel import AdminPanelServer, render_dashboard_html
 
 
 def test_v278_version():
-    assert __version__ == "2.8.0"
+    assert __version__ == "2.9.0"
 
 
 def test_v278_settings_page_and_about_dialog_render():
-    html = render_dashboard_html(version="2.8.0")
+    html = render_dashboard_html(version="2.8.1")
     assert "settings-page" in html
     assert "tds-language-select" in html
     assert "tds-startup-select" in html

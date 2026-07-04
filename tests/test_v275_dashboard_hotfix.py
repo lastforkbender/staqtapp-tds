@@ -3,7 +3,7 @@ from staqtapp_tds.admin.panel import HTML, AdminPanelServer
 
 
 def test_v275_version():
-    assert __version__ == "2.8.0"
+    assert __version__ == "2.9.0"
 
 
 def test_v275_status_json_serializer_imported():

@@ -4,7 +4,7 @@ from staqtapp_tds.telemetry import TelemetryManager
 
 
 def test_v272_version():
-    assert __version__ == "2.8.0"
+    assert __version__ == "2.9.0"
 
 
 def test_pressure_engine_exposes_component_scores_without_hot_path_state():
