@@ -1,5 +1,22 @@
 # Changelog
 
+## v2.8.9 — Spiral Rank Statistics
+
+- Added `SpiralRankStats` for immutable per-run observer statistics.
+- Added `SpiralRankRun` and `rank_trace_run(...)` for returning rank results plus stats in one bundle.
+- Added `NativeSpiralRankEngine.rank_run(...)` while preserving the existing list-returning `rank(...)` API.
+- Captured input/ranked/limited/drop counts, native/fallback path, elapsed/scoring/sorting/shaping timings, min/max/mean score, warnings, and config id.
+- Added v2.8.8 tests covering stats shape, limit accounting, empty-run safety, helper export, and `last_stats`.
+- Updated English and Japanese README files with the v2.8.8 stats workflow.
+
+## v2.8.8 — Native Spiral Rank Engine
+
+- Added `staqtapp_tds.spiral.rank` with `NativeSpiralRankEngine`, `SpiralRankConfig`, `SpiralRankResult`, and `rank_traces`.
+- Added native C-extension `spiral_rank_scores` scoring loop with GIL release and Python fallback.
+- Kept Spiral ranking isolated from the storage hot path: copied numeric metadata in, immutable rank results out.
+- Added v2.8.8 rank tests covering deterministic ordering, native/Python score equivalence, result shape, and validation.
+- Rebuilt bilingual README files with English/Japanese links and unicode flags.
+
 ## v2.8.1 — Admin Browser Security Hotfix
 
 - Added per-server CSRF tokens for browser/admin state-changing POST routes.
@@ -9,7 +26,7 @@
 - Hardened browser settings parsing and exposed language-pack fallback status.
 - Preserved the native storage engine and all storage hot-path behavior.
 
-## 2.8.0
+## 2.8.1
 
 - Added external TDS Browser language packs under `static/i18n/` for English, Spanish, Portuguese, Japanese, German, French, and Italian.
 - Localized the Browser Operations Console pages, navigation, Settings page, telemetry labels, About dialog, advisory text, and snapshot-page labels through a shared language manager.
