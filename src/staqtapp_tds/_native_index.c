@@ -1098,6 +1098,18 @@ PyMODINIT_FUNC PyInit__native_index(void) {
     if (PyType_Ready(&NativeHandleIndexType) < 0) return NULL;
     m = PyModule_Create(&moduledef);
     if (!m) return NULL;
+    if (PyModule_AddIntConstant(m, "TDS_NATIVE_ABI_VERSION", 1) < 0) {
+        Py_DECREF(m);
+        return NULL;
+    }
+    if (PyModule_AddStringConstant(m, "TDS_NATIVE_ENGINE", "index") < 0) {
+        Py_DECREF(m);
+        return NULL;
+    }
+    if (PyModule_AddStringConstant(m, "TDS_NATIVE_CAPABILITIES", "index,checksum32,spiral_rank,utf8_chunks,diagnostics") < 0) {
+        Py_DECREF(m);
+        return NULL;
+    }
     Py_INCREF(&NativeHandleIndexType);
     if (PyModule_AddObject(m, "NativeHandleIndex", (PyObject*)&NativeHandleIndexType) < 0) {
         Py_DECREF(&NativeHandleIndexType);

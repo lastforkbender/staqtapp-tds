@@ -1477,7 +1477,7 @@ class TDSFileSystem:
         asyncio.run(db.awrite("key", value))
         value = asyncio.run(db.aread("key"))
     """
-    VERSION = (2, 9, 4)
+    VERSION = (2, 9, 3)
 
     def __init__(self, name: str = "tds_root", manifest_policy: Optional[ManifestPolicy] = None, runtime_config: Optional[RuntimeConfig] = None, config_registry: Optional[ConfigRegistry] = None, crypto_provider: Optional[CryptoProvider] = None, telemetry_manager: Optional[TelemetryManager] = None):
         self.manifest_policy = manifest_policy or ManifestPolicy.default()

@@ -73,6 +73,14 @@ class TDSResultCode(str, Enum):
     SPIRAL_RANK_OK = "SPIRAL_RANK_OK"
     SPIRAL_RANK_ERROR = "SPIRAL_RANK_ERROR"
 
+    NATIVE_MANAGER_OK = "NATIVE_MANAGER_OK"
+    NATIVE_ENGINE_LOADED = "NATIVE_ENGINE_LOADED"
+    NATIVE_ENGINE_FALLBACK = "NATIVE_ENGINE_FALLBACK"
+    NATIVE_ENGINE_UNAVAILABLE = "NATIVE_ENGINE_UNAVAILABLE"
+    NATIVE_ENGINE_INCOMPATIBLE = "NATIVE_ENGINE_INCOMPATIBLE"
+    NATIVE_ENGINE_LOAD_ERROR = "NATIVE_ENGINE_LOAD_ERROR"
+    NATIVE_CAPABILITY_OK = "NATIVE_CAPABILITY_OK"
+
 
 @dataclass(frozen=True, slots=True)
 class TDSResultInfo:
@@ -154,6 +162,13 @@ TDS_RESULT_REGISTRY: Mapping[TDSResultCode, TDSResultInfo] = {
     TDSResultCode.QUERY_REQUIRES_SELECTOR: _info(False, "query_requires_selector", None, "cluster", "warn", False, "Cluster query requires a selector or explicit scan=True."),
     TDSResultCode.SPIRAL_RANK_OK: _info(True, "NativeSpiralRankEngine.rank_result", "rank run dictionary", "spiral", "info", False, "Spiral rank completed."),
     TDSResultCode.SPIRAL_RANK_ERROR: _info(False, "NativeSpiralRankEngine.rank_result", None, "spiral", "error", True, "Spiral rank failed in a controlled non-halting path."),
+    TDSResultCode.NATIVE_MANAGER_OK: _info(True, "NativeEngineManager.status_result", "native status snapshot", "native", "info", False, "Native engine manager status was produced."),
+    TDSResultCode.NATIVE_ENGINE_LOADED: _info(True, "NativeEngineManager.load_result", "loaded native backend", "native", "info", False, "A compatible native engine was loaded."),
+    TDSResultCode.NATIVE_ENGINE_FALLBACK: _info(True, "NativeEngineManager.load_result", "python fallback backend", "native", "warn", False, "Native engine was not used; TDS safely selected a Python fallback."),
+    TDSResultCode.NATIVE_ENGINE_UNAVAILABLE: _info(False, "NativeEngineManager.load_result", None, "native", "warn", False, "No compiled native engine was available for this runtime platform."),
+    TDSResultCode.NATIVE_ENGINE_INCOMPATIBLE: _info(False, "NativeEngineManager.load_result", None, "native", "error", False, "A native engine was present but did not satisfy the expected TDS native ABI or capabilities."),
+    TDSResultCode.NATIVE_ENGINE_LOAD_ERROR: _info(False, "NativeEngineManager.load_result", None, "native", "error", False, "Native engine loading failed and was contained without halting TDS."),
+    TDSResultCode.NATIVE_CAPABILITY_OK: _info(True, "NativeEngineManager.capabilities_result", "native capability snapshot", "native", "info", False, "Native platform and capability details were collected."),
 }
 
 
@@ -253,3 +268,29 @@ class TDSResult:
 
     def __bool__(self) -> bool:
         return bool(self.ok)
+
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, TDSResult):
+            return self.as_dict() == other.as_dict()
+        return self.value == other
+
+    def __getitem__(self, key: Any) -> Any:
+        return self.value[key]
+
+    def __iter__(self):
+        if self.value is None:
+            return iter(())
+        return iter(self.value)
+
+    def __len__(self) -> int:
+        try:
+            return len(self.value)  # type: ignore[arg-type]
+        except Exception:
+            return 0
+
+    def __array__(self, dtype: Any = None) -> Any:
+        try:
+            import numpy as _np
+            return _np.asarray(self.value, dtype=dtype)
+        except Exception:
+            return self.value

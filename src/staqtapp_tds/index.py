@@ -5,8 +5,9 @@ from __future__ import annotations
 import os
 from typing import Any, List, Optional, Tuple
 
-from staqtapp_tds.backends.native import load_native_backend
+from staqtapp_tds.backends.native import load_native_backend_report
 from staqtapp_tds.backends.python_index import PythonEntryIndexBackend, EntryIndexStats
+from staqtapp_tds.result import TDSResult, TDSResultCode
 
 
 class EntryIndex:
@@ -22,11 +23,23 @@ class EntryIndex:
         if selected not in {"auto", "python", "native"}:
             raise ValueError("EntryIndex backend must be 'auto', 'python', or 'native'")
         impl = None
+        self._native_report = None
         if selected in {"auto", "native"}:
-            impl = load_native_backend(shards=shards)
-            if impl is None and selected == "native":
-                raise RuntimeError("native EntryIndex backend requested but not available")
+            impl, self._native_report = load_native_backend_report(shards=shards, requested=selected)
         self._impl = impl if impl is not None else PythonEntryIndexBackend(shards=shards)
+
+
+    def native_status_result(self) -> TDSResult:
+        """Return the native load status for this EntryIndex without raising."""
+        report = getattr(self, "_native_report", None)
+        if report is None:
+            return TDSResult.success(
+                TDSResultCode.NATIVE_ENGINE_FALLBACK,
+                "Python EntryIndex backend selected; native load was not requested.",
+                value={"backend": self.backend_name},
+            )
+        code = TDSResultCode.NATIVE_ENGINE_LOADED if report.native_loaded else TDSResultCode.NATIVE_ENGINE_FALLBACK
+        return TDSResult.success(code, report.reason, value=report.as_dict())
 
     @property
     def backend_name(self) -> str:
