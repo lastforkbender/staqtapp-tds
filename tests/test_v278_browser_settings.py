@@ -3,7 +3,7 @@ from staqtapp_tds.admin.panel import AdminPanelServer, render_dashboard_html
 
 
 def test_v278_version():
-    assert __version__ == "3.0.1"
+    assert __version__ == "3.0.2"
 
 
 def test_v278_settings_page_and_about_dialog_render():
