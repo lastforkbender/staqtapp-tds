@@ -1,100 +1,82 @@
-# Non-Halting Public API Contract
+# Non-Halting Execution Contract
 
-Staqtapp-TDS is designed for AI systems and long-running services that must keep control flow alive during normal storage, retrieval, decode, validation, and environment-error conditions.
+Staqtapp-TDS is designed for AI systems, autonomous agents, and long-running services where storage failures must be observable without unexpectedly stopping the caller's execution.
 
-## Meaning of non-halting
+## Contract
 
-For TDS-controlled operational outcomes, public result-first APIs return a `TDSResult` object instead of requiring the caller to catch TDS-generated exceptions or interpret ambiguous values such as `False`, `None`, or raw bytes.
+Public TDS operations that can encounter ordinary operational failure return `TDSResult` instead of using TDS-generated exceptions as the normal failure path.
 
-The standard pattern is:
+A caller should be able to use one standard pattern:
 
 ```python
-result = directory.read("agent_state")
+result = tds.write("agent_state", state)
 
 if result.ok:
-    state = result.value
+    ...
 else:
-    handle(result.code, result.message, result.meta)
+    print(result.code)
+    print(result.message)
+    print(result.meta)
 ```
 
-## TDSResult is the standard envelope
+## What non-halting means
 
-`TDSResult` is the single public success/failure envelope for controlled TDS outcomes.
+Non-halting means TDS does not intentionally terminate normal application control flow for recoverable TDS conditions such as:
 
-Fields:
+- invalid names
+- missing entries
+- serialization or deserialization failure
+- read-only directories
+- native engine load failure
+- native ABI mismatch
+- optional native binary absence
 
-| Field | Meaning |
-| --- | --- |
-| `ok` | `True` for success, `False` for controlled failure. |
-| `code` | Stable machine-readable result code. |
-| `message` | Human-readable explanation. |
-| `name` | Optional TDS entry name context. |
-| `path` | Optional TDS path context. |
-| `value` | Returned object or operation payload when applicable. |
-| `meta` | Structured diagnostics for logging, telemetry, retry policy, or AI control logic. |
+Those conditions are represented as `TDSResult` values with centralized result codes.
+
+## What non-halting does not mean
+
+No Python library can guarantee survival from every process-level or interpreter-level condition. Examples outside the TDS operational contract include:
+
+- process termination by the operating system
+- interpreter crash
+- severe memory exhaustion
+- `KeyboardInterrupt` or external cancellation
+- hardware failure
+- fatal native memory corruption from outside TDS
+
+TDS avoids using those as normal control-flow mechanisms and reports ordinary TDS failures through `TDSResult` wherever the public API boundary can safely do so.
+
+## Native Engine Manager behavior
+
+The Native Engine Manager preserves the non-halting contract for optional compiled engines:
+
+```text
+Application
+    ↓
+Public TDS API
+    ↓
+Native Engine Manager
+    ├─ native module loads and ABI matches → native backend active
+    └─ unavailable / incompatible / load failed → Python backend fallback
+    ↓
+TDSResult diagnostics
+```
+
+A missing `.so`, `.pyd`, or incompatible compiled extension should not crash an AI application during normal startup. TDS records native availability, ABI status, platform information, and fallback status through diagnostics and result metadata.
 
 ## Result-code source of truth
 
-Every public `TDSResult.code` is defined in one runtime source of truth:
+The authoritative runtime source is:
 
 ```text
 src/staqtapp_tds/result.py
 ```
 
-Use:
-
-```python
-from staqtapp_tds import TDSResultCode, result_info
-```
-
-The registry metadata is available through `result_info(code)` and `TDS_RESULT_REGISTRY`.
-
-Generated references:
+Generated public references are:
 
 ```text
 docs/TDS_RESULT_CODES.md
 docs/TDS_RESULT_CODES.json
 ```
 
-These files are generated from the runtime registry and should not be treated as an independent source of truth.
-
-## What TDS converts into TDSResult
-
-Public result-first surfaces should convert controlled outcomes into `TDSResult`, including:
-
-- missing entries,
-- read/write/delete failures caught inside the TDS boundary,
-- payload decode and deserialize failures,
-- unsupported stored payload formats,
-- validation failures,
-- text/JSON/chunked-text operation failures,
-- persistence reader failures,
-- variable-control conflicts,
-- cluster selector failures,
-- Spiral rank controlled failures.
-
-## What TDS does not claim to control
-
-The non-halting contract does not mean TDS can prevent every possible process-level stop. Examples outside the TDS-controlled boundary include:
-
-- Python interpreter termination,
-- operating-system failure,
-- process kill signals,
-- fatal native crashes,
-- unrecoverable memory exhaustion,
-- `KeyboardInterrupt` or external cancellation,
-- hardware failure.
-
-TDS does not intentionally raise TDS-defined exceptions from public result-first APIs for normal operational failures.
-
-## Compatibility methods
-
-Some explicit compatibility methods may return raw values or booleans by design. Their names should make this clear, for example:
-
-```text
-read_value()
-write_entry()
-delete_entry()
-```
-
-Use result-first methods for AI systems and production control flow where the non-halting contract matters.
+The result-code reference is generated from the runtime registry so documentation and implementation do not drift.
