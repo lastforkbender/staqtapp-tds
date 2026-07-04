@@ -3,7 +3,7 @@
 </p>
 
 
-# 🟦🟪🟧 Staqtapp-TDS v2.9.4
+# 🟦🟪🟧 Staqtapp-TDS v3.0.1
 
 🇺🇸 **English** | 🇯🇵 [日本語](README_ja.md)
 
@@ -13,31 +13,26 @@ The core rule remains simple:
 
 > TDS stores, retrieves, indexes, observes, and records provenance. It does not reason, reward, train, or mutate policy decisions on behalf of an AI system.
 
-## v2.9.4 Non-Halting Result Contract
+## v3.0.1 Native Engine Manager
 
-v2.9.4 formalizes the public TDS return contract for AI systems and long-running services. Public TDS operations that can fail in normal operation return a standardized `TDSResult` instead of halting caller execution with TDS-generated exceptions or ambiguous boolean failure values.
+v3.0.1 adds a professional Native Engine Manager as the single authority for optional compiled native engines. TDS now detects the runtime platform, attempts native loading through one controlled boundary, verifies the expected TDS native ABI, records capability diagnostics, and can fall back to the Python backend without halting application execution.
 
-This means callers can use one predictable pattern:
+The user application does not choose binary filenames. The library owns that responsibility.
 
 ```python
-result = directory.write("agent_state", state)
+from staqtapp_tds import EntryIndex, native_status_result, native_capabilities_result
 
-if result.ok:
-    stored = result.value
-else:
-    print(result.code)
-    print(result.message)
-    print(result.meta)
+idx = EntryIndex(backend="auto")
+print(idx.native_status_result().as_dict())
+print(native_status_result().as_dict())
+print(native_capabilities_result().as_dict())
 ```
 
-`TDSResult` is the single public success/failure envelope for controlled TDS outcomes. It contains:
+Native manager diagnostics return `TDSResult` values and use the centralized result-code registry. Relevant codes include `NATIVE_ENGINE_LOADED`, `NATIVE_ENGINE_FALLBACK`, `NATIVE_ENGINE_UNAVAILABLE`, `NATIVE_ENGINE_INCOMPATIBLE`, `NATIVE_ENGINE_LOAD_ERROR`, `NATIVE_MANAGER_OK`, and `NATIVE_CAPABILITY_OK`.
 
-- `ok`: `True` for success, `False` for controlled failure.
-- `code`: a stable machine-readable result code.
-- `message`: a human-readable explanation.
-- `name` / `path`: optional TDS location context.
-- `value`: the returned object or operation payload when applicable.
-- `meta`: structured diagnostics for logging, telemetry, retry policy, or AI decision logic.
+## Non-halting API contract
+
+Public AI-facing TDS operations use `TDSResult` where success/failure must be reported without raising TDS-generated exceptions. Native import failures, missing compiled binaries, ABI mismatches, and fallback decisions are reported through structured result values, not by stopping the caller.
 
 The authoritative result-code source is:
 
@@ -45,50 +40,25 @@ The authoritative result-code source is:
 src/staqtapp_tds/result.py
 ```
 
-All public `TDSResult.code` values are defined in `TDSResultCode` and described in `TDS_RESULT_REGISTRY`. Human and machine-readable references are generated from that registry:
+Generated references are available at:
 
 ```text
 docs/TDS_RESULT_CODES.md
 docs/TDS_RESULT_CODES.json
 ```
 
-Additional contract documentation:
+## Automated release pipeline scaffold
 
-```text
-docs/API_TDSResult.md
-docs/NON_HALTING_API.md
-```
+v3.0.1 adds release-check automation and a future wheel-build scaffold. The current ZIP is a clean source archive and intentionally excludes `.so`, `.pyd`, `.dll`, `.dylib`, `.pyc`, `__pycache__`, and `.pytest_cache` artifacts. Platform wheels and compiled binaries belong to the release-distribution stage after TDS reaches public release readiness.
 
-Design guarantees for normal TDS-controlled failures:
+Design notes:
 
-- Public result-first operations return `TDSResult`.
-- Public TDS operations do not intentionally halt caller execution for normal storage, decode, missing-entry, validation, or caught environment failures.
-- Result codes are centralized in the runtime registry, not scattered across the codebase as independent status strings.
-- Result-code documentation is generated from the runtime registry to prevent documentation drift.
-- Compatibility methods that return raw values remain explicit by name, such as `read_value()`, `write_entry()`, and `delete_entry()`.
-
-This guarantee does not claim to prevent process-level failures outside TDS control, such as interpreter termination, operating-system failure, fatal native crashes, `KeyboardInterrupt`, or unrecoverable memory exhaustion.
-
-## v2.9.4 Result Registry Discipline
-
-Staqtapp-TDS defines every public `TDSResult.code` in one runtime source of truth: `src/staqtapp_tds/result.py`. Use `TDSResultCode` for code comparisons and `result_info(code)` for machine-readable metadata. The Markdown and JSON result-code references are generated from that registry.
-
-```python
-from staqtapp_tds import TDSResultCode, result_info
-
-result = directory.read("agent_state")
-
-if not result.ok:
-    info = result_info(result.code)
-    if result.code == TDSResultCode.READ_MISSING.value:
-        ...
-```
+- `docs/44_v301_Native_Engine_Manager.md`
+- `docs/RELEASE_PIPELINE.md`
 
 ## Highlights
 
 - Directory-first VFS API with semantic routing zones and reserved namespace policy.
-- Standardized non-halting `TDSResult` return envelope for public result-first operations.
-- Central `TDSResultCode` registry with generated Markdown and JSON references.
 - Native Swiss-table-inspired `EntryIndex` backend where available.
 - Native diagnostic event ring with loss-tolerant telemetry snapshots.
 - Native Spiral Rank scoring loop with Python fallback and immutable per-run stats.
@@ -232,6 +202,6 @@ This keeps TDS useful under advanced AI workflows while preserving its storage i
 
 ## Release notes
 
-v2.9.0 builds on the v2.8.7 Native Spiral Rank Engine. It adds immutable Spiral rank statistics, run-bundle export, stats tests, updated bilingual documentation, and preserves the list-returning v2.8.7 rank API.
+v3.0.1 builds on the v2.8.7 Native Spiral Rank Engine. It adds immutable Spiral rank statistics, run-bundle export, stats tests, updated bilingual documentation, and preserves the list-returning v2.8.7 rank API.
 
-Additional v2.9.0 design note: `docs/40_v290_Spiral_Rank_Browser_Telemetry.md`.
+Additional v3.0.1 design note: `docs/40_v290_Spiral_Rank_Browser_Telemetry.md`.
