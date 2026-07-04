@@ -26,6 +26,7 @@ from staqtapp_tds.tds_filesystem import (
 )
 from staqtapp_tds.manifest import ManifestPolicy, load_manifest, write_default_manifest
 from staqtapp_tds.tds_json import dumps_canonical, loads_strict
+from staqtapp_tds.result import TDSResult, TDSResultCode
 from staqtapp_tds.telemetry import TelemetryMode
 
 try:
@@ -311,11 +312,32 @@ class TDSReader:
         with self._lock:
             return bytes(self._mm[abs_off: abs_off + rec.length])
 
+    def read_result(self, name: str) -> TDSResult:
+        """Public non-halting persistence read surface: always return TDSResult."""
+        try:
+            value = self.read(name)
+            if isinstance(value, TDSResult) and not value.ok:
+                return value
+            return TDSResult.success(TDSResultCode.PERSIST_READ_OK, "Persisted entry read.", name=name, path=str(self.path), value=value)
+        except Exception as exc:
+            return TDSResult.from_exception(TDSResultCode.PERSIST_READ_ERROR, exc, name=name, path=str(self.path))
+
     def read_many(self, names: List[str]) -> Dict[str, Any]:
         pool = ConcurrencyPool.acquire()
         def _one(n):
             return (n, self.read(n))
         return dict(pool.map_parallel(_one, names))
+
+    def read_many_result(self, names: List[str]) -> TDSResult:
+        """Public non-halting batch persistence read surface."""
+        try:
+            values = self.read_many(names)
+            failures = {k: v.as_dict() for k, v in values.items() if isinstance(v, TDSResult) and not v.ok}
+            if failures:
+                return TDSResult.fail(TDSResultCode.PERSIST_BATCH_READ_PARTIAL, "One or more persisted entries could not be read.", path=str(self.path), value=values, meta={"failures": failures})
+            return TDSResult.success(TDSResultCode.PERSIST_BATCH_READ_OK, "Persisted entries read.", path=str(self.path), value=values, meta={"count": len(values)})
+        except Exception as exc:
+            return TDSResult.from_exception(TDSResultCode.PERSIST_BATCH_READ_ERROR, exc, path=str(self.path), meta={"count": len(names)})
 
     def keys(self) -> List[str]:
         return [r.name for r in self._idx.all_records()]

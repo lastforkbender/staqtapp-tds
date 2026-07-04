@@ -13,7 +13,7 @@ from typing import Dict, Iterable, List, Optional
 import numpy as np
 
 from staqtapp_tds.provenance import ProvenanceClass, stable_id
-from staqtapp_tds.result import TDSResult
+from staqtapp_tds.result import TDSResult, TDSResultCode
 
 
 CLUSTER_DTYPE = np.dtype([
@@ -73,5 +73,5 @@ class TDSClusterIdentity:
 def query_requires_selector(**selectors) -> TDSResult:
     active = [k for k, v in selectors.items() if v not in (None, "", [], (), {})]
     if not active and not selectors.get("scan", False):
-        return TDSResult.fail("QUERY_REQUIRES_SELECTOR", "Cluster query requires at least one selector or scan=True.")
-    return TDSResult.success("QUERY_ACCEPTED", "Cluster query selectors accepted.", meta={"selectors": active})
+        return TDSResult.fail(TDSResultCode.QUERY_REQUIRES_SELECTOR, "Cluster query requires at least one selector or scan=True.")
+    return TDSResult.success(TDSResultCode.QUERY_ACCEPTED, "Cluster query selectors accepted.", meta={"selectors": active})

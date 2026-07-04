@@ -30,7 +30,7 @@ from staqtapp_tds.telemetry import DirectoryTelemetry, TelemetryLevel, Telemetry
 from staqtapp_tds.srz import SRZMetadata
 from staqtapp_tds.manifest import ManifestPolicy
 from staqtapp_tds.namespaces import ReservedNamespaces
-from staqtapp_tds.result import TDSResult
+from staqtapp_tds.result import TDSResult, TDSResultCode
 from staqtapp_tds.errors import ErrorLogMode
 from staqtapp_tds.variables import VariableControl
 from staqtapp_tds.serializers import CompressionPolicy, PayloadKind, choose_variable_kind, content_hash_bytes, json_dumps_fast, json_loads_fast, kind_name
@@ -702,21 +702,46 @@ def _serialize_payload(data: Any, fmt_id: FmtID, codec: str = '') -> bytes:
 
 
 def _deserialize_payload(raw: bytes, fmt_id: FmtID, codec: str = '') -> Any:
-    if fmt_id & FmtID.COMPRESSED:
-        raw = CompressorRegistry.decompress(raw, codec)
+    """Decode a stored payload without ever returning undecoded raw bytes on error.
+
+    On decode failure this returns TDSResult.fail(...). That keeps corrupted,
+    incompatible, or hostile bytes from masquerading as valid application data
+    while preserving TDS's non-halting execution contract.
+    """
     base = fmt_id & ~FmtID.COMPRESSED
-    if base == FmtID.NUMPY_MATRIX:
-        import io
-        return np.load(io.BytesIO(raw), allow_pickle=False)
-    if base == FmtID.TEXT_UTF8:
-        return raw.decode('utf-8')
-    if base == FmtID.JSON_UTF8:
-        value, _backend = json_loads_fast(raw)
-        return value
     try:
-        return pickle.loads(raw)
-    except Exception:
-        return raw
+        if fmt_id & FmtID.COMPRESSED:
+            raw = CompressorRegistry.decompress(raw, codec)
+        if base == FmtID.NUMPY_MATRIX:
+            import io
+            return np.load(io.BytesIO(raw), allow_pickle=False)
+        if base == FmtID.TEXT_UTF8:
+            return raw.decode('utf-8')
+        if base == FmtID.JSON_UTF8:
+            value, _backend = json_loads_fast(raw)
+            return value
+        if base == FmtID.RAW_BINARY:
+            return bytes(raw)
+        if base == FmtID.PICKLE_OBJ or base not in (FmtID.NUMPY_MATRIX, FmtID.TEXT_UTF8, FmtID.JSON_UTF8, FmtID.RAW_BINARY):
+            return pickle.loads(raw)
+    except Exception as exc:
+        return TDSResult.fail(
+            TDSResultCode.PAYLOAD_DESERIALIZE_ERROR,
+            'Payload could not be deserialized.',
+            meta={
+                'fmt_id': int(fmt_id),
+                'base_fmt_id': int(base),
+                'codec': codec or '',
+                'raw_size': len(raw),
+                'exception_type': type(exc).__name__,
+                'exception_message': str(exc),
+            },
+        )
+    return TDSResult.fail(
+        TDSResultCode.PAYLOAD_FORMAT_UNSUPPORTED,
+        'Payload format is not supported.',
+        meta={'fmt_id': int(fmt_id), 'base_fmt_id': int(base), 'codec': codec or '', 'raw_size': len(raw)},
+    )
 
 
 @dataclass
@@ -927,7 +952,7 @@ class TDSDirectory:
 
     # --- core I/O ---
 
-    def write(self, name: str, value: Any,
+    def _write_entry(self, name: str, value: Any,
               fmt_id: FmtID = FmtID.PICKLE_OBJ,
               compress: bool | None = False,
               codec: str = '', provenance: ProvenanceTag | str | None = None) -> 'TDSEntry':
@@ -970,18 +995,35 @@ class TDSDirectory:
         )
         return entry
 
+    def write_entry(self, name: str, value: Any,
+                    fmt_id: FmtID = FmtID.PICKLE_OBJ,
+                    compress: bool | None = False,
+                    codec: str = '', provenance: ProvenanceTag | str | None = None) -> 'TDSEntry':
+        """Legacy/raw entry write for internal engine code and migration tools.
+
+        Public AI-facing code should call write(), which returns TDSResult.
+        """
+        return self._write_entry(name, value, fmt_id=fmt_id, compress=compress, codec=codec, provenance=provenance)
+
+    def write(self, name: str, value: Any,
+              fmt_id: FmtID = FmtID.PICKLE_OBJ,
+              compress: bool | None = False,
+              codec: str = '', provenance: ProvenanceTag | str | None = None) -> TDSResult:
+        """Public non-halting write surface: always return TDSResult."""
+        return self.write_result(name, value, fmt_id=fmt_id, compress=compress, codec=codec, provenance=provenance)
+
     def write_variable(self, name: str, value: Any, *, compress: bool | None = None, codec: str = '', provenance: ProvenanceTag | str | None = None) -> 'TDSEntry':
         kind = choose_variable_kind(value)
-        return self.write(name, value, fmt_id=FmtID(int(kind)), compress=compress, codec=codec, provenance=provenance)
+        return self._write_entry(name, value, fmt_id=FmtID(int(kind)), compress=compress, codec=codec, provenance=provenance)
 
     def write_json(self, name: str, value: Any, *, overwrite: bool = False, compress: bool | None = None, codec: str = '', provenance: ProvenanceTag | str | None = None) -> TDSResult:
         with self._lock:
             exists = name in self._entries
         if exists and not overwrite:
-            self.variables.errors.record('JSON_EXISTS', path=self.path(), name=name)
-            return TDSResult.fail('JSON_EXISTS', 'JSON entry already exists; use overwrite=True to replace.', name=name, path=self.path())
-        self.write(name, value, fmt_id=FmtID.JSON_UTF8, compress=compress, codec=codec, provenance=provenance)
-        return TDSResult.success('JSON_WRITTEN' if not exists else 'JSON_OVERWRITTEN', 'JSON entry stored.', name=name, path=self.path(), value=value)
+            self.variables.errors.record(TDSResultCode.JSON_EXISTS, path=self.path(), name=name)
+            return TDSResult.fail(TDSResultCode.JSON_EXISTS, 'JSON entry already exists; use overwrite=True to replace.', name=name, path=self.path())
+        self._write_entry(name, value, fmt_id=FmtID.JSON_UTF8, compress=compress, codec=codec, provenance=provenance)
+        return TDSResult.success(TDSResultCode.JSON_WRITTEN if not exists else TDSResultCode.JSON_OVERWRITTEN, 'JSON entry stored.', name=name, path=self.path(), value=value)
 
     def write_text(self, name: str, text: str, *, overwrite: bool = False,
                    compress: bool | None = None, codec: str = '', provenance: ProvenanceTag | str | None = None) -> TDSResult:
@@ -992,14 +1034,14 @@ class TDSDirectory:
         using the same directory namespace.
         """
         if not isinstance(text, str):
-            return TDSResult.fail('TEXT_TYPE_ERROR', 'Text entries require str data.', name=name, path=self.path())
+            return TDSResult.fail(TDSResultCode.TEXT_TYPE_ERROR, 'Text entries require str data.', name=name, path=self.path())
         with self._lock:
             exists = name in self._entries
         if exists and not overwrite:
-            self.variables.errors.record('TEXT_EXISTS', path=self.path(), name=name)
-            return TDSResult.fail('TEXT_EXISTS', 'Text entry already exists; use overwrite=True to replace.', name=name, path=self.path())
-        entry = self.write(name, text, fmt_id=FmtID.TEXT_UTF8, compress=compress, codec=codec, provenance=provenance)
-        return TDSResult.success('TEXT_WRITTEN' if not exists else 'TEXT_OVERWRITTEN', 'Text entry stored.', name=name, path=self.path(), value=text, meta={'compressed': bool(entry.fmt_id & FmtID.COMPRESSED), 'codec': codec or CompressorRegistry._default, 'content_hash': entry.content_hash, 'raw_size': entry.raw_size, 'stored_size': entry.stored_size})
+            self.variables.errors.record(TDSResultCode.TEXT_EXISTS, path=self.path(), name=name)
+            return TDSResult.fail(TDSResultCode.TEXT_EXISTS, 'Text entry already exists; use overwrite=True to replace.', name=name, path=self.path())
+        entry = self._write_entry(name, text, fmt_id=FmtID.TEXT_UTF8, compress=compress, codec=codec, provenance=provenance)
+        return TDSResult.success(TDSResultCode.TEXT_WRITTEN if not exists else TDSResultCode.TEXT_OVERWRITTEN, 'Text entry stored.', name=name, path=self.path(), value=text, meta={'compressed': bool(entry.fmt_id & FmtID.COMPRESSED), 'codec': codec or CompressorRegistry._default, 'content_hash': entry.content_hash, 'raw_size': entry.raw_size, 'stored_size': entry.stored_size})
 
     def _text_chunk_prefix(self, name: str) -> str:
         h = zlib.adler32(name.encode('utf-8')) & 0xFFFFFFFF
@@ -1008,21 +1050,21 @@ class TDSDirectory:
     def write_text_chunked(self, name: str, text: str, *, chunk_size: int = 65536,
                            overwrite: bool = False, compress: bool | None = None, codec: str = '') -> TDSResult:
         if not isinstance(text, str):
-            return TDSResult.fail('TEXT_TYPE_ERROR', 'Chunked text entries require str data.', name=name, path=self.path())
+            return TDSResult.fail(TDSResultCode.TEXT_TYPE_ERROR, 'Chunked text entries require str data.', name=name, path=self.path())
         if int(chunk_size) <= 0:
-            return TDSResult.fail('TEXT_CHUNK_SIZE_INVALID', 'chunk_size must be positive.', name=name, path=self.path())
+            return TDSResult.fail(TDSResultCode.TEXT_CHUNK_SIZE_INVALID, 'chunk_size must be positive.', name=name, path=self.path())
         with self._lock:
             exists = name in self._entries
         if exists and not overwrite:
-            self.variables.errors.record('TEXT_EXISTS', path=self.path(), name=name)
-            return TDSResult.fail('TEXT_EXISTS', 'Text entry already exists; use overwrite=True to replace.', name=name, path=self.path())
+            self.variables.errors.record(TDSResultCode.TEXT_EXISTS, path=self.path(), name=name)
+            return TDSResult.fail(TDSResultCode.TEXT_EXISTS, 'Text entry already exists; use overwrite=True to replace.', name=name, path=self.path())
         if exists and overwrite:
             try:
-                prior = self.read(name)
+                prior = self.read_value(name)
                 if isinstance(prior, dict) and prior.get('kind') == 'TEXT_CHUNKED_UTF8':
                     for chunk_name in prior.get('chunks', []) or []:
                         if chunk_name in self._entries:
-                            self.delete(chunk_name)
+                            self.delete_entry(chunk_name)
             except Exception:
                 pass
         raw = text.encode('utf-8')
@@ -1032,7 +1074,7 @@ class TDSDirectory:
         chunk_checksums, chunk_checksum_backend = _native_checksum32_many(chunks_raw)
         if len(chunk_checksums) != len(chunks_raw):
             self.telemetry_manager.record_chunk_transition("quarantined")
-            return TDSResult.fail('TEXT_CHUNK_CHECKSUM_ERROR', 'Chunk checksum batch returned inconsistent length.', name=name, path=self.path())
+            return TDSResult.fail(TDSResultCode.TEXT_CHUNK_CHECKSUM_ERROR, 'Chunk checksum batch returned inconsistent length.', name=name, path=self.path())
         chunk_names = []
         self.telemetry_manager.record_chunk_transition("pending", len(chunks_raw))
         for i, chunk_raw in enumerate(chunks_raw):
@@ -1040,13 +1082,14 @@ class TDSDirectory:
             try:
                 self.telemetry_manager.record_chunk_transition("sealed")
                 self.telemetry_manager.record_chunk_transition("verified")
-                self.write(cname, chunk_raw.decode('utf-8'), fmt_id=FmtID.TEXT_UTF8, compress=compress, codec=codec)
+                self._write_entry(cname, chunk_raw.decode('utf-8'), fmt_id=FmtID.TEXT_UTF8, compress=compress, codec=codec)
                 self.telemetry_manager.record_chunk_transition("indexed")
                 self.telemetry_manager.record_chunk_transition("exposed")
                 chunk_names.append(cname)
-            except Exception:
+            except Exception as exc:
                 self.telemetry_manager.record_chunk_transition("quarantined")
-                raise
+                self.telemetry_manager.record_error()
+                return TDSResult.from_exception(TDSResultCode.TEXT_CHUNK_WRITE_ERROR, exc, name=name, path=self.path())
         manifest = {
             'kind': 'TEXT_CHUNKED_UTF8', 'name': name,
             'chunk_size': int(chunk_size), 'chunk_size_unit': 'utf8_bytes',
@@ -1054,15 +1097,15 @@ class TDSDirectory:
             'raw_size': len(raw), 'chunk_count': len(chunk_names),
             'chunk_checksums32': chunk_checksums, 'chunk_checksum_backend': chunk_checksum_backend,
         }
-        self.write(name, manifest, fmt_id=FmtID.JSON_UTF8, compress=False)
+        self._write_entry(name, manifest, fmt_id=FmtID.JSON_UTF8, compress=False)
         self.telemetry_manager.record_chunk(len(chunk_names), time.perf_counter_ns() - chunk_scan_start)
-        return TDSResult.success('TEXT_CHUNKED_WRITTEN' if not exists else 'TEXT_CHUNKED_OVERWRITTEN', 'Chunked text entry stored.', name=name, path=self.path(), meta={'chunks': len(chunk_names), 'content_hash': manifest['content_hash'], 'raw_size': len(raw), 'chunk_checksum_backend': chunk_checksum_backend})
+        return TDSResult.success(TDSResultCode.TEXT_CHUNKED_WRITTEN if not exists else TDSResultCode.TEXT_CHUNKED_OVERWRITTEN, 'Chunked text entry stored.', name=name, path=self.path(), meta={'chunks': len(chunk_names), 'content_hash': manifest['content_hash'], 'raw_size': len(raw), 'chunk_checksum_backend': chunk_checksum_backend})
 
     def read_text(self, name: str) -> str:
-        value = self.read(name)
+        value = self.read_value(name)
         if isinstance(value, dict) and value.get('kind') == 'TEXT_CHUNKED_UTF8':
             chunk_names = list(value.get('chunks', []) or [])
-            parts = [self.read(chunk_name) for chunk_name in chunk_names]
+            parts = [self.read_value(chunk_name) for chunk_name in chunk_names]
             expected = value.get('chunk_checksums32')
             if expected is not None:
                 raw_parts = [str(part).encode('utf-8') for part in parts]
@@ -1079,6 +1122,15 @@ class TDSDirectory:
         if not isinstance(value, str):
             raise TypeError(f"Entry {name!r} is not a UTF-8 text entry")
         return value
+
+    def read_text_result(self, name: str) -> TDSResult:
+        """AI-safe text read surface: always return TDSResult, never raise."""
+        try:
+            value = self.read_text(name)
+            return TDSResult.success(TDSResultCode.TEXT_READ_OK, 'Text entry read.', name=name, path=self.path(), value=value)
+        except Exception as exc:
+            self.telemetry_manager.record_error()
+            return TDSResult.from_exception(TDSResultCode.TEXT_READ_ERROR, exc, name=name, path=self.path())
 
     def addvar(self, name: str, data: Any) -> TDSResult:
         return self.variables.addvar(name, data)
@@ -1119,6 +1171,13 @@ class TDSDirectory:
             'key_id': getattr(entry, 'key_id', None),
         }
 
+    def entry_metadata_result(self, name: str) -> TDSResult:
+        """Public non-halting metadata lookup surface."""
+        try:
+            return TDSResult.success(TDSResultCode.ENTRY_METADATA_OK, 'Entry metadata read.', name=name, path=self.path(), value=self.entry_metadata(name))
+        except Exception as exc:
+            return TDSResult.from_exception(TDSResultCode.ENTRY_METADATA_MISSING, exc, name=name, path=self.path())
+
     def invariant_report(self) -> dict:
         return self.invariants.evaluate_directory(self).as_dict()
 
@@ -1128,7 +1187,18 @@ class TDSDirectory:
             raise KeyError(name)
         return getattr(entry, 'provenance', ProvenanceTag()).compact_record(f'{self.path()}::{name}')
 
-    def read(self, name: str) -> Any:
+    def provenance_record_result(self, name: str) -> TDSResult:
+        """Public non-halting provenance record lookup surface."""
+        try:
+            return TDSResult.success(TDSResultCode.PROVENANCE_RECORD_OK, 'Provenance record read.', name=name, path=self.path(), value=self.provenance_record(name))
+        except Exception as exc:
+            return TDSResult.from_exception(TDSResultCode.PROVENANCE_RECORD_MISSING, exc, name=name, path=self.path())
+
+    def read_value(self, name: str) -> Any:
+        """Legacy/raw value read for internal engine code and migration tools.
+
+        Public AI-facing code should call read(), which returns TDSResult.
+        """
         start_ns = self.telemetry.start()
         route_id = int(self.srz.route_id) if self.srz.enabled else 0
         # JIT Bloom gate — definite miss with no lock acquired
@@ -1164,23 +1234,76 @@ class TDSDirectory:
         self.telemetry_manager.record_read(elapsed, hit=True, backend=self._entry_index.backend_name)
         return entry.data
 
-    def delete(self, name: str) -> None:
+    def read(self, name: str) -> TDSResult:
+        """Public non-halting read surface: always return TDSResult."""
+        return self.read_result(name)
+
+    def read_result(self, name: str) -> TDSResult:
+        """AI-safe read surface: always return TDSResult, never raise."""
+        try:
+            value = self.read_value(name)
+            if isinstance(value, TDSResult) and not value.ok:
+                return value
+            return TDSResult.success(TDSResultCode.READ_OK, 'Entry read.', name=name, path=self.path(), value=value)
+        except Exception as exc:
+            self.telemetry_manager.record_error()
+            
+            code = TDSResultCode.READ_MISSING if isinstance(exc, KeyError) else TDSResultCode.READ_ERROR
+            return TDSResult.from_exception(code, exc, name=name, path=self.path())
+
+    def write_result(self, name: str, value: Any,
+                     fmt_id: FmtID = FmtID.PICKLE_OBJ,
+                     compress: bool | None = False,
+                     codec: str = '', provenance: ProvenanceTag | str | None = None) -> TDSResult:
+        """AI-safe write surface: always return TDSResult, never raise."""
+        try:
+            entry = self._write_entry(name, value, fmt_id=fmt_id, compress=compress, codec=codec, provenance=provenance)
+            return TDSResult.success(TDSResultCode.WRITE_OK, 'Entry written.', name=name, path=self.path(), value=value, meta={
+                'fmt_id': int(entry.fmt_id),
+                'payload_kind': entry.payload_kind,
+                'content_hash': entry.content_hash,
+                'raw_size': int(entry.raw_size),
+                'stored_size': int(entry.stored_size),
+            })
+        except Exception as exc:
+            self.telemetry_manager.record_error()
+            return TDSResult.from_exception(TDSResultCode.WRITE_ERROR, exc, name=name, path=self.path())
+
+    def delete_result(self, name: str) -> TDSResult:
+        """AI-safe delete surface: always return TDSResult, never raise."""
+        try:
+            existed = name in self._entries
+            self.delete_entry(name)
+            return TDSResult.success(TDSResultCode.DELETE_OK if existed else TDSResultCode.DELETE_MISSING, 'Delete completed.' if existed else 'Entry was already absent.', name=name, path=self.path(), meta={'existed': bool(existed)})
+        except Exception as exc:
+            self.telemetry_manager.record_error()
+            return TDSResult.from_exception(TDSResultCode.DELETE_ERROR, exc, name=name, path=self.path())
+
+    def delete_entry(self, name: str) -> None:
+        """Legacy/raw delete for internal engine code and migration tools.
+
+        Public AI-facing code should call delete(), which returns TDSResult.
+        """
         with self._lock:
             self._entries.pop(name, None)
             self._ts_mod = int(time.time_ns())
         self._registry.remove(name)
         self.telemetry_manager.record_delete()
 
+    def delete(self, name: str) -> TDSResult:
+        """Public non-halting delete surface: always return TDSResult."""
+        return self.delete_result(name)
+
     # --- async surface ---
 
     async def awrite(self, name: str, value: Any, **kwargs) -> 'TDSEntry':
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
-            None, lambda: self.write(name, value, **kwargs))
+            None, lambda: self.write_result(name, value, **kwargs))
 
     async def aread(self, name: str) -> Any:
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, lambda: self.read(name))
+        return await loop.run_in_executor(None, lambda: self.read_result(name))
 
     # --- directory ops ---
 
@@ -1222,7 +1345,7 @@ class TDSDirectory:
             keys = self._entries.keys()
 
         def _read_one(k):
-            return (k, self.read(k))
+            return (k, self.read_value(k))
 
         pairs = self._pool.map_parallel(_read_one, keys)
         # Pre-size the result dict
@@ -1342,7 +1465,7 @@ class TDSFileSystem:
         mem = fs.root.mkdir("working_mem", flags=DirFlags.LOOP_PINNED)
 
         db.set_schema("embedding_matrix", EntrySchema(dtype=np.float32, shape=(1024, 1024)))
-        db.write("embedding_matrix", np.random.randn(1024, 1024).astype(np.float32),
+        db.write_entry("embedding_matrix", np.random.randn(1024, 1024).astype(np.float32),
                  fmt_id=FmtID.NUMPY_MATRIX, compress=True)
 
         mem.loop_cache.register("gradient_buf", cycle=32)
@@ -1354,7 +1477,7 @@ class TDSFileSystem:
         asyncio.run(db.awrite("key", value))
         value = asyncio.run(db.aread("key"))
     """
-    VERSION = (2, 5, 0)
+    VERSION = (2, 9, 4)
 
     def __init__(self, name: str = "tds_root", manifest_policy: Optional[ManifestPolicy] = None, runtime_config: Optional[RuntimeConfig] = None, config_registry: Optional[ConfigRegistry] = None, crypto_provider: Optional[CryptoProvider] = None, telemetry_manager: Optional[TelemetryManager] = None):
         self.manifest_policy = manifest_policy or ManifestPolicy.default()
@@ -1499,7 +1622,7 @@ class TDSFileSystem:
     def parallel_batch_write(self, writes: List[Tuple[str, str, Any]]) -> None:
         def _do_write(args):
             path, name, value = args
-            self.resolve(path).write(name, value)
+            self.resolve(path).write_result(name, value)
         self._pool.map_parallel(_do_write, writes)
 
     def snapshot_headers(self) -> Dict[str, dict]:
@@ -1614,8 +1737,8 @@ class WriteAheadLog:
                     break
                 fmt_id = FmtID(fmt_id_int)
                 data   = _deserialize_payload(data_b, fmt_id)
-                directory.write(name, data, fmt_id=fmt_id & ~FmtID.COMPRESSED,
-                                compress=bool(fmt_id & FmtID.COMPRESSED))
+                directory.write_entry(name, data, fmt_id=fmt_id & ~FmtID.COMPRESSED,
+                                      compress=bool(fmt_id & FmtID.COMPRESSED))
                 replayed += 1
                 cursor = p
             except Exception:
@@ -1647,7 +1770,7 @@ def demo():
     print(">> Writing compressed numpy matrices ...")
     for i in range(4):
         mat = np.random.randn(128, 128).astype(np.float32)
-        vec_db.write(f"embed_{i:04d}", mat,
+        vec_db.write_entry(f"embed_{i:04d}", mat,
                      fmt_id=FmtID.NUMPY_MATRIX, compress=True)
 
     print(">> Symbol table: intern + matrix swap ...")
@@ -1655,9 +1778,9 @@ def demo():
     sym_db.symbols.intern("NULL")
     sym_db.symbols.intern("START")
     sym_db.symbols.intern("END")
-    sym_db.write("token_template", token_mat, fmt_id=FmtID.SYMBOL_TABLE)
+    sym_db.write_entry("token_template", token_mat, fmt_id=FmtID.SYMBOL_TABLE)
     swapped = sym_db.symbols.swap("NULL", "START", token_mat.copy())
-    sym_db.write("token_v1", swapped, fmt_id=FmtID.SYMBOL_TABLE)
+    sym_db.write_entry("token_v1", swapped, fmt_id=FmtID.SYMBOL_TABLE)
     print(f"   decoded[0]: {sym_db.symbols.decode_matrix(swapped[:2])}")
 
     print(">> Loop cache: pow-2 fast path (cycle=8) ...")

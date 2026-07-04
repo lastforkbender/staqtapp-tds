@@ -10,7 +10,7 @@ from typing import Any, Dict, List
 import copy
 import threading
 
-from staqtapp_tds.result import TDSResult
+from staqtapp_tds.result import TDSResult, TDSResultCode
 from staqtapp_tds.errors import ErrorTelemetry, ErrorLogMode
 
 
@@ -70,37 +70,37 @@ class VariableControl:
         return name in self.directory._entries
 
     def _delete(self, name: str) -> None:
-        self.directory.delete(name)
+        self.directory.delete_entry(name)
 
     def is_locked(self, name: str) -> bool:
         return bool(self.lockvars.get(name, False))
 
     def addvar(self, name: str, data: Any) -> TDSResult:
         if self._exists(name):
-            self.errors.record("VAR_EXISTS", path=self._path(), name=name)
-            return TDSResult.fail("VAR_EXISTS", "Variable already exists; use editvar() to replace.", name=name, path=self._path())
+            self.errors.record(TDSResultCode.VAR_EXISTS, path=self._path(), name=name)
+            return TDSResult.fail(TDSResultCode.VAR_EXISTS, "Variable already exists; use editvar() to replace.", name=name, path=self._path())
         self.directory.write_variable(name, data)
-        return TDSResult.success("VAR_ADDED", "Variable added.", name=name, path=self._path(), value=data)
+        return TDSResult.success(TDSResultCode.VAR_ADDED, "Variable added.", name=name, path=self._path(), value=data)
 
     def editvar(self, name: str, data: Any, *, overwrite: bool = True) -> TDSResult:
         if self.is_locked(name):
-            self.errors.record("VAR_LOCKED", path=self._path(), name=name, severity="warn")
-            return TDSResult.fail("VAR_LOCKED", "Variable is locked.", name=name, path=self._path())
+            self.errors.record(TDSResultCode.VAR_LOCKED, path=self._path(), name=name, severity="warn")
+            return TDSResult.fail(TDSResultCode.VAR_LOCKED, "Variable is locked.", name=name, path=self._path())
         if not self._exists(name):
             self.directory.write_variable(name, data)
-            return TDSResult.success("VAR_CREATED", "Variable did not exist and was created.", name=name, path=self._path(), value=data)
+            return TDSResult.success(TDSResultCode.VAR_CREATED, "Variable did not exist and was created.", name=name, path=self._path(), value=data)
         if not overwrite:
-            self.errors.record("VAR_EXISTS", path=self._path(), name=name)
-            return TDSResult.fail("VAR_EXISTS", "Variable already exists.", name=name, path=self._path())
+            self.errors.record(TDSResultCode.VAR_EXISTS, path=self._path(), name=name)
+            return TDSResult.fail(TDSResultCode.VAR_EXISTS, "Variable already exists.", name=name, path=self._path())
         self.directory.write_variable(name, data)
-        return TDSResult.success("VAR_EDITED", "Variable edited.", name=name, path=self._path(), value=data)
+        return TDSResult.success(TDSResultCode.VAR_EDITED, "Variable edited.", name=name, path=self._path(), value=data)
 
     def lockvar(self, name: str, locked: bool = True) -> TDSResult:
         if not self._exists(name):
-            self.errors.record("VAR_MISSING", path=self._path(), name=name)
-            return TDSResult.fail("VAR_MISSING", "Variable does not exist.", name=name, path=self._path())
+            self.errors.record(TDSResultCode.VAR_MISSING, path=self._path(), name=name)
+            return TDSResult.fail(TDSResultCode.VAR_MISSING, "Variable does not exist.", name=name, path=self._path())
         self.lockvars[name] = bool(locked)
-        return TDSResult.success("VAR_LOCKED" if locked else "VAR_UNLOCKED", "Variable lock state updated.", name=name, path=self._path(), meta={"locked": bool(locked)})
+        return TDSResult.success(TDSResultCode.VAR_LOCKED if locked else TDSResultCode.VAR_UNLOCKED, "Variable lock state updated.", name=name, path=self._path(), meta={"locked": bool(locked)})
 
     def unlockvar(self, name: str) -> TDSResult:
         return self.lockvar(name, False)
@@ -122,56 +122,56 @@ class VariableControl:
         if name.startswith("~"):
             base = name[1:]
             if not base:
-                return TDSResult.fail("VAR_INVALID_NAME", "Stalk variable name cannot be empty.", name=name, path=self._path())
+                return TDSResult.fail(TDSResultCode.VAR_INVALID_NAME, "Stalk variable name cannot be empty.", name=name, path=self._path())
             with self._chain_lock(base):
                 if self.is_locked(base):
-                    self.errors.record("VAR_LOCKED", path=self._path(), name=base, severity="warn")
-                    return TDSResult.fail("VAR_LOCKED", "Base variable is locked.", name=base, path=self._path())
+                    self.errors.record(TDSResultCode.VAR_LOCKED, path=self._path(), name=base, severity="warn")
+                    return TDSResult.fail(TDSResultCode.VAR_LOCKED, "Base variable is locked.", name=base, path=self._path())
                 if not self._exists(base):
-                    self.errors.record("VAR_MISSING", path=self._path(), name=base)
-                    return TDSResult.fail("VAR_MISSING", "Base variable does not exist.", name=base, path=self._path())
+                    self.errors.record(TDSResultCode.VAR_MISSING, path=self._path(), name=base)
+                    return TDSResult.fail(TDSResultCode.VAR_MISSING, "Base variable does not exist.", name=base, path=self._path())
                 state = self.stalkvars.get(base)
                 if state is None:
                     state = StalkState(active=True, latest_index=0, latest_name=base, chain_names=[])
                     self.stalkvars[base] = state
-                previous = self.directory.read(state.latest_name)
+                previous = self.directory.read_value(state.latest_name)
                 combined = _merge_values(previous, data)
                 next_index = state.latest_index + 1
                 next_name = f"{base}_{next_index:04d}"
                 # Avoid accidental collision outside tracked chain.
                 if self._exists(next_name) and next_name not in state.chain_names:
-                    self.errors.record("VAR_CHAIN_COLLISION", path=self._path(), name=next_name, severity="error")
-                    return TDSResult.fail("VAR_CHAIN_COLLISION", "Next stalk increment name already exists outside the tracked chain.", name=next_name, path=self._path())
+                    self.errors.record(TDSResultCode.VAR_CHAIN_COLLISION, path=self._path(), name=next_name, severity="error")
+                    return TDSResult.fail(TDSResultCode.VAR_CHAIN_COLLISION, "Next stalk increment name already exists outside the tracked chain.", name=next_name, path=self._path())
                 self.directory.write_variable(next_name, combined)
                 state.latest_index = next_index
                 state.latest_name = next_name
                 state.chain_names.append(next_name)
-                return TDSResult.success("VAR_STALKED", "Stalk increment created.", name=next_name, path=self._path(), value=combined, meta={"base": base, "index": next_index, "latest": next_name})
+                return TDSResult.success(TDSResultCode.VAR_STALKED, "Stalk increment created.", name=next_name, path=self._path(), value=combined, meta={"base": base, "index": next_index, "latest": next_name})
 
         # No tilde: if a chain exists, clear tracked increments. If data is None,
         # keep base unchanged. If data is not None, edit/replace the base.
         base = name
         with self._chain_lock(base):
             if self.is_locked(base):
-                self.errors.record("VAR_LOCKED", path=self._path(), name=base, severity="warn")
-                return TDSResult.fail("VAR_LOCKED", "Variable is locked.", name=base, path=self._path())
+                self.errors.record(TDSResultCode.VAR_LOCKED, path=self._path(), name=base, severity="warn")
+                return TDSResult.fail(TDSResultCode.VAR_LOCKED, "Variable is locked.", name=base, path=self._path())
             had_chain = base in self.stalkvars
             removed = self._clear_chain(base)
             if data is None:
-                return TDSResult.success("VAR_STALK_CLEARED" if had_chain else "VAR_NOOP", "Stalk chain cleared; base retained." if had_chain else "No stalk chain active; base retained.", name=base, path=self._path(), meta={"removed": removed})
+                return TDSResult.success(TDSResultCode.VAR_STALK_CLEARED if had_chain else TDSResultCode.VAR_NOOP, "Stalk chain cleared; base retained." if had_chain else "No stalk chain active; base retained.", name=base, path=self._path(), meta={"removed": removed})
             if not self._exists(base):
                 self.directory.write_variable(base, data)
-                return TDSResult.success("VAR_CREATED", "Variable created.", name=base, path=self._path(), value=data, meta={"removed": removed})
+                return TDSResult.success(TDSResultCode.VAR_CREATED, "Variable created.", name=base, path=self._path(), value=data, meta={"removed": removed})
             self.directory.write_variable(base, data)
-            return TDSResult.success("VAR_EDITED", "Variable edited and stalk chain cleared." if had_chain else "Variable edited.", name=base, path=self._path(), value=data, meta={"removed": removed})
+            return TDSResult.success(TDSResultCode.VAR_EDITED, "Variable edited and stalk chain cleared." if had_chain else "Variable edited.", name=base, path=self._path(), value=data, meta={"removed": removed})
 
     def findvar(self, name: str) -> TDSResult:
         if not self._exists(name):
-            return TDSResult.fail("VAR_MISSING", "Variable does not exist.", name=name, path=self._path())
-        return TDSResult.success("VAR_FOUND", "Variable found.", name=name, path=self._path(), value=self.directory.read(name), meta={"locked": self.is_locked(name)})
+            return TDSResult.fail(TDSResultCode.VAR_MISSING, "Variable does not exist.", name=name, path=self._path())
+        return TDSResult.success(TDSResultCode.VAR_FOUND, "Variable found.", name=name, path=self._path(), value=self.directory.read_value(name), meta={"locked": self.is_locked(name)})
 
     def loadvar(self, name: str) -> Any:
-        return self.directory.read(name)
+        return self.directory.read_value(name)
 
     def snapshot(self) -> Dict[str, Any]:
         return {

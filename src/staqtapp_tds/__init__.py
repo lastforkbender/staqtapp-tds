@@ -48,7 +48,7 @@ from staqtapp_tds.telemetry import DirectoryTelemetry, TelemetryLevel, Telemetry
 from staqtapp_tds.latency import LatencyPolicy, LatencyBucket, classify_latency, latency_ratio
 from staqtapp_tds.capabilities import CapabilityRegistry, ZoneCapability
 from staqtapp_tds.namespaces import ReservedNamespaces
-from staqtapp_tds.result import TDSResult
+from staqtapp_tds.result import TDSResult, TDSResultCode, TDSResultInfo, TDS_RESULT_REGISTRY, TDS_RESULT_CODES, known_result_codes, is_known_result_code, result_info
 from staqtapp_tds.variables import VariableControl, StalkState
 from staqtapp_tds.errors import ErrorTelemetry, ErrorLogMode
 from staqtapp_tds.serializers import PayloadKind, CompressionPolicy, SerializerDecision, choose_variable_kind, content_hash_bytes
@@ -86,7 +86,7 @@ __all__ = [
     "DirectoryTelemetry", "TelemetryLevel", "TelemetryMode", "TELEMETRY_DTYPE", "TelemetryManager", "TelemetrySnapshot", "TelemetryPublisherThread",
     "LatencyPolicy", "LatencyBucket", "classify_latency", "latency_ratio",
     "CapabilityRegistry", "ZoneCapability", "ReservedNamespaces",
-    "TDSResult", "VariableControl", "StalkState", "ErrorTelemetry", "ErrorLogMode",
+    "TDSResult", "TDSResultCode", "TDSResultInfo", "TDS_RESULT_REGISTRY", "TDS_RESULT_CODES", "known_result_codes", "is_known_result_code", "result_info", "VariableControl", "StalkState", "ErrorTelemetry", "ErrorLogMode",
     "PayloadKind", "CompressionPolicy", "SerializerDecision", "choose_variable_kind", "content_hash_bytes",
     "InvariantEngine", "InvariantReport", "InvariantViolation", "InvariantCode", "INVARIANT_DTYPE",
     "ProvenanceTag", "ProvenanceClass", "PROVENANCE_DTYPE",
