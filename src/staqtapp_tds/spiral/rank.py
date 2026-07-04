@@ -16,6 +16,8 @@ try:  # pragma: no cover - availability depends on build platform
 except Exception:  # pragma: no cover
     _native = None
 
+from staqtapp_tds.result import TDSResult, TDSResultCode
+
 
 @dataclass(frozen=True)
 class SpiralRankConfig:
@@ -97,7 +99,7 @@ class SpiralRankStats:
 
 
 @dataclass(frozen=True)
-class SpiralRankResult:
+class SpiralRankRecord:
     trace_id: str
     score: float
     source_score: float
@@ -122,16 +124,32 @@ class SpiralRankResult:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class SpiralRankRun:
     """Rank output plus immutable observer statistics."""
 
-    results: tuple[SpiralRankResult, ...]
+    records: tuple[SpiralRankRecord, ...]
     stats: SpiralRankStats
+
+    def __init__(self, records: Iterable[SpiralRankRecord] | None = None, stats: SpiralRankStats | None = None, **legacy: Any) -> None:
+        if records is None and "results" in legacy:
+            records = legacy.pop("results")
+        if legacy:
+            raise TypeError(f"unexpected SpiralRankRun argument(s): {', '.join(sorted(legacy))}")
+        if stats is None:
+            raise TypeError("stats is required")
+        object.__setattr__(self, "records", tuple(records or ()))
+        object.__setattr__(self, "stats", stats)
+
+    @property
+    def results(self) -> tuple[SpiralRankRecord, ...]:
+        """Backward-compatible alias for record rows, not a result envelope."""
+        return self.records
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "results": [r.to_dict() for r in self.results],
+            "records": [r.to_dict() for r in self.records],
+            "results": [r.to_dict() for r in self.records],  # legacy JSON key
             "stats": self.stats.to_dict(),
         }
 
@@ -236,7 +254,7 @@ class NativeSpiralRankEngine:
 
         shape_start = perf_counter_ns()
         results = tuple(
-            SpiralRankResult(
+            SpiralRankRecord(
                 trace_id=tid,
                 score=float(score),
                 source_score=float(source),
@@ -273,7 +291,7 @@ class NativeSpiralRankEngine:
             warnings=tuple(warnings),
         )
         self.last_stats = stats
-        return SpiralRankRun(results=results, stats=stats)
+        return SpiralRankRun(records=results, stats=stats)
 
     def rank(
         self,
@@ -285,7 +303,7 @@ class NativeSpiralRankEngine:
         *,
         limit: int | None = None,
         descending: bool = True,
-    ) -> list[SpiralRankResult]:
+    ) -> list[SpiralRankRecord]:
         return list(self.rank_run(
             trace_ids,
             scores,
@@ -294,12 +312,39 @@ class NativeSpiralRankEngine:
             ages_ns,
             limit=limit,
             descending=descending,
-        ).results)
+        ).records)
+
+    def rank_result(
+        self,
+        trace_ids: Iterable[str],
+        scores: Iterable[float],
+        confidences: Iterable[float] | None = None,
+        depths: Iterable[int] | None = None,
+        ages_ns: Iterable[int] | None = None,
+        *,
+        limit: int | None = None,
+        descending: bool = True,
+    ) -> TDSResult:
+        """AI-safe rank surface: always returns TDSResult, never raises."""
+        try:
+            run = self.rank_run(trace_ids, scores, confidences, depths, ages_ns, limit=limit, descending=descending)
+            return TDSResult.success(
+                TDSResultCode.SPIRAL_RANK_OK,
+                "Spiral rank completed.",
+                value=run.to_dict(),
+                meta={"stats": run.stats.to_dict(), "record_count": len(run.records)},
+            )
+        except Exception as exc:  # pragma: no cover - exercised through invalid caller input
+            return TDSResult.from_exception(TDSResultCode.SPIRAL_RANK_ERROR, exc)
 
 
-def rank_traces(trace_ids: Iterable[str], scores: Iterable[float], **kwargs: Any) -> list[SpiralRankResult]:
+def rank_traces(trace_ids: Iterable[str], scores: Iterable[float], **kwargs: Any) -> list[SpiralRankRecord]:
     return NativeSpiralRankEngine().rank(trace_ids, scores, **kwargs)
 
 
 def rank_trace_run(trace_ids: Iterable[str], scores: Iterable[float], **kwargs: Any) -> SpiralRankRun:
     return NativeSpiralRankEngine().rank_run(trace_ids, scores, **kwargs)
+
+
+def rank_trace_result(trace_ids: Iterable[str], scores: Iterable[float], **kwargs: Any) -> TDSResult:
+    return NativeSpiralRankEngine().rank_result(trace_ids, scores, **kwargs)

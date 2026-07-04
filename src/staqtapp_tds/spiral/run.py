@@ -98,7 +98,7 @@ class SpiralRun:
     def store_search_trace(self, trace_id: str, content: Any, *, rank_score: float | None = None,
                            rank_source: str = "", created_by: str = "", tags: tuple[str, ...] = ()) -> TraceRecord:
         entry_name = f"{trace_id}.tds"
-        self.traces.write(entry_name, content)
+        self.traces.write_result(entry_name, content)
         cfg = self.run_dir.config_registry.active()
         rec = TraceRecord(
             run_id=self.run_id,
@@ -134,7 +134,7 @@ class SpiralRun:
                           aggregation_step: int = 1, rank_score: float | None = None,
                           rank_source: str = "", metadata: dict[str, Any] | None = None) -> AggregationRecord:
         entry_name = f"{aggregation_id}.tds"
-        self.aggregations.write(entry_name, output)
+        self.aggregations.write_result(entry_name, output)
         rec = AggregationRecord(
             run_id=self.run_id,
             aggregation_id=aggregation_id,
@@ -150,7 +150,7 @@ class SpiralRun:
         return rec
 
     def store_final(self, name: str, output: Any, *, derived_from: list[str] | tuple[str, ...] = ()) -> None:
-        self.final.write(name, output)
+        self.final.write_result(name, output)
         self.metadata.write_json(f"final_{name}.json", {
             "run_id": self.run_id,
             "final_entry": f"final/{name}",
@@ -164,7 +164,7 @@ class SpiralRun:
         for name in self.metadata.ls(sort_by_prob=False):
             clean = name.replace("[dir] ", "")
             if clean.startswith("trace_") and clean.endswith(".json"):
-                records.append(TraceRecord.from_mapping(self.metadata.read(clean)))
+                records.append(TraceRecord.from_mapping(self.metadata.read_value(clean)))
         return sorted(records, key=lambda r: (-1.0 if r.rank_score is None else float(r.rank_score)), reverse=descending)
 
     def snapshot(self) -> dict[str, Any]:
