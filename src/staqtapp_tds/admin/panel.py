@@ -11,7 +11,7 @@ from urllib.parse import parse_qs, unquote
 
 from staqtapp_tds import __version__
 from staqtapp_tds.admin.control import AdminControl
-from staqtapp_tds.tds_json import dumps_pretty
+from staqtapp_tds.tds_json import dumps_status
 
 PANEL_REFRESH_SECONDS = 2.0
 
@@ -121,7 +121,7 @@ class AdminPanelServer:
 
             def do_GET(self):
                 if self.path == "/status.json":
-                    self._send(200, dumps_pretty(outer._status_snapshot())[0], "application/json")
+                    self._send(200, dumps_status(outer._status_snapshot())[0], "application/json")
                     return
                 if self.path.startswith("/static/"):
                     asset = outer._static_asset(self.path)

@@ -3,6 +3,7 @@ from typing import Any
 from staqtapp_tds.config import ConfigRegistry, RuntimeConfig
 from staqtapp_tds.admin.auth import ConfigGrant, LocalAuthProvider
 from staqtapp_tds.admin.audit import AuditEvent, AuditLog
+from staqtapp_tds.admin.spiral_rank import SpiralRankTelemetry, spiral_rank_snapshot_from
 
 class AdminControl:
     def __init__(self, registry: ConfigRegistry | None = None, auth: LocalAuthProvider | None = None, audit: AuditLog | None = None, observation_source: Any | None = None):
@@ -10,6 +11,7 @@ class AdminControl:
         self.auth = auth or LocalAuthProvider()
         self.audit = audit or AuditLog()
         self.observation_source = observation_source
+        self.spiral_rank_telemetry = SpiralRankTelemetry()
 
     def status(self) -> dict[str, Any]:
         snap = self.registry.snapshot()
@@ -22,6 +24,9 @@ class AdminControl:
                 snap["observation"] = source.snapshot()
             elif callable(source):
                 snap["observation"] = source()
+            snap["spiral_rank"] = spiral_rank_snapshot_from(source)
+        else:
+            snap["spiral_rank"] = self.spiral_rank_telemetry.snapshot()
         return snap
 
     def stage_config(self, candidate: RuntimeConfig, grant: ConfigGrant) -> RuntimeConfig:
