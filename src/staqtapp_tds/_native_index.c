@@ -840,6 +840,112 @@ static PyObject *NativeHandleIndex_stats(NativeHandleIndex *self, PyObject *Py_U
 
 static uint32_t checksum32_nogil(const char *data, Py_ssize_t len) { return fnv1a32(data, len); }
 
+
+/* =============================================================================
+ * v2.8.9 Native Spiral Rank scoring engine
+ *
+ * The rank engine is intentionally isolated from NativeHandleIndex. It consumes
+ * caller-supplied numeric metadata, releases the GIL for the scoring loop, and
+ * returns copied score values to Python. It never reads storage payloads, never
+ * controls storage locks, and never mutates trace/run directories.
+ * ============================================================================= */
+static inline double tds_clamp01(double x) {
+    if (x < 0.0) return 0.0;
+    if (x > 1.0) return 1.0;
+    return x;
+}
+
+static PyObject *module_spiral_rank_scores(PyObject *self, PyObject *args, PyObject *kwargs) {
+    PyObject *scores_obj = NULL;
+    PyObject *conf_obj = Py_None;
+    PyObject *depth_obj = Py_None;
+    PyObject *age_obj = Py_None;
+    double score_weight = 0.72;
+    double confidence_weight = 0.18;
+    double depth_penalty = 0.035;
+    double age_penalty = 0.000001;
+    static char *kwlist[] = {"scores", "confidences", "depths", "ages_ns", "score_weight", "confidence_weight", "depth_penalty", "age_penalty", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|OOOdddd", kwlist,
+                                     &scores_obj, &conf_obj, &depth_obj, &age_obj,
+                                     &score_weight, &confidence_weight, &depth_penalty, &age_penalty)) return NULL;
+
+    PyObject *scores_fast = PySequence_Fast(scores_obj, "scores must be a sequence");
+    if (!scores_fast) return NULL;
+    Py_ssize_t n = PySequence_Fast_GET_SIZE(scores_fast);
+    PyObject **score_items = PySequence_Fast_ITEMS(scores_fast);
+
+    PyObject *conf_fast = NULL, *depth_fast = NULL, *age_fast = NULL;
+    PyObject **conf_items = NULL, **depth_items = NULL, **age_items = NULL;
+    if (conf_obj != Py_None) {
+        conf_fast = PySequence_Fast(conf_obj, "confidences must be a sequence");
+        if (!conf_fast) { Py_DECREF(scores_fast); return NULL; }
+        if (PySequence_Fast_GET_SIZE(conf_fast) != n) { Py_DECREF(scores_fast); Py_DECREF(conf_fast); PyErr_SetString(PyExc_ValueError, "confidences length must match scores length"); return NULL; }
+        conf_items = PySequence_Fast_ITEMS(conf_fast);
+    }
+    if (depth_obj != Py_None) {
+        depth_fast = PySequence_Fast(depth_obj, "depths must be a sequence");
+        if (!depth_fast) { Py_DECREF(scores_fast); Py_XDECREF(conf_fast); return NULL; }
+        if (PySequence_Fast_GET_SIZE(depth_fast) != n) { Py_DECREF(scores_fast); Py_XDECREF(conf_fast); Py_DECREF(depth_fast); PyErr_SetString(PyExc_ValueError, "depths length must match scores length"); return NULL; }
+        depth_items = PySequence_Fast_ITEMS(depth_fast);
+    }
+    if (age_obj != Py_None) {
+        age_fast = PySequence_Fast(age_obj, "ages_ns must be a sequence");
+        if (!age_fast) { Py_DECREF(scores_fast); Py_XDECREF(conf_fast); Py_XDECREF(depth_fast); return NULL; }
+        if (PySequence_Fast_GET_SIZE(age_fast) != n) { Py_DECREF(scores_fast); Py_XDECREF(conf_fast); Py_XDECREF(depth_fast); Py_DECREF(age_fast); PyErr_SetString(PyExc_ValueError, "ages_ns length must match scores length"); return NULL; }
+        age_items = PySequence_Fast_ITEMS(age_fast);
+    }
+
+    double *scores = (double*)calloc((size_t)n, sizeof(double));
+    double *conf = (double*)calloc((size_t)n, sizeof(double));
+    double *depth = (double*)calloc((size_t)n, sizeof(double));
+    double *age = (double*)calloc((size_t)n, sizeof(double));
+    double *out = (double*)calloc((size_t)n, sizeof(double));
+    if (!scores || !conf || !depth || !age || !out) {
+        Py_DECREF(scores_fast); Py_XDECREF(conf_fast); Py_XDECREF(depth_fast); Py_XDECREF(age_fast);
+        free(scores); free(conf); free(depth); free(age); free(out); PyErr_NoMemory(); return NULL;
+    }
+    for (Py_ssize_t i = 0; i < n; ++i) {
+        scores[i] = PyFloat_AsDouble(score_items[i]);
+        if (PyErr_Occurred()) goto parse_error;
+        conf[i] = conf_items ? PyFloat_AsDouble(conf_items[i]) : 1.0;
+        if (PyErr_Occurred()) goto parse_error;
+        depth[i] = depth_items ? PyFloat_AsDouble(depth_items[i]) : 0.0;
+        if (PyErr_Occurred()) goto parse_error;
+        age[i] = age_items ? PyFloat_AsDouble(age_items[i]) : 0.0;
+        if (PyErr_Occurred()) goto parse_error;
+        if (depth[i] < 0.0) depth[i] = 0.0;
+        if (age[i] < 0.0) age[i] = 0.0;
+    }
+
+    diag_counter_add(DIAG_COUNTER_PYTHON_NATIVE_TRANSITIONS, 1);
+    diag_emit_transition(DIAG_EVENT_NATIVE_OPERATION, 7, 288, (uint64_t)n, 0, 0);
+    Py_BEGIN_ALLOW_THREADS
+    for (Py_ssize_t i = 0; i < n; ++i) {
+        double base = tds_clamp01(scores[i]);
+        double c = tds_clamp01(conf[i]);
+        double d_pen = depth_penalty * depth[i];
+        double a_pen = age_penalty * age[i];
+        out[i] = (base * score_weight) + (c * confidence_weight) - d_pen - a_pen;
+    }
+    Py_END_ALLOW_THREADS
+
+    PyObject *list = PyList_New(n);
+    if (!list) goto fail;
+    for (Py_ssize_t i = 0; i < n; ++i) {
+        PyObject *v = PyFloat_FromDouble(out[i]);
+        if (!v) { Py_DECREF(list); list = NULL; goto fail; }
+        PyList_SET_ITEM(list, i, v);
+    }
+    Py_DECREF(scores_fast); Py_XDECREF(conf_fast); Py_XDECREF(depth_fast); Py_XDECREF(age_fast);
+    free(scores); free(conf); free(depth); free(age); free(out);
+    return list;
+parse_error:
+fail:
+    Py_DECREF(scores_fast); Py_XDECREF(conf_fast); Py_XDECREF(depth_fast); Py_XDECREF(age_fast);
+    free(scores); free(conf); free(depth); free(age); free(out);
+    return NULL;
+}
+
 static PyObject *module_checksum32(PyObject *self, PyObject *args) {
     const char *data; Py_ssize_t len; uint32_t out;
     if (!PyArg_ParseTuple(args, "y#", &data, &len)) return NULL;
@@ -969,6 +1075,7 @@ static PyTypeObject NativeHandleIndexType = {
 static PyMethodDef module_methods[] = {
     {"checksum32", module_checksum32, METH_VARARGS, "FNV-1a 32-bit checksum with GIL released."},
     {"checksum32_many", module_checksum32_many, METH_VARARGS, "Batch FNV-1a 32-bit checksums with the GIL released."},
+    {"spiral_rank_scores", (PyCFunction)module_spiral_rank_scores, METH_VARARGS | METH_KEYWORDS, "Native Spiral rank scoring loop with released GIL."},
     {"utf8_chunk_bounds", module_utf8_chunk_bounds, METH_VARARGS, "Return UTF-8 safe chunk end offsets with GIL released."},
     {"diag_snapshot", (PyCFunction)module_diag_snapshot, METH_VARARGS | METH_KEYWORDS, "Return immutable native diagnostic snapshot."},
     {"diag_reset", module_diag_reset, METH_NOARGS, "Reset native diagnostic counters and event ring."},

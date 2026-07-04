@@ -1,17 +1,29 @@
-"""Central JSON backend for Staqtapp-TDS.
+"""Central accelerated JSON backend for Staqtapp-TDS.
 
-v2.7.0 keeps JSON parsing and emission behind one stateless module so
-simdjson/orjson can be used without thread-shared parser objects or scattered
-fallback logic.  The functions never read live engine state and never retain
-references to backend parser documents.
+v2.9.0 keeps every JSON boundary behind this stateless module while making
+backend selection fast and observable. Optional accelerators are imported once
+at module load: ``simdjson`` is preferred for parsing and ``orjson`` is
+preferred for emission. The public API preserves the existing tuple return
+shape so callers can record backend telemetry without scattering JSON logic.
 """
 
 from __future__ import annotations
 
 import json
+import threading
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any, Mapping, Tuple
+
+try:  # optional parser accelerator
+    import simdjson as _simdjson  # type: ignore
+except Exception:  # pragma: no cover - depends on optional dependency
+    _simdjson = None  # type: ignore[assignment]
+
+try:  # optional serializer accelerator
+    import orjson as _orjson  # type: ignore
+except Exception:  # pragma: no cover - depends on optional dependency
+    _orjson = None  # type: ignore[assignment]
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,6 +32,88 @@ class JsonBackendInfo:
     dumps_backend: str
     parse_ns: int = 0
     dump_ns: int = 0
+    simdjson_available: bool = False
+    orjson_available: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class JsonCodecStats:
+    loads_calls: int = 0
+    dumps_calls: int = 0
+    parse_ns: int = 0
+    dump_ns: int = 0
+    simdjson_reads: int = 0
+    stdlib_reads: int = 0
+    orjson_writes: int = 0
+    stdlib_writes: int = 0
+    parse_failovers: int = 0
+    dump_failovers: int = 0
+
+    @property
+    def avg_parse_ns(self) -> int:
+        return int(self.parse_ns / max(1, self.loads_calls))
+
+    @property
+    def avg_dump_ns(self) -> int:
+        return int(self.dump_ns / max(1, self.dumps_calls))
+
+    def to_dict(self) -> dict[str, int | bool | str]:
+        data = asdict(self)
+        data["avg_parse_ns"] = self.avg_parse_ns
+        data["avg_dump_ns"] = self.avg_dump_ns
+        data["loads_backend"] = preferred_loads_backend()
+        data["dumps_backend"] = preferred_dumps_backend()
+        data["simdjson_available"] = _simdjson is not None
+        data["orjson_available"] = _orjson is not None
+        return data
+
+
+_stats_lock = threading.Lock()
+_stats = JsonCodecStats()
+
+
+def _bump_stats(*, parse_ns: int = 0, dump_ns: int = 0, backend: str = "", failover: bool = False) -> None:
+    global _stats
+    with _stats_lock:
+        data = asdict(_stats)
+        if parse_ns:
+            data["loads_calls"] += 1
+            data["parse_ns"] += max(0, int(parse_ns))
+            if backend == "simdjson":
+                data["simdjson_reads"] += 1
+            else:
+                data["stdlib_reads"] += 1
+            if failover:
+                data["parse_failovers"] += 1
+        if dump_ns:
+            data["dumps_calls"] += 1
+            data["dump_ns"] += max(0, int(dump_ns))
+            if backend == "orjson":
+                data["orjson_writes"] += 1
+            else:
+                data["stdlib_writes"] += 1
+            if failover:
+                data["dump_failovers"] += 1
+        _stats = JsonCodecStats(**data)
+
+
+def codec_stats() -> JsonCodecStats:
+    with _stats_lock:
+        return _stats
+
+
+def reset_codec_stats() -> None:
+    global _stats
+    with _stats_lock:
+        _stats = JsonCodecStats()
+
+
+def preferred_loads_backend() -> str:
+    return "simdjson" if _simdjson is not None else "stdlib"
+
+
+def preferred_dumps_backend() -> str:
+    return "orjson" if _orjson is not None else "stdlib"
 
 
 def _as_bytes(raw: bytes | bytearray | memoryview | str) -> bytes:
@@ -45,20 +139,32 @@ def _stdlib_dumps(value: Any, *, pretty: bool = False) -> bytes:
 
 
 def loads_fast(raw: bytes | bytearray | memoryview | str) -> Tuple[Any, str]:
-    """Parse JSON with simdjson when installed; fall back to stdlib.
+    """Parse JSON using the fastest available centralized backend.
 
-    A fresh parser is intentionally created per call because simdjson parser
-    instances retain document ownership constraints and should not be shared
-    across telemetry/admin/persistence threads.
+    ``simdjson`` is selected once at import time when installed. A fresh parser
+    is still created per call to avoid document ownership/thread-sharing
+    hazards, but the expensive module import/probe no longer sits in the hot
+    path. Invalid JSON falls back only when the accelerator itself errors; the
+    final stdlib exception remains visible to callers.
     """
     data = _as_bytes(raw)
-    try:
-        import simdjson  # type: ignore
-        parser = simdjson.Parser()
-        parsed = parser.parse(data, recursive=True)
-        return parsed, "simdjson"
-    except Exception:
-        return _stdlib_loads(data), "stdlib"
+    start = time.perf_counter_ns()
+    if _simdjson is not None:
+        try:
+            parser = _simdjson.Parser()
+            parsed = parser.parse(data, recursive=True)
+            elapsed = time.perf_counter_ns() - start
+            _bump_stats(parse_ns=elapsed, backend="simdjson")
+            return parsed, "simdjson"
+        except Exception:
+            value = _stdlib_loads(data)
+            elapsed = time.perf_counter_ns() - start
+            _bump_stats(parse_ns=elapsed, backend="stdlib", failover=True)
+            return value, "stdlib"
+    value = _stdlib_loads(data)
+    elapsed = time.perf_counter_ns() - start
+    _bump_stats(parse_ns=elapsed, backend="stdlib")
+    return value, "stdlib"
 
 
 def loads_strict(raw: bytes | bytearray | memoryview | str, *, expected_type: type | tuple[type, ...] | None = None) -> Tuple[Any, str]:
@@ -92,21 +198,49 @@ def loads_policy(raw: bytes | bytearray | memoryview | str) -> Tuple[dict[str, A
 
 
 def dumps_canonical(value: Any) -> Tuple[bytes, str]:
-    """Emit deterministic compact JSON bytes.  orjson is preferred for writes."""
-    try:
-        import orjson  # type: ignore
-        return orjson.dumps(value, option=orjson.OPT_SORT_KEYS), "orjson"
-    except Exception:
-        return _stdlib_dumps(value, pretty=False), "stdlib"
+    """Emit deterministic compact JSON bytes through the centralized codec."""
+    start = time.perf_counter_ns()
+    if _orjson is not None:
+        try:
+            raw = _orjson.dumps(value, option=_orjson.OPT_SORT_KEYS)
+            elapsed = time.perf_counter_ns() - start
+            _bump_stats(dump_ns=elapsed, backend="orjson")
+            return raw, "orjson"
+        except Exception:
+            raw = _stdlib_dumps(value, pretty=False)
+            elapsed = time.perf_counter_ns() - start
+            _bump_stats(dump_ns=elapsed, backend="stdlib", failover=True)
+            return raw, "stdlib"
+    raw = _stdlib_dumps(value, pretty=False)
+    elapsed = time.perf_counter_ns() - start
+    _bump_stats(dump_ns=elapsed, backend="stdlib")
+    return raw, "stdlib"
+
+
+def dumps_status(value: Mapping[str, Any]) -> Tuple[bytes, str, int]:
+    """Emit compact status/browser telemetry JSON for polling endpoints."""
+    start = time.perf_counter_ns()
+    raw, backend = dumps_canonical(value)
+    return raw, backend, time.perf_counter_ns() - start
 
 
 def dumps_pretty(value: Any) -> Tuple[str, str]:
-    try:
-        import orjson  # type: ignore
-        raw = orjson.dumps(value, option=orjson.OPT_SORT_KEYS | orjson.OPT_INDENT_2)
-        return raw.decode("utf-8") + "\n", "orjson"
-    except Exception:
-        return _stdlib_dumps(value, pretty=True).decode("utf-8"), "stdlib"
+    start = time.perf_counter_ns()
+    if _orjson is not None:
+        try:
+            raw = _orjson.dumps(value, option=_orjson.OPT_SORT_KEYS | _orjson.OPT_INDENT_2)
+            elapsed = time.perf_counter_ns() - start
+            _bump_stats(dump_ns=elapsed, backend="orjson")
+            return raw.decode("utf-8") + "\n", "orjson"
+        except Exception:
+            text = _stdlib_dumps(value, pretty=True).decode("utf-8")
+            elapsed = time.perf_counter_ns() - start
+            _bump_stats(dump_ns=elapsed, backend="stdlib", failover=True)
+            return text, "stdlib"
+    text = _stdlib_dumps(value, pretty=True).decode("utf-8")
+    elapsed = time.perf_counter_ns() - start
+    _bump_stats(dump_ns=elapsed, backend="stdlib")
+    return text, "stdlib"
 
 
 def dumps_snapshot(value: Mapping[str, Any]) -> Tuple[bytes, str, int]:
@@ -116,6 +250,9 @@ def dumps_snapshot(value: Mapping[str, Any]) -> Tuple[bytes, str, int]:
 
 
 def backend_probe() -> JsonBackendInfo:
-    _, loads_backend = loads_fast(b"{}")
-    _, dumps_backend = dumps_canonical({})
-    return JsonBackendInfo(loads_backend=loads_backend, dumps_backend=dumps_backend)
+    return JsonBackendInfo(
+        loads_backend=preferred_loads_backend(),
+        dumps_backend=preferred_dumps_backend(),
+        simdjson_available=_simdjson is not None,
+        orjson_available=_orjson is not None,
+    )
