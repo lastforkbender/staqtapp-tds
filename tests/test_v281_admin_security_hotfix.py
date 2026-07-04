@@ -16,7 +16,7 @@ def _asset(path: str) -> str:
 
 
 def test_v281_version():
-    assert __version__ == "2.9.0"
+    assert __version__ == "2.9.4"
 
 
 def test_v281_dashboard_embeds_csrf_token_meta():

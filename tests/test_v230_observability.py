@@ -11,7 +11,7 @@ def test_observation_snapshot_counts_reads_writes_and_behavior():
     fs = TDSFileSystem(telemetry_manager=TelemetryManager(snapshot_interval_seconds=0.25))
     fs.root.write("a", "alpha")
     fs.root.write("b", "beta")
-    assert fs.root.read("a") == "alpha"
+    assert fs.root.read_value("a") == "alpha"
     snap = fs.observation_snapshot(force=True)
     assert snap["schema_version"] == 1
     assert snap["performance"]["write_count"] >= 2

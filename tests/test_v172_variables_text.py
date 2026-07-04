@@ -12,7 +12,7 @@ def test_addvar_duplicate_is_status_not_exception():
     r2 = d.addvar('alpha', {'b': 2})
     assert r1.ok and r1.code == 'VAR_ADDED'
     assert not r2.ok and r2.code == 'VAR_EXISTS'
-    assert d.read('alpha') == {'a': 1}
+    assert d.read_value('alpha') == {'a': 1}
 
 
 def test_editvar_and_lockvar_statuses():
@@ -22,10 +22,10 @@ def test_editvar_and_lockvar_statuses():
     assert d.lockvar('x').ok
     blocked = d.editvar('x', 2)
     assert not blocked.ok and blocked.code == 'VAR_LOCKED'
-    assert d.read('x') == 1
+    assert d.read_value('x') == 1
     assert d.unlockvar('x').ok
     edited = d.editvar('x', 2)
-    assert edited.ok and d.read('x') == 2
+    assert edited.ok and d.read_value('x') == 2
 
 
 def test_stalkvar_linear_compound_and_clear_keep_base():
@@ -36,16 +36,16 @@ def test_stalkvar_linear_compound_and_clear_keep_base():
     r2 = d.stalkvar('~new_var', {'c': 3})
     assert r1.ok and r1.name == 'new_var_0001'
     assert r2.ok and r2.name == 'new_var_0002'
-    assert d.read('new_var') == {'a': 1}
-    assert d.read('new_var_0001') == {'a': 1, 'b': 2}
-    assert d.read('new_var_0002') == {'a': 1, 'b': 2, 'c': 3}
+    assert d.read_value('new_var') == {'a': 1}
+    assert d.read_value('new_var_0001') == {'a': 1, 'b': 2}
+    assert d.read_value('new_var_0002') == {'a': 1, 'b': 2, 'c': 3}
     cleared = d.stalkvar('new_var', None)
     assert cleared.ok and cleared.code == 'VAR_STALK_CLEARED'
-    assert d.read('new_var') == {'a': 1}
+    assert d.read_value('new_var') == {'a': 1}
     with pytest.raises(KeyError):
-        d.read('new_var_0001')
+        d.read_value('new_var_0001')
     with pytest.raises(KeyError):
-        d.read('new_var_0002')
+        d.read_value('new_var_0002')
 
 
 def test_stalkvar_clear_and_replace_base():
@@ -56,9 +56,9 @@ def test_stalkvar_clear_and_replace_base():
     d.stalkvar('~v', [3])
     replaced = d.stalkvar('v', [9])
     assert replaced.ok and replaced.code == 'VAR_EDITED'
-    assert d.read('v') == [9]
+    assert d.read_value('v') == [9]
     with pytest.raises(KeyError):
-        d.read('v_0001')
+        d.read_value('v_0001')
 
 
 def test_stalkvar_without_chain_behaves_like_editvar_when_data_present():
@@ -67,10 +67,10 @@ def test_stalkvar_without_chain_behaves_like_editvar_when_data_present():
     d.addvar('my_var', 1)
     r = d.stalkvar('my_var', 5)
     assert r.ok and r.code == 'VAR_EDITED'
-    assert d.read('my_var') == 5
+    assert d.read_value('my_var') == 5
     noop = d.stalkvar('my_var', None)
     assert noop.ok and noop.code == 'VAR_NOOP'
-    assert d.read('my_var') == 5
+    assert d.read_value('my_var') == 5
 
 
 def test_text_storage_duplicate_and_overwrite():
@@ -99,9 +99,9 @@ def test_variable_and_text_persistence_roundtrip(tmp_path: Path):
     p.flush(fs, parallel_nodes=False)
 
     loaded_vars = p.load_node(tmp_path / 'root__vars.tds')
-    assert loaded_vars.read('state') == {'base': True}
-    assert loaded_vars.read('state_0001') == {'base': True, 'step': 1}
-    assert loaded_vars.read('state_0002') == {'base': True, 'step': 2}
+    assert loaded_vars.read_value('state') == {'base': True}
+    assert loaded_vars.read_value('state_0001') == {'base': True, 'step': 1}
+    assert loaded_vars.read_value('state_0002') == {'base': True, 'step': 2}
     assert loaded_vars.variables.is_locked('state') is True
     assert not loaded_vars.stalkvar('state', None).ok
     loaded_vars.unlockvar('state')

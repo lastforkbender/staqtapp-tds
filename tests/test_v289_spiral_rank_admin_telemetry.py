@@ -5,7 +5,7 @@ from staqtapp_tds.spiral.rank import NativeSpiralRankEngine
 
 
 def test_v289_version():
-    assert __version__ == "2.9.0"
+    assert __version__ == "2.9.4"
 
 
 def test_spiral_rank_telemetry_observes_run():

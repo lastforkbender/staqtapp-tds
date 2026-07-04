@@ -14,10 +14,10 @@ def test_chunked_text_uses_utf8_byte_budget_without_splitting_codepoints():
     result = d.write_text_chunked('unicode.txt', text, chunk_size=5)
     assert result.ok
     assert d.read_text('unicode.txt') == text
-    manifest = d.read('unicode.txt')
+    manifest = d.read_value('unicode.txt')
     assert manifest['chunk_size_unit'] == 'utf8_bytes'
     for chunk_name in manifest['chunks']:
-        chunk = d.read(chunk_name)
+        chunk = d.read_value(chunk_name)
         encoded = chunk.encode('utf-8')
         # Some chunks may exceed the budget only when a single UTF-8 code point
         # is wider than the budget. With a 5-byte budget here every emitted

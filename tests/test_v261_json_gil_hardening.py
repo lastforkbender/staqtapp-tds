@@ -7,7 +7,7 @@ from staqtapp_tds.tds_json import dumps_canonical, dumps_pretty, loads_fast, loa
 
 
 def test_v261_version():
-    assert __version__ == "2.9.0"
+    assert __version__ == "2.9.4"
 
 
 def test_central_json_round_trip_and_strict_loaders():
@@ -30,7 +30,7 @@ def test_chunked_text_has_checksum_manifest_and_detects_corruption():
     text = "alphaβγ" * 200
     result = fs.root.write_text_chunked("doc", text, chunk_size=17)
     assert result.ok
-    manifest = fs.root.read("doc")
+    manifest = fs.root.read_value("doc")
     assert manifest["chunk_checksums32"]
     assert manifest["chunk_checksum_backend"] in {"native", "python"}
     assert fs.root.read_text("doc") == text

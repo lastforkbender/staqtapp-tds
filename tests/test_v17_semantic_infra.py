@@ -48,9 +48,9 @@ def test_directory_telemetry_light_mode_records_hits_and_misses():
     fs = TDSFileSystem("root")
     d = fs.root.mkdir("fast", telemetry_mode=TelemetryMode.LIGHT, expected_lookup_ns=1)
     d.write("x", b"payload")
-    assert d.read("x") == b"payload"
+    assert d.read_value("x") == b"payload"
     try:
-        d.read("missing")
+        d.read_value("missing")
     except KeyError:
         pass
     snap = d.telemetry_snapshot()
@@ -71,7 +71,7 @@ def test_persistence_writes_manifest_and_preserves_srz_telemetry(tmp_path):
     fs = TDSFileSystem("root")
     d = fs.root.mkdir("zone", srz_enabled=True, route_stamp="ZONE.TEST.v1")
     d.write("a", {"v": 1})
-    d.read("a")
+    d.read_value("a")
     p = TDSPersistence(tmp_path)
     p.flush(fs, parallel_nodes=False)
     assert (tmp_path / ".tds_manifest").exists()
