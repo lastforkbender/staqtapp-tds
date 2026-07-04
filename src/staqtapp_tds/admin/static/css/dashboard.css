@@ -126,3 +126,23 @@ body{
 .telemetry-command-card img{width:48px;height:48px;filter:drop-shadow(0 0 16px rgba(72,168,255,.24));flex:0 0 auto}
 .telemetry-command-card div{min-width:0}.telemetry-command-card span,.comparison-tile span{display:block;color:var(--tds-muted);font-size:11px;text-transform:uppercase;letter-spacing:.1em;white-space:normal;overflow-wrap:anywhere;line-height:1.25}.telemetry-command-card b{display:block;color:#fff;font-size:24px;margin:2px 0;white-space:normal;overflow-wrap:anywhere}.telemetry-command-card small{display:block;color:#c8d4ef;line-height:1.35;white-space:normal;overflow-wrap:anywhere}.telemetry-kv p{min-width:0}.compact-breakdown{margin:8px 0 12px}.comparison-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:10px 0 14px}.comparison-tile{border:1px solid rgba(119,140,255,.16);background:rgba(8,16,34,.56);border-radius:12px;padding:13px;min-width:0}.comparison-tile img{width:30px;height:30px;margin-bottom:8px}.comparison-tile b{display:block;font-size:25px;color:#fff;line-height:1.05;white-space:normal;overflow-wrap:anywhere}.comparison-tile small{color:#aebbd1;white-space:normal;overflow-wrap:anywhere}.alerts-list{min-height:120px}.alert-row{border-left:3px solid var(--blue)}.alert-row.warning{border-left-color:var(--orange)}.alert-row.critical{border-left-color:var(--red)}.alert-row.info{border-left-color:var(--cyan)}
 @media(max-width:900px){.telemetry-summary-grid,.comparison-grid{grid-template-columns:1fr}}
+
+/* v2.8.9 Native Spiral Rank browser telemetry */
+.spiral-rank-page{grid-template-columns:minmax(0,1.18fr) minmax(320px,.82fr);align-items:stretch}
+.spiral-rank-page,.spiral-rank-page *{min-width:0}
+.spiral-rank-card{grid-row:span 2}
+.spiral-rank-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+.spiral-rank-summary .telemetry-command-card{align-items:flex-start}
+.spiral-rank-summary .telemetry-command-card img{filter:drop-shadow(0 0 18px rgba(179,92,255,.28))}
+.spiral-rank-page .telemetry-kv p{display:grid;grid-template-columns:minmax(128px,.9fr) minmax(0,1.1fr);align-items:center}
+.spiral-rank-page .telemetry-kv b{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0;text-align:right;white-space:normal;overflow-wrap:anywhere}
+.spiral-rank-page .bar{flex:0 1 96px;max-width:96px}
+.spiral-rank-list{max-height:420px;overflow:auto;padding-right:2px}
+.spiral-rank-list .diag-event-row b{color:#ffbd4a;white-space:normal;overflow-wrap:anywhere}
+.spiral-rank-list .diag-event-row span{white-space:normal;overflow-wrap:anywhere}
+.spiral-rank-history{display:grid;gap:10px;min-height:140px;overflow:hidden}
+.spiral-rank-spark{height:118px;align-items:end;gap:4px;overflow:hidden}
+.spiral-rank-spark i{background:linear-gradient(180deg,var(--purple),var(--blue),var(--orange));min-width:5px}
+.spiral-rank-spark i::after{font-size:9px;color:#dfe8ff;opacity:.72}
+@media(max-width:1180px){.spiral-rank-page{grid-template-columns:1fr}.spiral-rank-card{grid-row:auto}}
+@media(max-width:680px){.spiral-rank-summary{grid-template-columns:1fr}.spiral-rank-page .telemetry-kv p{grid-template-columns:1fr}.spiral-rank-page .telemetry-kv b{justify-content:flex-start;text-align:left}.spiral-rank-page .bar{max-width:140px}}
