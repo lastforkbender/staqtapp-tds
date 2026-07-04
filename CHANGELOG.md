@@ -1,6 +1,31 @@
+# v2.9.4 - Result Registry Source of Truth
+
+- Added `TDSResultCode`, the authoritative enum for all public `TDSResult.code` values.
+- Added `TDS_RESULT_REGISTRY` with category, severity, retryable, surface, value, and description metadata.
+- Removed hard-coded `TDSResult` code string literals from public result call sites; call sites now use `TDSResultCode`.
+- Added `result_info()` for runtime lookup of code metadata.
+- Regenerated `docs/TDS_RESULT_CODES.md` and `docs/TDS_RESULT_CODES.json` from the registry.
+- Added tests preventing result-code drift and scattered hard-coded public result code literals.
+
+# v2.9.3 - TDSResult Centralization
+
+- Formalized `TDSResult` as the single public success/error envelope for AI-facing non-halting operations.
+- Added `TDS_RESULT_CODES`, `known_result_codes()`, `is_known_result_code()`, and `TDSResult.known_code`.
+- Added `docs/API_TDSResult.md` with the full result-code contract.
+- Replaced the public Spiral rank row name `SpiralRankResult` with `SpiralRankRecord` to avoid multiple result-envelope titles.
+- Added `NativeSpiralRankEngine.rank_result(...)` and `rank_trace_result(...)`, both returning `TDSResult`.
+
 # Changelog
 
-## v2.8.9 — Spiral Rank Statistics
+## v2.9.1 — Non-Halting Result Envelope Hardening
+
+- Hardened payload deserialization so decode failures return `TDSResult.fail("PAYLOAD_DESERIALIZE_ERROR", ...)` instead of raw undecoded bytes.
+- Added AI-safe `TDSDirectory.read_result(...)`, `write_result(...)`, `delete_result(...)`, and `read_text_result(...)` methods that always return the centralized `TDSResult` envelope.
+- Upgraded `TDSResult` to an immutable slotted dataclass with `from_exception(...)`, preserving the standard `{ok, code, message, name, path, value, meta}` pattern.
+- Reworked chunked text write failure handling to return `TEXT_CHUNK_WRITE_ERROR` instead of re-raising.
+- Added regression tests for non-raw deserialize errors and standard read/write result surfaces.
+
+## v2.8.8 — Spiral Rank Statistics
 
 - Added `SpiralRankStats` for immutable per-run observer statistics.
 - Added `SpiralRankRun` and `rank_trace_run(...)` for returning rank results plus stats in one bundle.

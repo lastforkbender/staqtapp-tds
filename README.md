@@ -3,7 +3,7 @@
 </p>
 
 
-# 🟦🟪🟧 Staqtapp-TDS v2.9.0
+# 🟦🟪🟧 Staqtapp-TDS v2.9.4
 
 🇺🇸 **English** | 🇯🇵 [日本語](README_ja.md)
 
@@ -13,19 +13,82 @@ The core rule remains simple:
 
 > TDS stores, retrieves, indexes, observes, and records provenance. It does not reason, reward, train, or mutate policy decisions on behalf of an AI system.
 
-## What is new in v2.9.0
-## v2.9.0 JSON performance codec
+## v2.9.4 Non-Halting Result Contract
 
-v2.9.0 upgrades the centralized JSON boundary into a performance-grade codec. TDS now probes optional `simdjson` and `orjson` once, keeps stdlib fallback safety, emits compact browser `status.json` payloads, and exposes codec stats for loads, dumps, backend usage, elapsed nanoseconds, and failovers.
+v2.9.4 formalizes the public TDS return contract for AI systems and long-running services. Public TDS operations that can fail in normal operation return a standardized `TDSResult` instead of halting caller execution with TDS-generated exceptions or ambiguous boolean failure values.
 
-Design note: `docs/41_v290_JSON_Performance_Codec.md`.
+This means callers can use one predictable pattern:
 
+```python
+result = directory.write("agent_state", state)
 
-v2.9.0 completes the Spiral Rank observability loop. The Native Spiral Rank Engine still remains outside the storage hot path, while the admin layer now exposes cached browser feedback telemetry on a dedicated **Spiral Rank** analytics page. The dashboard shows run counts, native/fallback ratio, timings, score range, mean score, Top-N ranked traces, and recent run history.
+if result.ok:
+    stored = result.value
+else:
+    print(result.code)
+    print(result.message)
+    print(result.meta)
+```
+
+`TDSResult` is the single public success/failure envelope for controlled TDS outcomes. It contains:
+
+- `ok`: `True` for success, `False` for controlled failure.
+- `code`: a stable machine-readable result code.
+- `message`: a human-readable explanation.
+- `name` / `path`: optional TDS location context.
+- `value`: the returned object or operation payload when applicable.
+- `meta`: structured diagnostics for logging, telemetry, retry policy, or AI decision logic.
+
+The authoritative result-code source is:
+
+```text
+src/staqtapp_tds/result.py
+```
+
+All public `TDSResult.code` values are defined in `TDSResultCode` and described in `TDS_RESULT_REGISTRY`. Human and machine-readable references are generated from that registry:
+
+```text
+docs/TDS_RESULT_CODES.md
+docs/TDS_RESULT_CODES.json
+```
+
+Additional contract documentation:
+
+```text
+docs/API_TDSResult.md
+docs/NON_HALTING_API.md
+```
+
+Design guarantees for normal TDS-controlled failures:
+
+- Public result-first operations return `TDSResult`.
+- Public TDS operations do not intentionally halt caller execution for normal storage, decode, missing-entry, validation, or caught environment failures.
+- Result codes are centralized in the runtime registry, not scattered across the codebase as independent status strings.
+- Result-code documentation is generated from the runtime registry to prevent documentation drift.
+- Compatibility methods that return raw values remain explicit by name, such as `read_value()`, `write_entry()`, and `delete_entry()`.
+
+This guarantee does not claim to prevent process-level failures outside TDS control, such as interpreter termination, operating-system failure, fatal native crashes, `KeyboardInterrupt`, or unrecoverable memory exhaustion.
+
+## v2.9.4 Result Registry Discipline
+
+Staqtapp-TDS defines every public `TDSResult.code` in one runtime source of truth: `src/staqtapp_tds/result.py`. Use `TDSResultCode` for code comparisons and `result_info(code)` for machine-readable metadata. The Markdown and JSON result-code references are generated from that registry.
+
+```python
+from staqtapp_tds import TDSResultCode, result_info
+
+result = directory.read("agent_state")
+
+if not result.ok:
+    info = result_info(result.code)
+    if result.code == TDSResultCode.READ_MISSING.value:
+        ...
+```
 
 ## Highlights
 
 - Directory-first VFS API with semantic routing zones and reserved namespace policy.
+- Standardized non-halting `TDSResult` return envelope for public result-first operations.
+- Central `TDSResultCode` registry with generated Markdown and JSON references.
 - Native Swiss-table-inspired `EntryIndex` backend where available.
 - Native diagnostic event ring with loss-tolerant telemetry snapshots.
 - Native Spiral Rank scoring loop with Python fallback and immutable per-run stats.
