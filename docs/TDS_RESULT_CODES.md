@@ -41,6 +41,13 @@ else:
 | `JSON_EXISTS` | `False` | TDSDirectory.write_json | None | json | warn | `False` | JSON entry already exists and overwrite was not enabled. |
 | `JSON_OVERWRITTEN` | `True` | TDSDirectory.write_json | JSON-safe object | json | info | `False` | Existing JSON entry was overwritten. |
 | `JSON_WRITTEN` | `True` | TDSDirectory.write_json | JSON-safe object | json | info | `False` | JSON entry was stored. |
+| `NATIVE_CAPABILITY_OK` | `True` | NativeEngineManager.capabilities_result | native capability snapshot | native | info | `False` | Native platform and capability details were collected. |
+| `NATIVE_ENGINE_FALLBACK` | `True` | NativeEngineManager.load_result | python fallback backend | native | warn | `False` | Native engine was not used; TDS safely selected a Python fallback. |
+| `NATIVE_ENGINE_INCOMPATIBLE` | `False` | NativeEngineManager.load_result | None | native | error | `False` | A native engine was present but did not satisfy the expected TDS native ABI or capabilities. |
+| `NATIVE_ENGINE_LOADED` | `True` | NativeEngineManager.load_result | loaded native backend | native | info | `False` | A compatible native engine was loaded. |
+| `NATIVE_ENGINE_LOAD_ERROR` | `False` | NativeEngineManager.load_result | None | native | error | `False` | Native engine loading failed and was contained without halting TDS. |
+| `NATIVE_ENGINE_UNAVAILABLE` | `False` | NativeEngineManager.load_result | None | native | warn | `False` | No compiled native engine was available for this runtime platform. |
+| `NATIVE_MANAGER_OK` | `True` | NativeEngineManager.status_result | native status snapshot | native | info | `False` | Native engine manager status was produced. |
 | `OK` | `True` | generic | operation-specific | generic | info | `False` | Generic successful operation. |
 | `PAYLOAD_DESERIALIZE_ERROR` | `False` | payload decoder | None | serialization | error | `False` | Stored payload could not be deserialized and was not returned as raw bytes. |
 | `PAYLOAD_FORMAT_UNSUPPORTED` | `False` | payload decoder | None | serialization | error | `False` | Stored payload format is unsupported. |

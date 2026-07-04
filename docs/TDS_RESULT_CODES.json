@@ -71,6 +71,69 @@
     "surface": "TDSDirectory.write_json",
     "value": "JSON-safe object"
   },
+  "NATIVE_CAPABILITY_OK": {
+    "category": "native",
+    "description": "Native platform and capability details were collected.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "NativeEngineManager.capabilities_result",
+    "value": "native capability snapshot"
+  },
+  "NATIVE_ENGINE_FALLBACK": {
+    "category": "native",
+    "description": "Native engine was not used; TDS safely selected a Python fallback.",
+    "ok": true,
+    "retryable": false,
+    "severity": "warn",
+    "surface": "NativeEngineManager.load_result",
+    "value": "python fallback backend"
+  },
+  "NATIVE_ENGINE_INCOMPATIBLE": {
+    "category": "native",
+    "description": "A native engine was present but did not satisfy the expected TDS native ABI or capabilities.",
+    "ok": false,
+    "retryable": false,
+    "severity": "error",
+    "surface": "NativeEngineManager.load_result",
+    "value": null
+  },
+  "NATIVE_ENGINE_LOADED": {
+    "category": "native",
+    "description": "A compatible native engine was loaded.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "NativeEngineManager.load_result",
+    "value": "loaded native backend"
+  },
+  "NATIVE_ENGINE_LOAD_ERROR": {
+    "category": "native",
+    "description": "Native engine loading failed and was contained without halting TDS.",
+    "ok": false,
+    "retryable": false,
+    "severity": "error",
+    "surface": "NativeEngineManager.load_result",
+    "value": null
+  },
+  "NATIVE_ENGINE_UNAVAILABLE": {
+    "category": "native",
+    "description": "No compiled native engine was available for this runtime platform.",
+    "ok": false,
+    "retryable": false,
+    "severity": "warn",
+    "surface": "NativeEngineManager.load_result",
+    "value": null
+  },
+  "NATIVE_MANAGER_OK": {
+    "category": "native",
+    "description": "Native engine manager status was produced.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "NativeEngineManager.status_result",
+    "value": "native status snapshot"
+  },
   "OK": {
     "category": "generic",
     "description": "Generic successful operation.",

@@ -42,20 +42,15 @@ Field meanings:
 | `value` | Payload on success, otherwise normally `None`. |
 | `meta` | Structured diagnostics such as exception type, codec, raw size, stats, or lock state. |
 
-Helpers and registry access:
+Helpers:
 
 ```python
-from staqtapp_tds import TDSResultCode, result_info, known_result_codes, is_known_result_code
-
 result.as_dict()
 bool(result)              # same as result.ok
 result.known_code         # True when code is in the public catalog
 known_result_codes()      # tuple of public codes
 is_known_result_code(code)
-result_info(code)         # registry metadata for AI/runtime policy
 ```
-
-The runtime source of truth is `src/staqtapp_tds/result.py`. Public call sites should use `TDSResultCode` members rather than independent hard-coded result-code strings.
 
 ## Centralization rule
 
@@ -140,13 +135,9 @@ A new AI-facing method should follow this shape:
 def some_operation_result(...) -> TDSResult:
     try:
         value = internal_operation(...)
-        return TDSResult.success(
-            TDSResultCode.SOME_OPERATION_OK,
-            "Operation completed.",
-            value=value,
-        )
+        return TDSResult.success("SOME_OPERATION_OK", "Operation completed.", value=value)
     except Exception as exc:
-        return TDSResult.from_exception(TDSResultCode.SOME_OPERATION_ERROR, exc)
+        return TDSResult.from_exception("SOME_OPERATION_ERROR", exc)
 ```
 
-Add every new public result code to `TDSResultCode` and `TDS_RESULT_REGISTRY` in `src/staqtapp_tds/result.py`, then regenerate `docs/TDS_RESULT_CODES.md` and `docs/TDS_RESULT_CODES.json` with `tools/generate_result_code_docs.py`. Do not maintain independent result-code lists by hand.
+Add every new code to `TDS_RESULT_CODES` and this document in the same change.
