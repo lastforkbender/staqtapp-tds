@@ -31,7 +31,8 @@ function normalize(data){
     uptime:obs.uptime_seconds||0,
     panel:data.panel||{},
     nativeDiagnostics:obs.native_diagnostics||data.native_diagnostics||{},
-    recovery:obs.recovery||data.recovery||{}
+    recovery:obs.recovery||data.recovery||{},
+    spiralRank:obs.spiral_rank||data.spiral_rank||{}
   };
 }
 function updateNav(){document.querySelectorAll('.nav-pill').forEach(a=>{a.addEventListener('click',()=>{document.querySelectorAll('.nav-pill').forEach(n=>n.classList.remove('active'));a.classList.add('active');});});}
@@ -167,6 +168,63 @@ function renderRecoveryPlanner(recovery){
 }
 
 
+
+function renderSpiralRank(data){
+  const n=normalize(data), sr=n.spiralRank||{};
+  const stats=sr.last_stats||{};
+  const hasStats=Object.keys(stats).length>0;
+  setText('spiral-rank-status', hasStats ? titleCase(sr.status || 'ready') : 'WAITING');
+  setText('spiral-rank-runs', fmt(sr.runs_total,0));
+  setText('spiral-rank-path', `${fmt(sr.native_runs,0)} native · ${fmt(sr.fallback_runs,0)} fallback · observer only`);
+  setText('spiral-rank-elapsed', fmt(stats.elapsed_ms ?? sr.average_elapsed_ms ?? 0,0));
+  setText('spiral-rank-average', `rolling average ${fmt(sr.average_elapsed_ms ?? 0,0)} ms`);
+  setText('spiral-rank-native-pct', `${fmt(sr.native_percent ?? (stats.native?100:0),0)}%`);
+  setWidth('spiral-rank-native-bar', sr.native_percent ?? (stats.native?100:0));
+  setText('spiral-rank-fallback-pct', `${fmt(sr.fallback_percent ?? (!stats.native&&hasStats?100:0),0)}%`);
+  setText('spiral-rank-input', fmt(stats.input_count,0));
+  setText('spiral-rank-ranked', fmt(stats.ranked_count ?? sr.total_ranked,0));
+  setText('spiral-rank-limited', fmt(stats.limited_count,0));
+  setText('spiral-rank-dropped', fmt(stats.dropped_by_limit ?? sr.total_dropped_by_limit,0));
+  setText('spiral-rank-min', stats.min_score===null||stats.min_score===undefined?'—':fmt(stats.min_score,0));
+  setText('spiral-rank-max', stats.max_score===null||stats.max_score===undefined?'—':fmt(stats.max_score,0));
+  setText('spiral-rank-mean', stats.mean_score===null||stats.mean_score===undefined?'—':fmt(stats.mean_score,0));
+  setText('spiral-rank-scoring', fmt(stats.scoring_ms,0));
+  setText('spiral-rank-sorting', fmt(stats.sorting_ms,0));
+  setText('spiral-rank-shaping', fmt(stats.shaping_ms,0));
+  setText('spiral-rank-config', stats.config_id || '—');
+  const top=$('spiral-rank-top'); if(top){
+    clear(top);
+    const rows=Array.isArray(sr.top_results)?sr.top_results:[];
+    setText('spiral-rank-top-chip', `top ${rows.length}`);
+    if(!rows.length){ appendPairRow(top,'diag-event-row','No ranked traces yet','Run Spiral Rank and publish the run to admin telemetry.'); }
+    rows.slice(0,8).forEach(r=>{
+      const rank=fmt(r.rank,0), score=fmt(r.score,0), conf=fmt(r.confidence,0), depth=fmt(r.depth,0);
+      appendPairRow(top,'diag-event-row',`#${rank} ${r.trace_id||'trace'}`,`score ${score} · confidence ${conf} · depth ${depth} · ${r.native?'native':'python'}`);
+    });
+  }
+  const hist=$('spiral-rank-history'); if(hist){
+    clear(hist);
+    const history=Array.isArray(sr.history)?sr.history.slice(-24):[];
+    if(!history.length){ hist.appendChild(node('p','Waiting for Spiral Rank run history.','panel-note')); }
+    else {
+      const max=Math.max(...history.map(h=>Number(h.elapsed_ms)||0),1);
+      const spark=document.createElement('div'); spark.className='spark spiral-rank-spark';
+      history.forEach(h=>{
+        const bar=document.createElement('i');
+        const pct=Math.max(4,Math.min(100,(Number(h.elapsed_ms)||0)/max*100));
+        bar.style.height=`${pct}%`;
+        bar.title=`${fmt(h.elapsed_ms,0)} ms · ${fmt(h.ranked_count,0)} ranked · ${h.engine||'engine'}`;
+        bar.setAttribute('data-label', fmt(h.ranked_count,0));
+        spark.appendChild(bar);
+      });
+      hist.appendChild(spark);
+      const latest=history[history.length-1]||{};
+      appendPairRow(hist,'diag-event-row','Latest run',`${fmt(latest.elapsed_ms,0)} ms · ${fmt(latest.ranked_count,0)} ranked · ${latest.engine||'engine'}`);
+    }
+  }
+  if (window.TDSI18N) window.TDSI18N.applyTranslations(document.getElementById('spiral-rank'));
+}
+
 function renderCompletedTelemetryPages(data){
   const n=normalize(data), perf=n.perf||{}, storage=n.storage||{}, indexes=n.indexes||{}, pressure=n.pressure||{}, nativeDiag=n.nativeDiagnostics||{};
   const ndc=nativeDiag.counters||{}, swiss=indexes.swiss||{}, radix=indexes.radix||{};
@@ -196,6 +254,7 @@ function renderCompletedTelemetryPages(data){
   setText('compare-memory-pressure', `${fmt(pressure.memory_pressure ?? storage.memory_percent ?? 0,0)}%`);
   setText('compare-dashboard-pressure', `${fmt(pressure.dashboard_pressure ?? 0,0)}%`);
   renderAlertsPage(data);
+  renderSpiralRank(data);
 }
 function renderAlertsPage(data){
   const host=$('alerts-list'); if(!host) return; clear(host);
