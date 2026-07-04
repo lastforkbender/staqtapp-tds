@@ -1,0 +1,461 @@
+{
+  "DELETE_ERROR": {
+    "category": "filesystem",
+    "description": "Entry could not be deleted.",
+    "ok": false,
+    "retryable": true,
+    "severity": "error",
+    "surface": "TDSDirectory.delete/delete_result",
+    "value": null
+  },
+  "DELETE_MISSING": {
+    "category": "filesystem",
+    "description": "Delete completed and the entry was already absent.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "TDSDirectory.delete/delete_result",
+    "value": null
+  },
+  "DELETE_OK": {
+    "category": "filesystem",
+    "description": "Entry existed and was removed.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "TDSDirectory.delete/delete_result",
+    "value": null
+  },
+  "ENTRY_METADATA_MISSING": {
+    "category": "metadata",
+    "description": "Entry metadata is unavailable because the entry is missing.",
+    "ok": false,
+    "retryable": false,
+    "severity": "warn",
+    "surface": "TDSDirectory.entry_metadata_result",
+    "value": null
+  },
+  "ENTRY_METADATA_OK": {
+    "category": "metadata",
+    "description": "Entry metadata was read.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "TDSDirectory.entry_metadata_result",
+    "value": "metadata dictionary"
+  },
+  "JSON_EXISTS": {
+    "category": "json",
+    "description": "JSON entry already exists and overwrite was not enabled.",
+    "ok": false,
+    "retryable": false,
+    "severity": "warn",
+    "surface": "TDSDirectory.write_json",
+    "value": null
+  },
+  "JSON_OVERWRITTEN": {
+    "category": "json",
+    "description": "Existing JSON entry was overwritten.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "TDSDirectory.write_json",
+    "value": "JSON-safe object"
+  },
+  "JSON_WRITTEN": {
+    "category": "json",
+    "description": "JSON entry was stored.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "TDSDirectory.write_json",
+    "value": "JSON-safe object"
+  },
+  "OK": {
+    "category": "generic",
+    "description": "Generic successful operation.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "generic",
+    "value": "operation-specific"
+  },
+  "PAYLOAD_DESERIALIZE_ERROR": {
+    "category": "serialization",
+    "description": "Stored payload could not be deserialized and was not returned as raw bytes.",
+    "ok": false,
+    "retryable": false,
+    "severity": "error",
+    "surface": "payload decoder",
+    "value": null
+  },
+  "PAYLOAD_FORMAT_UNSUPPORTED": {
+    "category": "serialization",
+    "description": "Stored payload format is unsupported.",
+    "ok": false,
+    "retryable": false,
+    "severity": "error",
+    "surface": "payload decoder",
+    "value": null
+  },
+  "PERSIST_BATCH_READ_ERROR": {
+    "category": "persistence",
+    "description": "Batch persistence read failed.",
+    "ok": false,
+    "retryable": true,
+    "severity": "error",
+    "surface": "TDSReader.read_many_result",
+    "value": null
+  },
+  "PERSIST_BATCH_READ_OK": {
+    "category": "persistence",
+    "description": "All requested persisted entries were read.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "TDSReader.read_many_result",
+    "value": "dict[name, object]"
+  },
+  "PERSIST_BATCH_READ_PARTIAL": {
+    "category": "persistence",
+    "description": "Some persisted entries could not be read.",
+    "ok": false,
+    "retryable": true,
+    "severity": "warn",
+    "surface": "TDSReader.read_many_result",
+    "value": "dict[name, object|TDSResult]"
+  },
+  "PERSIST_READ_ERROR": {
+    "category": "persistence",
+    "description": "Persisted entry could not be read.",
+    "ok": false,
+    "retryable": true,
+    "severity": "error",
+    "surface": "TDSReader.read_result",
+    "value": null
+  },
+  "PERSIST_READ_OK": {
+    "category": "persistence",
+    "description": "Persisted entry was read.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "TDSReader.read_result",
+    "value": "persisted object"
+  },
+  "PROVENANCE_RECORD_MISSING": {
+    "category": "provenance",
+    "description": "Provenance record is unavailable because the entry is missing.",
+    "ok": false,
+    "retryable": false,
+    "severity": "warn",
+    "surface": "TDSDirectory.provenance_record_result",
+    "value": null
+  },
+  "PROVENANCE_RECORD_OK": {
+    "category": "provenance",
+    "description": "Provenance record was read.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "TDSDirectory.provenance_record_result",
+    "value": "numpy provenance record"
+  },
+  "QUERY_ACCEPTED": {
+    "category": "cluster",
+    "description": "Cluster query selectors were accepted.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "query_requires_selector",
+    "value": null
+  },
+  "QUERY_REQUIRES_SELECTOR": {
+    "category": "cluster",
+    "description": "Cluster query requires a selector or explicit scan=True.",
+    "ok": false,
+    "retryable": false,
+    "severity": "warn",
+    "surface": "query_requires_selector",
+    "value": null
+  },
+  "READ_ERROR": {
+    "category": "filesystem",
+    "description": "Entry could not be read due to an internal or environment error.",
+    "ok": false,
+    "retryable": false,
+    "severity": "error",
+    "surface": "TDSDirectory.read/read_result",
+    "value": null
+  },
+  "READ_MISSING": {
+    "category": "filesystem",
+    "description": "Requested entry does not exist.",
+    "ok": false,
+    "retryable": false,
+    "severity": "warn",
+    "surface": "TDSDirectory.read/read_result",
+    "value": null
+  },
+  "READ_OK": {
+    "category": "filesystem",
+    "description": "Entry was read successfully.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "TDSDirectory.read/read_result",
+    "value": "stored object"
+  },
+  "SPIRAL_RANK_ERROR": {
+    "category": "spiral",
+    "description": "Spiral rank failed in a controlled non-halting path.",
+    "ok": false,
+    "retryable": true,
+    "severity": "error",
+    "surface": "NativeSpiralRankEngine.rank_result",
+    "value": null
+  },
+  "SPIRAL_RANK_OK": {
+    "category": "spiral",
+    "description": "Spiral rank completed.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "NativeSpiralRankEngine.rank_result",
+    "value": "rank run dictionary"
+  },
+  "TEXT_CHUNKED_OVERWRITTEN": {
+    "category": "text",
+    "description": "Existing chunked text entry was overwritten.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "TDSDirectory.write_text_chunked",
+    "value": null
+  },
+  "TEXT_CHUNKED_WRITTEN": {
+    "category": "text",
+    "description": "Chunked text entry was stored.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "TDSDirectory.write_text_chunked",
+    "value": null
+  },
+  "TEXT_CHUNK_CHECKSUM_ERROR": {
+    "category": "text",
+    "description": "Chunk checksum batch was inconsistent.",
+    "ok": false,
+    "retryable": true,
+    "severity": "error",
+    "surface": "TDSDirectory.write_text_chunked",
+    "value": null
+  },
+  "TEXT_CHUNK_SIZE_INVALID": {
+    "category": "text",
+    "description": "Chunk size must be positive.",
+    "ok": false,
+    "retryable": false,
+    "severity": "error",
+    "surface": "TDSDirectory.write_text_chunked",
+    "value": null
+  },
+  "TEXT_CHUNK_WRITE_ERROR": {
+    "category": "text",
+    "description": "Chunked text entry could not be written.",
+    "ok": false,
+    "retryable": true,
+    "severity": "error",
+    "surface": "TDSDirectory.write_text_chunked",
+    "value": null
+  },
+  "TEXT_EXISTS": {
+    "category": "text",
+    "description": "Text entry already exists and overwrite was not enabled.",
+    "ok": false,
+    "retryable": false,
+    "severity": "warn",
+    "surface": "TDSDirectory.write_text/write_text_chunked",
+    "value": null
+  },
+  "TEXT_OVERWRITTEN": {
+    "category": "text",
+    "description": "Existing text entry was overwritten.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "TDSDirectory.write_text",
+    "value": "str"
+  },
+  "TEXT_READ_ERROR": {
+    "category": "text",
+    "description": "Text entry could not be read.",
+    "ok": false,
+    "retryable": false,
+    "severity": "error",
+    "surface": "TDSDirectory.read_text_result",
+    "value": null
+  },
+  "TEXT_READ_OK": {
+    "category": "text",
+    "description": "Text entry was read.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "TDSDirectory.read_text_result",
+    "value": "str"
+  },
+  "TEXT_TYPE_ERROR": {
+    "category": "text",
+    "description": "Text operation received a non-string value.",
+    "ok": false,
+    "retryable": false,
+    "severity": "error",
+    "surface": "text surfaces",
+    "value": null
+  },
+  "TEXT_WRITTEN": {
+    "category": "text",
+    "description": "Text entry was stored.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "TDSDirectory.write_text",
+    "value": "str"
+  },
+  "VAR_ADDED": {
+    "category": "variables",
+    "description": "Variable was added.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "VariableControl.addvar",
+    "value": "stored object"
+  },
+  "VAR_CHAIN_COLLISION": {
+    "category": "variables",
+    "description": "Stalk chain next name collides with an unrelated entry.",
+    "ok": false,
+    "retryable": false,
+    "severity": "error",
+    "surface": "VariableControl.stalkvar",
+    "value": null
+  },
+  "VAR_CREATED": {
+    "category": "variables",
+    "description": "Variable was created.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "VariableControl.editvar/stalkvar",
+    "value": "stored object"
+  },
+  "VAR_EDITED": {
+    "category": "variables",
+    "description": "Variable was edited.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "VariableControl.editvar/stalkvar",
+    "value": "stored object"
+  },
+  "VAR_EXISTS": {
+    "category": "variables",
+    "description": "Variable already exists.",
+    "ok": false,
+    "retryable": false,
+    "severity": "warn",
+    "surface": "VariableControl.addvar/editvar",
+    "value": null
+  },
+  "VAR_FOUND": {
+    "category": "variables",
+    "description": "Variable was found.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "VariableControl.findvar",
+    "value": "stored object"
+  },
+  "VAR_INVALID_NAME": {
+    "category": "variables",
+    "description": "Variable name is invalid.",
+    "ok": false,
+    "retryable": false,
+    "severity": "error",
+    "surface": "VariableControl.stalkvar",
+    "value": null
+  },
+  "VAR_LOCKED": {
+    "category": "variables",
+    "description": "Variable is locked.",
+    "ok": false,
+    "retryable": false,
+    "severity": "warn",
+    "surface": "VariableControl",
+    "value": null
+  },
+  "VAR_MISSING": {
+    "category": "variables",
+    "description": "Variable does not exist.",
+    "ok": false,
+    "retryable": false,
+    "severity": "warn",
+    "surface": "VariableControl",
+    "value": null
+  },
+  "VAR_NOOP": {
+    "category": "variables",
+    "description": "Operation completed with no state change.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "VariableControl.stalkvar",
+    "value": null
+  },
+  "VAR_STALKED": {
+    "category": "variables",
+    "description": "Stalk increment was created.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "VariableControl.stalkvar",
+    "value": "combined object"
+  },
+  "VAR_STALK_CLEARED": {
+    "category": "variables",
+    "description": "Stalk chain was cleared.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "VariableControl.stalkvar",
+    "value": null
+  },
+  "VAR_UNLOCKED": {
+    "category": "variables",
+    "description": "Variable was unlocked or lock state updated to unlocked.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "VariableControl.unlockvar",
+    "value": null
+  },
+  "WRITE_ERROR": {
+    "category": "filesystem",
+    "description": "Entry could not be written.",
+    "ok": false,
+    "retryable": true,
+    "severity": "error",
+    "surface": "TDSDirectory.write/write_result",
+    "value": null
+  },
+  "WRITE_OK": {
+    "category": "filesystem",
+    "description": "Entry was written successfully.",
+    "ok": true,
+    "retryable": false,
+    "severity": "info",
+    "surface": "TDSDirectory.write/write_result",
+    "value": "written object"
+  }
+}
