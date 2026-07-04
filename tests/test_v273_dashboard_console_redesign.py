@@ -5,7 +5,7 @@ from staqtapp_tds.admin.panel import AdminPanelServer, render_dashboard_html
 
 
 def test_v273_version():
-    assert __version__ == "2.9.4"
+    assert __version__ == "3.0.1"
 
 
 def test_v273_dashboard_has_categorized_engineering_navigation():

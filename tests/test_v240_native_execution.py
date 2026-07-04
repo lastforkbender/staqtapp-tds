@@ -33,7 +33,7 @@ def test_native_entry_index_reports_execution_stats_when_available():
 def test_filesystem_dashboard_snapshot_contains_execution_percentages():
     fs = TDSFileSystem("root", telemetry_manager=TelemetryManager(snapshot_interval_seconds=0.25))
     fs.root.write("alpha", "payload")
-    assert fs.root.read_value("alpha") == "payload"
+    assert fs.root.read("alpha") == "payload"
     snap = fs.telemetry_manager.snapshot(force=True)
     perf = snap["performance"]
     assert "native_execution_percent" in perf

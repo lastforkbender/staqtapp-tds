@@ -15,8 +15,8 @@ def test_variable_serializer_lanes_and_metadata():
     assert cfg_meta['payload_kind'] == 'JSON_UTF8'
     assert cfg_meta['content_hash']
     assert obj_meta['payload_kind'] == 'PICKLE_OBJ'
-    assert d.read_value('cfg') == {'a': 1, 'b': [2, 3]}
-    assert d.read_value('obj') == ({'tuple': True}, 7)
+    assert d.read('cfg') == {'a': 1, 'b': [2, 3]}
+    assert d.read('obj') == ({'tuple': True}, 7)
 
 
 def test_text_metadata_hash_and_compression_threshold():
@@ -37,11 +37,11 @@ def test_json_entry_roundtrip_and_persistence(tmp_path: Path):
     fs = TDSFileSystem('root')
     d = fs.makedirs('/json')
     assert d.write_json('config.json', {'name': 'tds', 'n': 3}).ok
-    assert d.read_value('config.json') == {'name': 'tds', 'n': 3}
+    assert d.read('config.json') == {'name': 'tds', 'n': 3}
     p = TDSPersistence(tmp_path)
     p.flush(fs, parallel_nodes=False)
     loaded = p.load_node(tmp_path / 'root__json.tds')
-    assert loaded.read_value('config.json') == {'name': 'tds', 'n': 3}
+    assert loaded.read('config.json') == {'name': 'tds', 'n': 3}
     assert loaded.entry_metadata('config.json')['payload_kind'] == 'JSON_UTF8'
 
 
