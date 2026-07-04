@@ -381,12 +381,33 @@ static void key_pool_init(TinyKeyPool *pool, Py_ssize_t block_size) {
 
 static char *key_alloc(NativeHandleIndex *self, Py_ssize_t len) {
     TinyKeyPool *pool = &self->key_pool;
-    if (len > 0 && len <= pool->block_size && pool->free_list) {
-        KeyNode *n = pool->free_list;
-        pool->free_list = n->next;
-        pool->reuse_count++;
-        return (char*)n;
+    if (len <= 0) {
+        return NULL;
     }
+
+    /*
+     * TinyKeyPool safety invariant:
+     *
+     * Every pointer stored in free_list is allocated with exactly
+     * pool->block_size bytes of capacity.  key_free() only receives the
+     * logical key length, not the allocation capacity, so pooled buffers must
+     * all have the same known capacity.
+     *
+     * Do not allocate small keys with malloc(len) and later pool them.  That
+     * allows a 10-byte allocation to be reused for a 100-byte key and causes a
+     * heap buffer overflow during memcpy().
+     */
+    if (len <= pool->block_size) {
+        if (pool->free_list) {
+            KeyNode *n = pool->free_list;
+            pool->free_list = n->next;
+            pool->reuse_count++;
+            return (char*)n;
+        }
+        pool->allocator_calls++;
+        return (char*)malloc((size_t)pool->block_size);
+    }
+
     pool->allocator_calls++;
     return (char*)malloc((size_t)len);
 }
@@ -394,7 +415,7 @@ static char *key_alloc(NativeHandleIndex *self, Py_ssize_t len) {
 static void key_free(NativeHandleIndex *self, char *ptr, Py_ssize_t len) {
     if (!ptr) return;
     TinyKeyPool *pool = &self->key_pool;
-    if (len >= (Py_ssize_t)sizeof(KeyNode) && len <= pool->block_size) {
+    if (len > 0 && len <= pool->block_size) {
         KeyNode *n = (KeyNode*)ptr;
         n->next = pool->free_list;
         pool->free_list = n;
