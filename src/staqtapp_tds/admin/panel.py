@@ -138,8 +138,13 @@ class AdminPanelServer:
 
             def _same_origin_request(self) -> bool:
                 expected = f"http://{outer.host}:{outer.port}"
-                for header in ("Origin", "Referer"):
-                    value = self.headers.get(header)
+                origin = self.headers.get("Origin")
+                referer = self.headers.get("Referer")
+
+                if not origin and not referer:
+                    return False
+
+                for value in (origin, referer):
                     if value and not value.startswith(expected):
                         return False
                 return True

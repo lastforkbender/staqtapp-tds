@@ -1,7 +1,7 @@
 """Admin-facing Spiral Rank telemetry snapshots.
 
 This module intentionally lives in the admin layer. It observes immutable
-``SpiralRankRun``/``SpiralRankStats`` objects produced elsewhere and shapes them
+``SpiralRankRun``/``SpiralRankStats`` data records produced elsewhere and shapes them
 for the browser Operations Console. It does not invoke ranking by itself, read
 payloads, mutate storage, or feed decisions back into the native engine.
 """
@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from time import time
 from typing import Any, Deque, Iterable
 
-from staqtapp_tds.spiral.rank import SpiralRankResult, SpiralRankRun, SpiralRankStats
+from staqtapp_tds.spiral.rank import SpiralRankRecord, SpiralRankRun, SpiralRankStats
 
 
 def _stats_to_dict(stats: SpiralRankStats | None) -> dict[str, Any]:
@@ -21,7 +21,7 @@ def _stats_to_dict(stats: SpiralRankStats | None) -> dict[str, Any]:
     return stats.to_dict() if hasattr(stats, "to_dict") else dict(stats)  # type: ignore[arg-type]
 
 
-def _result_to_dict(result: SpiralRankResult | Any) -> dict[str, Any]:
+def _result_to_dict(result: SpiralRankRecord | Any) -> dict[str, Any]:
     if hasattr(result, "to_dict"):
         return result.to_dict()
     if isinstance(result, dict):
@@ -84,9 +84,9 @@ class SpiralRankTelemetry:
         while len(self._history) > self.history_limit:
             self._history.popleft()
 
-    def observe_stats(self, stats: SpiralRankStats, results: Iterable[SpiralRankResult] | None = None) -> None:
+    def observe_stats(self, stats: SpiralRankStats, results: Iterable[SpiralRankRecord] | None = None) -> None:
         """Record stats with optional result rows as a synthetic run bundle."""
-        self.observe_run(SpiralRankRun(results=tuple(results or ()), stats=stats))
+        self.observe_run(SpiralRankRun(records=tuple(results or ()), stats=stats))
 
     @property
     def last_stats(self) -> SpiralRankStats | None:

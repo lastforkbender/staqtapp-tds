@@ -23,7 +23,7 @@ def main(argv=None):
     elif args.cmd == "verify":
         fs = TDSFileSystem("verify_root")
         if args.sample:
-            fs.write("sample", b"staqtapp-tds")
+            fs.write_result("sample", b"staqtapp-tds")
         print(dumps_pretty(verify(fs).to_dict())[0], end="")
     elif args.cmd == "serve-panel":
         AdminPanelServer(control, args.host, args.port).serve_forever()
