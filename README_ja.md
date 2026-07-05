@@ -3,9 +3,49 @@
 </p>
 
 
-# 🟦🟪🟧 Staqtapp-TDS v3.0.2
+# 🟦🟪🟧 Staqtapp-TDS v3.1.2
+
+## v3.1.2 Driver Foundry API
+
+TDS v3.1.2 では AI セーフな `DriverFoundry` API を追加しました。これは AI による高速な Driver 生成を支援する build/test/candidate 層ですが、registry trust 権限は与えません。Foundry は TDDL validation、`.tdd` bytecode compile、VM contract audit、`DriverVMRuntime` による test、registry candidate submission を実行できます。一方で approve、sign、activate、policy bypass、storage write、任意 Python 実行はできません。
+
+Class A Foundry 特性:
+
+- AI/Studio 呼び出し側は、想定される source/package/fixture/runtime/policy failure を raw exception ではなく `DriverFoundryResult` として受け取ります。
+- Foundry test result は `DriverVMResult` を保持し、repair loop に trace、fault、cost、context、partial output、emitted result evidence を渡します。
+- Candidate submission は既定で成功した runtime test evidence を必須とし、driver を `DriverState.CANDIDATE` に入れるだけです。
+- Approval、signing、activation、retirement、revocation は Foundry API の外側に残します。
+- `foundry_capability_matrix()` は future PyQt5 Studio と AI agent surface に authority boundary を表示します。
+
+## v3.1.1 Driver VM 非停止 Result フレームワーク
+
+TDS v3.1.1 では Driver VM 専用の非停止実行エンベロープ `DriverVMResult` を追加しました。ドライバー実行の失敗はホストプロセスを停止せず、`VMStatus`、`VMFault`、`DriverVMContext`、trace、metrics、partial output として返されます。
+
+Class A 実行特性:
+
+- `execute()` は想定される VM 障害を Python 例外ではなく構造化 Result として返します。
+- 正常終了は `VMStatus.HALTED` を返し、互換用の `VMState.EXECUTED` も保持します。
+- 不正な入力は `INPUT_REJECTED`、予算超過は `BUDGET_EXCEEDED`、未対応のランタイム意味論は `FAULTED`、想定外の内部エラーは `INTERNAL_ERROR` になります。
+- 入力 record snapshot は deep copy され、Driver VM は呼び出し元の入力を変更しません。
+- `MATCH field=...` は predicate を必須化し、`regex_limited` と numeric `range` は決定的なランタイム挙動を持ちます。
+- Driver VM runtime は storage engine 内部から分離され、その境界を regression test で保護します。
+
+## v3.1.0 Driver VM Runtime
+
+v3.1.0 adds the first deterministic Driver VM runtime for validated `.tdd` bytecode packages. It executes the safe opcode set against explicit in-memory `.tds` record snapshots and remains separate from the Native Storage Engine. Runtime loading remains fail-closed through bytecode hash, opcode, class, capability and budget validation.
+
+## v3.0.9 Driver Studio Class A Quick Test
+
+TDS v3.0.9 adds a non-GUI Driver Studio readiness path. It models the future Studio as a gated certification workflow: learn, syntax validation, capability checks, bytecode generation, VM audit, VM skeleton load, registry approval, signing and activation. Execution remains disabled; the Studio teaches and orchestrates while Builder/VM/Registry remain authoritative.
 
 🇯🇵 **日本語** | 🇺🇸 [English](README.md)
+
+## v3.0.9 TDDL Grammar Validation
+
+TDS v3.0.9 adds a non-executing TDS Driver Language grammar and validation layer for future Driver VM, Builder, Registry and Studio work. It validates SCAN/READ/MATCH/EXTRACT/SCORE/EMIT/HALT behavior, rejects unsafe adapter names and path escapes, requires declared capabilities/adapters, and exposes an instruction metadata table for a future minimal syntax editor.
+
+This release still does not execute driver programs; it prepares a stable, tested syntax boundary before native Driver VM bytecode is introduced.
+
 
 Staqtapp-TDS は、ディレクトリ中心の Temporal Directory System です。仮想ストレージ、radix ルーティング、Swiss-table 風インデックス、ネイティブ診断、ブラウザ運用テレメトリ、そして任意の Spiral 互換トレースワークフローを提供します。
 
@@ -209,3 +249,15 @@ Dashboard observes immutable snapshots.
 v3.0.1 は v2.8.7 の Native Spiral Rank Engine の上に構築されています。不変の Spiral Rank 統計、実行バンドル出力、統計テスト、更新済みの日英ドキュメントを追加し、v2.8.7 のリスト返却型 rank API も維持しています。
 
 追加の v3.0.1 設計ノート: `docs/40_v290_Spiral_Rank_Browser_Telemetry.md`。
+
+
+## v3.0.9 Driver Foundation Testbed
+
+TDS v3.0.9 は、将来の Native Driver VM と Driver Studio のために、実行を行わないドライバー基盤を追加します。Driver Manifest、Registry 状態、署名ポリシー拒否、決定的な Trace Ranking の契約をテストで固定し、Native Storage Engine は分離されたまま変更しません。
+
+
+## v3.0.9 TDDL Bytecode Package
+
+v3.0.9 は、将来のネイティブ Driver VM に向けた非実行型のバイトコード成果物レイヤーを追加します。検証済み TDDL は、安定した opcode マップ、定数プール、source hash、package hash を持つ決定的な `BytecodePackage` にコンパイルできます。
+
+このリリースではまだ Driver VM の実行は行いません。
