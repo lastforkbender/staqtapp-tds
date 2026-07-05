@@ -14,10 +14,10 @@ def test_chunked_text_uses_utf8_byte_budget_without_splitting_codepoints():
     result = d.write_text_chunked('unicode.txt', text, chunk_size=5)
     assert result.ok
     assert d.read_text('unicode.txt') == text
-    manifest = d.read('unicode.txt')
+    manifest = d.read('unicode.txt').value
     assert manifest['chunk_size_unit'] == 'utf8_bytes'
     for chunk_name in manifest['chunks']:
-        chunk = d.read(chunk_name)
+        chunk = d.read(chunk_name).value
         encoded = chunk.encode('utf-8')
         # Some chunks may exceed the budget only when a single UTF-8 code point
         # is wider than the budget. With a 5-byte budget here every emitted
@@ -56,6 +56,8 @@ def test_native_tombstone_reuse_and_delete_reinsert_if_available():
         idx.put(f'item-{i}', i)
     for i in range(0, 512, 2):
         assert idx.pop(f'item-{i}') == i
+    if 'native' not in idx.backend_name:
+        pytest.skip('native backend not active on this interpreter')
     raw = idx._impl._index.stats()
     assert raw['tombstones'] > 0
     for i in range(0, 512, 2):

@@ -1,3 +1,4 @@
+import pytest
 from staqtapp_tds import EntryIndex, TelemetryManager, TDSFileSystem
 from staqtapp_tds.admin.panel import render_dashboard_html
 
@@ -18,6 +19,8 @@ def test_native_entry_index_reports_execution_stats_when_available():
         idx = EntryIndex(backend="native")
     except RuntimeError:
         return
+    if 'native' not in idx.backend_name:
+        pytest.skip('native backend not active on this interpreter')
     idx.put("alpha", object())
     idx.get_handle("alpha")
     idx.get_handles(["alpha", "missing"])

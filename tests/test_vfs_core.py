@@ -22,11 +22,12 @@ def test_arena_offset_handles():
 def test_entry_index_handles_and_compat_get():
     fs = TDSFileSystem('root')
     d = fs.root.mkdir('idx')
-    e = d.write('alpha', {'v': 1})
+    d.write('alpha', {'v': 1})
+    e = d._entries.get('alpha')
     handle = d._entries.get_handle('alpha')
     assert isinstance(handle, int) and handle > 0
     assert d._entries.get('alpha') is e
-    assert d.read('alpha') == {'v': 1}
+    assert d.read('alpha').value == {'v': 1}
     d.delete('alpha')
     assert d._entries.get('alpha') is None
 
@@ -36,7 +37,7 @@ def test_directory_numpy_roundtrip():
     d = fs.root.mkdir('vectors')
     arr = np.arange(16, dtype=np.float32).reshape(4, 4)
     d.write('x', arr, fmt_id=FmtID.NUMPY_MATRIX)
-    out = d.read('x')
+    out = d.read('x').value
     assert np.array_equal(out, arr)
 
 

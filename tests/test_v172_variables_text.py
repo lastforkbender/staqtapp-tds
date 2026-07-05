@@ -42,10 +42,8 @@ def test_stalkvar_linear_compound_and_clear_keep_base():
     cleared = d.stalkvar('new_var', None)
     assert cleared.ok and cleared.code == 'VAR_STALK_CLEARED'
     assert d.read('new_var') == {'a': 1}
-    with pytest.raises(KeyError):
-        d.read('new_var_0001')
-    with pytest.raises(KeyError):
-        d.read('new_var_0002')
+    assert not d.read('new_var_0001').ok
+    assert not d.read('new_var_0002').ok
 
 
 def test_stalkvar_clear_and_replace_base():
@@ -57,8 +55,7 @@ def test_stalkvar_clear_and_replace_base():
     replaced = d.stalkvar('v', [9])
     assert replaced.ok and replaced.code == 'VAR_EDITED'
     assert d.read('v') == [9]
-    with pytest.raises(KeyError):
-        d.read('v_0001')
+    assert not d.read('v_0001').ok
 
 
 def test_stalkvar_without_chain_behaves_like_editvar_when_data_present():
@@ -99,9 +96,9 @@ def test_variable_and_text_persistence_roundtrip(tmp_path: Path):
     p.flush(fs, parallel_nodes=False)
 
     loaded_vars = p.load_node(tmp_path / 'root__vars.tds')
-    assert loaded_vars.read('state') == {'base': True}
-    assert loaded_vars.read('state_0001') == {'base': True, 'step': 1}
-    assert loaded_vars.read('state_0002') == {'base': True, 'step': 2}
+    assert loaded_vars.read('state').value == {'base': True}
+    assert loaded_vars.read('state_0001').value == {'base': True, 'step': 1}
+    assert loaded_vars.read('state_0002').value == {'base': True, 'step': 2}
     assert loaded_vars.variables.is_locked('state') is True
     assert not loaded_vars.stalkvar('state', None).ok
     loaded_vars.unlockvar('state')

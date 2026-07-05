@@ -3,7 +3,7 @@ from staqtapp_tds.admin.panel import render_dashboard_html
 
 
 def test_version_v260():
-    assert __version__ == "3.0.2"
+    assert __version__ == "3.1.2"
 
 
 def test_pressure_model_modes_and_vfs_state():

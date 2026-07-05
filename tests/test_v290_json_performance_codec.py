@@ -12,7 +12,7 @@ from staqtapp_tds.tds_json import (
 
 
 def test_v290_version():
-    assert __version__ == "3.0.2"
+    assert __version__ == "3.1.2"
 
 
 def test_v290_json_backends_are_selected_without_hot_path_import_probe():

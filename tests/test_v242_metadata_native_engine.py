@@ -1,3 +1,4 @@
+import pytest
 import sys
 
 from staqtapp_tds import __version__, EntryIndex, TraceRecord, TraceSetManifest, AggregationRecord
@@ -6,7 +7,7 @@ from staqtapp_tds.telemetry import TelemetryManager
 
 
 def test_version_centralized_v242():
-    assert __version__ == "3.0.2"
+    assert __version__ == "3.1.2"
 
 
 def test_metadata_records_are_slotted_and_immutable():
@@ -34,6 +35,8 @@ def test_native_batch_put_and_pop_many_when_available():
         idx = EntryIndex(backend="native")
     except RuntimeError:
         return
+    if 'native' not in idx.backend_name:
+        pytest.skip('native backend not active on this interpreter')
     handles = idx.put_many([("a", 1), ("b", 2), ("c", 3)])
     assert len(handles) == 3
     assert idx.get_handles(["a", "b", "c", "missing"])[-1] == -1
