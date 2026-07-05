@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "3.0.1"
+EXPECTED_VERSION = "3.1.2"
 BANNED_SUFFIXES = {".so", ".pyd", ".dll", ".dylib", ".pyc"}
 BANNED_DIRS = {"__pycache__", ".pytest_cache"}
 
@@ -45,4 +45,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-  
