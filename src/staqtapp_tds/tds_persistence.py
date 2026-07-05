@@ -12,7 +12,6 @@ import struct
 import threading
 import time
 import zlib
-import pickle
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path

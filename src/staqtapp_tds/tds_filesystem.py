@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 import math
 import os
-import pickle
 import struct
 import time
 import threading
@@ -33,8 +32,10 @@ from staqtapp_tds.namespaces import ReservedNamespaces
 from staqtapp_tds.result import TDSResult, TDSResultCode
 from staqtapp_tds.errors import ErrorLogMode
 from staqtapp_tds.variables import VariableControl
-from staqtapp_tds.serializers import CompressionPolicy, PayloadKind, choose_variable_kind, content_hash_bytes, json_dumps_fast, json_loads_fast, kind_name
+from staqtapp_tds.serializers import CompressionPolicy, PayloadKind, choose_variable_kind, content_hash_bytes, kind_name
 from staqtapp_tds.tds_json import dumps_snapshot
+from staqtapp_tds.tds_pickle import PicklePolicyError, pickle_policy_snapshot
+from staqtapp_tds.serialization import SerializationManager, get_default_serialization_manager
 from staqtapp_tds.invariants import InvariantEngine
 from staqtapp_tds.provenance import ProvenanceTag, ProvenanceClass
 from staqtapp_tds.radix import RadixDirectoryRouter
@@ -681,28 +682,27 @@ class BloomFilter:
 # § 7  TDS ENTRY
 # ////////////////////////////////////////////////////////////////////////////////
 
+def _serialization_manager() -> SerializationManager:
+    return get_default_serialization_manager()
+
+
 def _serialize_payload(data: Any, fmt_id: FmtID, codec: str = '') -> bytes:
+    """Encode a payload through the first-class Serialization Manager.
+
+    The storage layer no longer decides Python-object serialization directly.
+    It identifies the requested format and delegates to the manager/codec
+    registry.  Pickle, when required for Python compatibility, is contained
+    behind the restricted pickle codec.
+    """
     base = fmt_id & ~FmtID.COMPRESSED
-    if base == FmtID.NUMPY_MATRIX and isinstance(data, np.ndarray):
-        import io
-        buf = io.BytesIO()
-        np.save(buf, data, allow_pickle=False)
-        raw = buf.getvalue()
-    elif base == FmtID.TEXT_UTF8:
-        if not isinstance(data, str):
-            raise TypeError(f"TEXT_UTF8 entries require str, got {type(data).__name__}")
-        raw = data.encode('utf-8')
-    elif base == FmtID.JSON_UTF8:
-        raw, _backend = json_dumps_fast(data)
-    else:
-        raw = pickle.dumps(data, protocol=5)
+    raw = _serialization_manager().serialize(data, int(base)).raw
     if fmt_id & FmtID.COMPRESSED:
         raw = CompressorRegistry.compress(raw, codec)
     return raw
 
 
 def _deserialize_payload(raw: bytes, fmt_id: FmtID, codec: str = '') -> Any:
-    """Decode a stored payload without ever returning undecoded raw bytes on error.
+    """Decode a stored payload through the Serialization Manager.
 
     On decode failure this returns TDSResult.fail(...). That keeps corrupted,
     incompatible, or hostile bytes from masquerading as valid application data
@@ -712,18 +712,7 @@ def _deserialize_payload(raw: bytes, fmt_id: FmtID, codec: str = '') -> Any:
     try:
         if fmt_id & FmtID.COMPRESSED:
             raw = CompressorRegistry.decompress(raw, codec)
-        if base == FmtID.NUMPY_MATRIX:
-            import io
-            return np.load(io.BytesIO(raw), allow_pickle=False)
-        if base == FmtID.TEXT_UTF8:
-            return raw.decode('utf-8')
-        if base == FmtID.JSON_UTF8:
-            value, _backend = json_loads_fast(raw)
-            return value
-        if base == FmtID.RAW_BINARY:
-            return bytes(raw)
-        if base == FmtID.PICKLE_OBJ or base not in (FmtID.NUMPY_MATRIX, FmtID.TEXT_UTF8, FmtID.JSON_UTF8, FmtID.RAW_BINARY):
-            return pickle.loads(raw)
+        return _serialization_manager().deserialize(raw, int(base))
     except Exception as exc:
         return TDSResult.fail(
             TDSResultCode.PAYLOAD_DESERIALIZE_ERROR,
@@ -735,13 +724,10 @@ def _deserialize_payload(raw: bytes, fmt_id: FmtID, codec: str = '') -> Any:
                 'raw_size': len(raw),
                 'exception_type': type(exc).__name__,
                 'exception_message': str(exc),
+                'pickle_policy': pickle_policy_snapshot() if base == FmtID.PICKLE_OBJ else None,
+                'serialization_manager': _serialization_manager().snapshot(),
             },
         )
-    return TDSResult.fail(
-        TDSResultCode.PAYLOAD_FORMAT_UNSUPPORTED,
-        'Payload format is not supported.',
-        meta={'fmt_id': int(fmt_id), 'base_fmt_id': int(base), 'codec': codec or '', 'raw_size': len(raw)},
-    )
 
 
 @dataclass
@@ -877,6 +863,7 @@ class TDSDirectory:
         self.loop_cache = LoopCacheManager()
         self.symbols    = SymbolTable()
         self.compression_policy = CompressionPolicy(enabled=False, codec='', threshold_bytes=4096)
+        self.serialization_manager = get_default_serialization_manager()
         self.variables  = VariableControl(self)
         self.invariants = InvariantEngine()
         self.config_registry = config_registry or (parent.config_registry if parent is not None else ConfigRegistry(runtime_config or RuntimeConfig.default()))
@@ -1013,7 +1000,7 @@ class TDSDirectory:
         return self.write_result(name, value, fmt_id=fmt_id, compress=compress, codec=codec, provenance=provenance)
 
     def write_variable(self, name: str, value: Any, *, compress: bool | None = None, codec: str = '', provenance: ProvenanceTag | str | None = None) -> 'TDSEntry':
-        kind = choose_variable_kind(value)
+        kind = self.serialization_manager.choose_fmt_id(value)
         return self._write_entry(name, value, fmt_id=FmtID(int(kind)), compress=compress, codec=codec, provenance=provenance)
 
     def write_json(self, name: str, value: Any, *, overwrite: bool = False, compress: bool | None = None, codec: str = '', provenance: ProvenanceTag | str | None = None) -> TDSResult:

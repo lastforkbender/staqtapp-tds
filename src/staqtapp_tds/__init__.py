@@ -52,6 +52,8 @@ from staqtapp_tds.result import TDSResult, TDSResultCode, TDSResultInfo, TDS_RES
 from staqtapp_tds.variables import VariableControl, StalkState
 from staqtapp_tds.errors import ErrorTelemetry, ErrorLogMode
 from staqtapp_tds.serializers import PayloadKind, CompressionPolicy, SerializerDecision, choose_variable_kind, content_hash_bytes
+from staqtapp_tds.tds_pickle import PicklePolicy, PicklePolicyError, dumps_pickle, loads_pickle, pickle_policy_snapshot
+from staqtapp_tds.serialization import EncodedPayload, SerializationCodec, CodecRegistry, SerializationManager, get_default_serialization_manager
 from staqtapp_tds.invariants import InvariantEngine, InvariantReport, InvariantViolation, InvariantCode, INVARIANT_DTYPE
 from staqtapp_tds.provenance import ProvenanceTag, ProvenanceClass, PROVENANCE_DTYPE
 from staqtapp_tds.cluster import TDSClusterIdentity, CLUSTER_DTYPE, query_requires_selector
@@ -88,7 +90,7 @@ __all__ = [
     "LatencyPolicy", "LatencyBucket", "classify_latency", "latency_ratio",
     "CapabilityRegistry", "ZoneCapability", "ReservedNamespaces",
     "TDSResult", "TDSResultCode", "TDSResultInfo", "TDS_RESULT_REGISTRY", "TDS_RESULT_CODES", "known_result_codes", "is_known_result_code", "result_info", "VariableControl", "StalkState", "ErrorTelemetry", "ErrorLogMode",
-    "PayloadKind", "CompressionPolicy", "SerializerDecision", "choose_variable_kind", "content_hash_bytes",
+    "PayloadKind", "CompressionPolicy", "SerializerDecision", "choose_variable_kind", "content_hash_bytes", "PicklePolicy", "PicklePolicyError", "dumps_pickle", "loads_pickle", "pickle_policy_snapshot", "EncodedPayload", "SerializationCodec", "CodecRegistry", "SerializationManager", "get_default_serialization_manager",
     "InvariantEngine", "InvariantReport", "InvariantViolation", "InvariantCode", "INVARIANT_DTYPE",
     "ProvenanceTag", "ProvenanceClass", "PROVENANCE_DTYPE",
     "TDSClusterIdentity", "CLUSTER_DTYPE", "query_requires_selector", "RadixDirectoryRouter",
