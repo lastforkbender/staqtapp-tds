@@ -1,3 +1,60 @@
+## 3.1.23 - Driver Studio Stress Scenario Matrix
+
+- Extended `staqtapp_tds.studio_pyqt5.operational_stress` with named stress scenarios and a default scenario matrix.
+- Added `StudioOperationalStressScenario`, `StudioOperationalStressScenarioResult`, and `StudioOperationalStressScenarioMatrix`.
+- Added `DEFAULT_OPERATIONAL_STRESS_SCENARIOS`.
+- Added `StudioOperationalStressHarness.run_scenario(...)` for individual stress paths.
+- Added `StudioOperationalStressHarness.run_scenario_matrix(...)` for deterministic matrix evidence.
+- Added named Browser polling, Studio live-event overflow, Manual Builder payload, `.tds` persistence atomicity, combined Browser + Studio + `.tds`, and authority-boundary denial scenarios.
+- Added scenario-matrix capability flags while preserving explicit denied authority flags.
+- Updated the API reference PDF under `tds_api_docs/` and linked it from both README files.
+- Preserved Studio and Browser authority boundaries: no approval, rejection, quarantine, signing, activation, Registry mutation, trusted VM execution, storage writes through Studio, private keys, or policy bypass.
+
+Validation:
+
+```text
+389 passed, 11 skipped
+release check passed
+```
+
+
+## 3.1.22 - Driver Studio Operational Stress Harness
+
+- Added `staqtapp_tds.studio_pyqt5.operational_stress`.
+- Added `StudioOperationalStressHarness`, `StudioOperationalStressReport`, `StudioOperationalStressObservation`, and `StudioOperationalStressStatus`.
+- Added Browser-style `AdminControl.status()` polling stress with JSON status emission checks.
+- Added bounded Studio live-event overflow stress that treats event loss as acceptable only when drop counts, retained cursor floor, and retention-gap warnings are explicit.
+- Added Manual Builder JSON/signal payload stress for unusual Qt-style form values.
+- Added `.tds` atomic persistence reader/writer stress checks for existing-reader usability and fresh-reader latest-generation visibility.
+- Added `studio_operational_stress_capability_matrix()` with explicit denied authority flags.
+- Added generated API reference PDF under `tds_api_docs/` and linked it from both README files.
+- Restored/verified README.md and README_ja.md cross-links.
+- Preserved Studio and Browser authority boundaries: no approval, rejection, quarantine, signing, activation, Registry mutation, trusted VM execution, storage writes through Studio, private keys, or policy bypass.
+
+Validation:
+
+```text
+382 passed, 11 skipped
+```
+
+
+## 3.1.21 - Driver Studio Runtime Hardening
+
+- Strengthened the optional Driver Studio runtime around bounded live-event streams, drop accounting, and runtime warning payloads.
+- Added event-retention floor and dropped-event counts to live bridge state/signal payloads so GUI polling can detect when older retained events were dropped before consumption.
+- Added runtime-level retention-gap detection and signal payload warnings without mutating backend state or widening Studio authority.
+- Hardened Manual Builder UI Runtime form payload serialization so unusual form values remain JSON/signal safe in accepted and rejected states.
+- Removed duplicate Studio factory/method definitions and preserved bridge/runtime/manual-builder compatibility.
+- Added focused v3.1.21 runtime-hardening tests for event retention gaps, bounded stream drop accounting, JSON-safe signal payloads, factory compatibility, and authority-boundary preservation.
+- Preserved Studio authority boundaries: no approval, rejection, quarantine, signing, activation, Registry mutation, trusted VM execution, storage writes, private keys, or policy bypass.
+
+Validation:
+
+```text
+375 passed, 11 skipped
+```
+
+
 ## 3.1.20 - Driver Studio Export Integrity Workflow
 
 - Added `staqtapp_tds.studio_pyqt5.export_integrity_workflow`.
