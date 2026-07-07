@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "staqtapp-tds"
-version = "3.1.2"
+version = "3.1.20"
 description = "Staqtapp-TDS Temporal Directory System VFS"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -12,6 +12,7 @@ dependencies = ["numpy>=1.23"]
 
 [project.optional-dependencies]
 fast = ["numba>=0.58"]
+gui = ["PyQt5>=5.15"]
 test = ["pytest>=7"]
 native = []
 
