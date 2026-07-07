@@ -29,3 +29,12 @@ The optional driver VM should use the same native loading discipline introduced 
 5. report all load/execution issues through `TDSResult`
 
 No driver VM code is active in v3.0.1. This is intentionally a clean extension boundary.
+
+
+## v3.1.20 Driver Studio Export Integrity Workflow
+
+Adds review-safe export packet verification above the v3.1.19 Export / Audit Console. The workflow recomputes manifest and packet hashes, compares optional expected integrity inputs, progresses checklist checkpoints, and prepares an intent-only review/export handoff gate.
+
+## v3.1.19 Driver Studio Export / Audit Console
+
+Adds hash-backed selected-driver export/audit packet previews while preserving Studio as a non-authoritative visibility and packaging layer.
