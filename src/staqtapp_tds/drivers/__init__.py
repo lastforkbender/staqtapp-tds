@@ -1,9 +1,8 @@
 """TDS Driver Foundation namespace.
 
-v3.1.2 extends the driver foundation for the future native
-Driver VM, Builder, Registry and Studio. These helpers deliberately do not
-execute driver programs; they model trust states, manifests, signatures and
-trace ranking plus strict non-executing TDDL parsing/validation plus deterministic bytecode packaging, VM contract audits, a non-executing VM skeleton, and the first deterministic runtime execution path plus a non-halting DriverVMResult envelope and AI-safe DriverFoundry API for validated bytecode packages.
+v3.1.20 extends the driver foundation for the future native
+Driver VM, Builder, Registry and Studio. These helpers preserve authority boundaries while modeling trust states, manifests, signatures and
+trace ranking plus strict non-executing TDDL parsing/validation, deterministic bytecode packaging, VM contract audits, a non-executing VM skeleton, the deterministic runtime execution path, a non-halting DriverVMResult envelope, AI-safe DriverFoundry API, Runtime Manager execution evidence, deterministic fixture regression harnessing, an admin batch review layer, read-only evidence bundle/audit trail export, bounded Studio admin review action submission, an optional PyQt5 cockpit shell, a manual Studio proposal builder routed through Foundry, live panel runtime coordination, review workflow, evidence timeline, risk intelligence, an opt-in Driver VM performance evidence harness, the Driver Studio Manual Builder UI Runtime, and export/audit packet preparation surfaces.
 """
 
 from .manifest import DriverManifest, DriverSafety, validate_manifest
@@ -23,14 +22,110 @@ from .foundry import (
     FoundryStatus,
     foundry_capability_matrix,
 )
+
+
+from .performance import (
+    DriverVMPerformanceBackend,
+    DriverVMPerformanceComparison,
+    DriverVMPerformanceHarness,
+    DriverVMPerformancePolicy,
+    DriverVMPerformanceReport,
+    DriverVMPerformanceRun,
+    DriverVMPerformanceStatus,
+    DriverVMPerformanceSummary,
+    driver_vm_performance_capability_matrix,
+    driver_vm_performance_enabled,
+)
+
+from .runtime_manager import (
+    DriverExecutionEvidence,
+    DriverRuntimeManager,
+    RuntimeManagerFault,
+    RuntimeManagerPolicy,
+    RuntimeManagerStatus,
+    runtime_manager_capability_matrix,
+)
+
+from .regression import (
+    DriverFixtureCase,
+    DriverRegressionHarness,
+    DriverRegressionReport,
+    DriverRegressionResult,
+    RegressionMismatch,
+    RegressionStatus,
+    regression_harness_capability_matrix,
+    runtime_fixture_hash,
+)
+
+
+from .evidence import (
+    AuditTrailStatus,
+    DriverAuditEvent,
+    DriverAuditEventType,
+    DriverAuditTrail,
+    DriverEvidenceBundle,
+    DriverEvidenceRecord,
+    EvidenceBundleExporter,
+    EvidenceBundleManifest,
+    EvidenceBundleStatus,
+    EvidenceExportFormat,
+    EvidenceIntegrityStatus,
+    evidence_export_capability_matrix,
+)
+
+from .review import (
+    BatchReviewPolicy,
+    BatchReviewStatus,
+    DriverBatchReviewBoard,
+    DriverBatchReviewReport,
+    DriverReviewDecision,
+    DriverReviewItem,
+    ReviewAction,
+    ReviewDecisionStatus,
+    ReviewFault,
+    batch_review_capability_matrix,
+)
+
 from .studio import (
+    DriverStudioConsoleSnapshot,
+    DriverStudioEventRow,
+    DriverStudioPanelSnapshot,
     DriverStudioQuickTestReport,
+    DriverStudioQueueItem,
+    DriverStudioReadOnlyConsole,
+    DriverStudioRiskCard,
     DriverStudioSession,
+    StudioConsoleStatus,
     StudioGate,
     StudioGateResult,
+    StudioPanelKind,
+    StudioPanelStatus,
     run_studio_quick_test,
     studio_instruction_reference,
+    studio_readonly_capability_matrix,
 )
+
+from .studio_builder import (
+    DriverStudioManualProposalBuilder,
+    StudioManualDriverTask,
+    StudioManualProposalPreview,
+    StudioManualProposalReport,
+    StudioManualProposalStatus,
+    studio_manual_builder_capability_matrix,
+)
+
+from .studio_actions import (
+    DriverStudioAdminReviewActions,
+    StudioReviewActionDecision,
+    StudioReviewActionEvent,
+    StudioReviewActionRequest,
+    StudioReviewActionStatus,
+    StudioReviewSubmissionPolicy,
+    StudioReviewSubmissionReport,
+    StudioReviewSubmissionStatus,
+    studio_admin_review_capability_matrix,
+)
+
 from .bytecode import (
     BYTECODE_MAGIC,
     BYTECODE_VERSION,
@@ -96,12 +191,37 @@ __all__ = [
     "decompile_to_ir",
     "opcode_table",
     "validate_bytecode_package",
+    "DriverStudioConsoleSnapshot",
+    "DriverStudioEventRow",
+    "DriverStudioPanelSnapshot",
     "DriverStudioQuickTestReport",
+    "DriverStudioQueueItem",
+    "DriverStudioReadOnlyConsole",
+    "DriverStudioRiskCard",
     "DriverStudioSession",
+    "StudioConsoleStatus",
     "StudioGate",
     "StudioGateResult",
+    "StudioPanelKind",
+    "StudioPanelStatus",
     "run_studio_quick_test",
     "studio_instruction_reference",
+    "studio_readonly_capability_matrix",
+    "DriverStudioManualProposalBuilder",
+    "StudioManualDriverTask",
+    "StudioManualProposalPreview",
+    "StudioManualProposalReport",
+    "StudioManualProposalStatus",
+    "studio_manual_builder_capability_matrix",
+    "DriverStudioAdminReviewActions",
+    "StudioReviewActionDecision",
+    "StudioReviewActionEvent",
+    "StudioReviewActionRequest",
+    "StudioReviewActionStatus",
+    "StudioReviewSubmissionPolicy",
+    "StudioReviewSubmissionReport",
+    "StudioReviewSubmissionStatus",
+    "studio_admin_review_capability_matrix",
     "DriverFoundry",
     "DriverFoundryContext",
     "DriverFoundryPolicy",
@@ -110,4 +230,50 @@ __all__ = [
     "FoundryStage",
     "FoundryStatus",
     "foundry_capability_matrix",
+    "DriverExecutionEvidence",
+    "DriverRuntimeManager",
+    "RuntimeManagerFault",
+    "RuntimeManagerPolicy",
+    "RuntimeManagerStatus",
+    "DriverVMPerformanceBackend",
+    "DriverVMPerformanceComparison",
+    "DriverVMPerformanceHarness",
+    "DriverVMPerformancePolicy",
+    "DriverVMPerformanceReport",
+    "DriverVMPerformanceRun",
+    "DriverVMPerformanceStatus",
+    "DriverVMPerformanceSummary",
+    "driver_vm_performance_capability_matrix",
+    "driver_vm_performance_enabled",
+    "runtime_manager_capability_matrix",
+    "DriverFixtureCase",
+    "DriverRegressionHarness",
+    "DriverRegressionReport",
+    "DriverRegressionResult",
+    "RegressionMismatch",
+    "RegressionStatus",
+    "regression_harness_capability_matrix",
+    "runtime_fixture_hash",
+    "AuditTrailStatus",
+    "DriverAuditEvent",
+    "DriverAuditEventType",
+    "DriverAuditTrail",
+    "DriverEvidenceBundle",
+    "DriverEvidenceRecord",
+    "EvidenceBundleExporter",
+    "EvidenceBundleManifest",
+    "EvidenceBundleStatus",
+    "EvidenceExportFormat",
+    "EvidenceIntegrityStatus",
+    "evidence_export_capability_matrix",
+    "BatchReviewPolicy",
+    "BatchReviewStatus",
+    "DriverBatchReviewBoard",
+    "DriverBatchReviewReport",
+    "DriverReviewDecision",
+    "DriverReviewItem",
+    "ReviewAction",
+    "ReviewDecisionStatus",
+    "ReviewFault",
+    "batch_review_capability_matrix",
 ]
