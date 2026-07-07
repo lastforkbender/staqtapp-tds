@@ -30,6 +30,10 @@ The optional driver VM should use the same native loading discipline introduced 
 
 No driver VM code is active in v3.0.1. This is intentionally a clean extension boundary.
 
+## v3.1.21 Driver Studio Runtime Hardening
+
+Strengthens the optional Driver Studio runtime with bounded live-event drop accounting, retained cursor floor reporting, retention-gap warnings, JSON-safe Manual Builder signal payloads, and additional authority-boundary tests. Studio remains an observer/intent surface only.
+
 
 ## v3.1.20 Driver Studio Export Integrity Workflow
 
