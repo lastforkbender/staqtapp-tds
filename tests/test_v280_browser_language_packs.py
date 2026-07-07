@@ -13,7 +13,7 @@ def _asset(path: str):
 
 
 def test_v280_version():
-    assert __version__ == "3.1.20"
+    assert __version__ == "3.1.23"
 
 
 def test_v280_language_pack_manifest_is_packaged():

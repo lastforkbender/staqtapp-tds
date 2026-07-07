@@ -229,7 +229,7 @@ RECORDS = [
 
 
 def test_v311_version():
-    assert __version__ == "3.1.20"
+    assert __version__ == "3.1.23"
 
 
 def test_successful_execution_returns_driver_vm_result_with_context():

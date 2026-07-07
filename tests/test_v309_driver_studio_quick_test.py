@@ -50,7 +50,7 @@ evolution:
 
 
 def test_v309_version():
-    assert __version__ == "3.1.20"
+    assert __version__ == "3.1.23"
 
 
 def test_studio_instruction_reference_is_complete_for_minimal_editor():

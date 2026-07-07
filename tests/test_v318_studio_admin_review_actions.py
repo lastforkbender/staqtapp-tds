@@ -101,7 +101,7 @@ def _bundle(report):
 
 
 def test_v318_version():
-    assert __version__ == "3.1.20"
+    assert __version__ == "3.1.23"
 
 
 def test_studio_admin_review_capability_matrix_allows_submission_not_authority():

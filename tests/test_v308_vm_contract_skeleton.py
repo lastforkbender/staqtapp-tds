@@ -85,7 +85,7 @@ evolution:
 
 
 def test_v308_version():
-    assert __version__ == "3.1.20"
+    assert __version__ == "3.1.23"
 
 
 def test_vm_contract_table_has_complete_metadata_for_each_opcode():

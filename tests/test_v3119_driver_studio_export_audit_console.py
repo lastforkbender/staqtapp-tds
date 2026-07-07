@@ -105,7 +105,7 @@ def _bundle(*, action=ReviewAction.APPROVE):
 
 
 def test_v3119_version():
-    assert __version__ == "3.1.20"
+    assert __version__ == "3.1.23"
 
 
 def test_export_audit_capability_matrix_is_prepare_only():
