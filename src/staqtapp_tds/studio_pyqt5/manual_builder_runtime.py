@@ -358,6 +358,7 @@ def studio_manual_builder_ui_runtime_capability_matrix() -> Mapping[str, bool]:
         "normalize_form_payloads": True,
         "render_manual_builder_form_schema": True,
         "preview_tddl_source": True,
+        "signal_payload_json_safe": True,
         "route_to_foundry": True,
         "join_builder_preview_evidence_review": True,
         "render_visual_quality_review": True,
@@ -529,13 +530,24 @@ def _layout_metrics(fields: Sequence[StudioFormField], *, source: str) -> Mappin
 
 
 def _serializable_payload(payload: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Return a recursively signal-safe, JSON-friendly form payload copy."""
+
     clean: dict[str, Any] = {}
     for key, value in payload.items():
-        if isinstance(value, (list, tuple)):
-            clean[str(key)] = tuple(str(item) for item in value)
-        else:
-            clean[str(key)] = value
+        clean[str(key)] = _signal_safe_value(value)
     return clean
+
+
+def _signal_safe_value(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, Mapping):
+        return {str(key): _signal_safe_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return tuple(_signal_safe_value(item) for item in value)
+    if isinstance(value, set):
+        return tuple(sorted(str(item) for item in value))
+    return str(value)
 
 
 def _as_text(value: Any, name: str) -> str:

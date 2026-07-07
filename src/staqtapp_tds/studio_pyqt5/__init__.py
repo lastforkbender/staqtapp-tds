@@ -1,8 +1,9 @@
-"""v3.1.20 Driver Studio PyQt5 cockpit shell, live runtime, review workflow console, evidence timeline, risk intelligence cards, manual builder UI runtime, export/audit console, and export integrity workflow.
+"""v3.1.23 Driver Studio PyQt5 cockpit shell and operational stress scenario surfaces.
 
 The package is import-safe without PyQt5. Headless tests and services can use
 ``StudioQtBridge`` and related view models; GUI launchers can construct
-``DriverStudioMainWindow`` only when PyQt5 is installed.
+``DriverStudioMainWindow`` only when PyQt5 is installed. The live runtime remains
+bounded and observe-only, with explicit retention-gap reporting, operational stress evidence, and scenario-matrix coverage for GUI/browser polling.
 """
 from __future__ import annotations
 
@@ -18,6 +19,7 @@ from .risk_intelligence import StudioRiskIntelligenceBand, StudioRiskIntelligenc
 from .manual_builder_runtime import StudioManualBuilderJoin, StudioManualBuilderRuntimeState, StudioManualBuilderRuntimeStatus, StudioManualBuilderRuntimeStep, StudioManualBuilderUIRuntime, StudioQtVisualQualityReport, StudioQtVisualQualityRule, studio_manual_builder_ui_runtime_capability_matrix, studio_qt_visual_quality_capability_matrix, studio_qt_visual_quality_review
 from .export_audit import StudioExportAuditChecklist, StudioExportAuditConsole, StudioExportAuditConsoleState, StudioExportAuditIntegrityItem, StudioExportAuditManifest, StudioExportAuditPacketPreview, StudioExportAuditReadinessCard, StudioExportAuditStatus, studio_export_audit_capability_matrix
 from .export_integrity_workflow import StudioExportIntegrityCheckpoint, StudioExportIntegrityCheckpointStatus, StudioExportIntegrityManifestComparison, StudioExportIntegrityReviewGate, StudioExportIntegrityWorkflow, StudioExportIntegrityWorkflowState, StudioExportIntegrityWorkflowStatus, studio_export_integrity_workflow_capability_matrix
+from .operational_stress import DEFAULT_OPERATIONAL_STRESS_SCENARIOS, StudioOperationalStressHarness, StudioOperationalStressObservation, StudioOperationalStressReport, StudioOperationalStressScenario, StudioOperationalStressScenarioMatrix, StudioOperationalStressScenarioResult, StudioOperationalStressStatus, studio_operational_stress_capability_matrix
 from .icons import STUDIO_SVG_ICONS, studio_svg_icon
 from .main_window import DriverStudioMainWindow, create_driver_studio_window
 from .panels import STUDIO_PANEL_DESCRIPTORS, StudioPanelDescriptor, panel_descriptor
@@ -86,6 +88,15 @@ __all__ = [
     "StudioExportIntegrityWorkflowState",
     "StudioExportIntegrityWorkflowStatus",
     "studio_export_integrity_workflow_capability_matrix",
+    "DEFAULT_OPERATIONAL_STRESS_SCENARIOS",
+    "StudioOperationalStressHarness",
+    "StudioOperationalStressObservation",
+    "StudioOperationalStressReport",
+    "StudioOperationalStressScenario",
+    "StudioOperationalStressScenarioMatrix",
+    "StudioOperationalStressScenarioResult",
+    "StudioOperationalStressStatus",
+    "studio_operational_stress_capability_matrix",
     "StudioManualBuilderJoin",
     "StudioManualBuilderRuntimeState",
     "StudioManualBuilderRuntimeStatus",

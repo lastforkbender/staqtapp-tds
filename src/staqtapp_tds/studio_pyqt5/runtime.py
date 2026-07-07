@@ -129,6 +129,9 @@ class StudioPanelRuntimeState:
     refresh_packets: tuple[StudioPanelRefreshPacket, ...]
     live_state: StudioLiveCockpitState
     capability_matrix: Mapping[str, bool]
+    event_retention_gap: bool = False
+    dropped_event_count: int = 0
+    runtime_warnings: tuple[str, ...] = ()
 
     @property
     def dirty_panel_kinds(self) -> tuple[StudioPanelKind, ...]:
@@ -159,6 +162,9 @@ class StudioPanelRuntimeState:
             "bundle_hash": self.selection.bundle_hash,
             "console_hash": self.selection.console_hash,
             "event_count": len(self.events),
+            "event_retention_gap": self.event_retention_gap,
+            "dropped_event_count": self.dropped_event_count,
+            "runtime_warnings": self.runtime_warnings,
             "dirty_panel_kinds": tuple(kind.value for kind in self.dirty_panel_kinds),
             "refresh_packet_count": len(self.refresh_packets),
             "refresh_packets": tuple(packet.signal_payload() for packet in self.refresh_packets),
@@ -211,6 +217,8 @@ class StudioLivePanelRuntime:
                 "event_to_panel_routing": True,
                 "selection_aware_panel_refresh": True,
                 "consume_incremental_events": True,
+                "detect_event_retention_gap": True,
+                "runtime_warning_payloads": True,
                 "live_runtime_mutates_backend": False,
                 "submit_candidate": False,
                 "approve_driver": False,
@@ -235,6 +243,7 @@ class StudioLivePanelRuntime:
 
         live_state = self.event_bridge.current_state()
         events = live_state.events_since(self._last_consumed_cursor)
+        retention_gap = live_state.has_retention_gap_since(self._last_consumed_cursor)
         dirty = self.plan_refresh(events)
         packets = self.refresh_packets(dirty, live_state=live_state) if include_packets else ()
         return StudioPanelRuntimeState(
@@ -247,6 +256,9 @@ class StudioLivePanelRuntime:
             refresh_packets=packets,
             live_state=live_state,
             capability_matrix=self.capability_matrix(),
+            event_retention_gap=retention_gap,
+            dropped_event_count=live_state.dropped_event_count,
+            runtime_warnings=_runtime_warnings(retention_gap=retention_gap),
         )
 
     def consume(self, *, include_packets: bool = True) -> StudioPanelRuntimeState:
@@ -282,6 +294,7 @@ class StudioLivePanelRuntime:
             for contract in self.contracts
         )
         packets = self.refresh_packets(dirty, live_state=live_state)
+        retention_gap = live_state.has_retention_gap_since(self._last_consumed_cursor)
         state = StudioPanelRuntimeState(
             generation=live_state.generation,
             cursor=live_state.cursor,
@@ -292,6 +305,9 @@ class StudioLivePanelRuntime:
             refresh_packets=packets,
             live_state=live_state,
             capability_matrix=self.capability_matrix(),
+            event_retention_gap=retention_gap,
+            dropped_event_count=live_state.dropped_event_count,
+            runtime_warnings=_runtime_warnings(retention_gap=retention_gap),
         )
         self._last_consumed_cursor = state.cursor
         return state
@@ -415,14 +431,6 @@ class StudioLivePanelRuntime:
 
         return StudioRiskIntelligenceCards(runtime=self)
 
-
-    def manual_builder_ui_runtime(self):
-        """Create a v3.1.18 Manual Builder UI Runtime on this live runtime."""
-
-        from .manual_builder_runtime import StudioManualBuilderUIRuntime
-
-        return StudioManualBuilderUIRuntime(bridge=self.event_bridge.bridge)
-
     def visual_quality_review(self):
         """Run the v3.1.18 static PyQt5 cockpit visual-quality review."""
 
@@ -470,6 +478,12 @@ class StudioLivePanelRuntime:
         from .export_integrity_workflow import StudioExportIntegrityWorkflow
 
         return StudioExportIntegrityWorkflow(runtime=self)
+
+
+def _runtime_warnings(*, retention_gap: bool) -> tuple[str, ...]:
+    if not retention_gap:
+        return ()
+    return ("live event retention gap detected; older events were dropped before runtime consumption",)
 
 
 def studio_live_panel_runtime_capability_matrix() -> Mapping[str, bool]:

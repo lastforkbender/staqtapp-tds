@@ -110,6 +110,14 @@ class StudioLiveCockpitState:
     events: tuple[StudioLiveEvent, ...]
     refresh_contracts: tuple[StudioPanelRefreshContract, ...]
     capability_matrix: Mapping[str, bool]
+    retained_cursor_floor: int = 0
+    dropped_event_count: int = 0
+
+    @property
+    def event_retention_gap(self) -> bool:
+        """Whether the retained stream has dropped earlier live events."""
+
+        return self.dropped_event_count > 0
 
     @property
     def latest_event_id(self) -> str | None:
@@ -119,9 +127,16 @@ class StudioLiveCockpitState:
         return self.hydrated.panel(kind)
 
     def events_since(self, cursor: int) -> tuple[StudioLiveEvent, ...]:
-        """Return events with monotonically increasing sequence above cursor."""
+        """Return retained events with sequence numbers above ``cursor``."""
 
         return tuple(event for event in self.events if _event_sequence(event.event_id) > int(cursor))
+
+    def has_retention_gap_since(self, cursor: int) -> bool:
+        """Return True when older events were dropped before ``cursor`` caught up."""
+
+        if not self.events:
+            return False
+        return int(cursor) < self.retained_cursor_floor - 1
 
     def signal_payload(self) -> Mapping[str, Any]:
         """Return JSON-friendly payload data for Qt signal emission."""
@@ -137,6 +152,9 @@ class StudioLiveCockpitState:
             "console_hash": self.selection.console_hash,
             "event_count": len(self.events),
             "latest_event_id": self.latest_event_id,
+            "retained_cursor_floor": self.retained_cursor_floor,
+            "dropped_event_count": self.dropped_event_count,
+            "event_retention_gap": self.event_retention_gap,
             "panel_status": {panel.kind.value: panel.status for panel in self.hydrated.panels},
             "capability_matrix": dict(self.capability_matrix),
         }
@@ -158,6 +176,7 @@ class StudioCockpitEventBridge:
         self._events: deque[StudioLiveEvent] = deque(maxlen=self.max_events)
         self._sequence = 0
         self._generation = 0
+        self._dropped_event_count = 0
 
     @property
     def generation(self) -> int:
@@ -170,6 +189,16 @@ class StudioCockpitEventBridge:
     @property
     def events(self) -> tuple[StudioLiveEvent, ...]:
         return tuple(self._events)
+
+    @property
+    def dropped_event_count(self) -> int:
+        return self._dropped_event_count
+
+    @property
+    def retained_cursor_floor(self) -> int:
+        if not self._events:
+            return self._sequence
+        return _event_sequence(self._events[0].event_id)
 
     def capability_matrix(self) -> Mapping[str, bool]:
         """Return live-bridge capabilities and denied authority."""
@@ -189,6 +218,8 @@ class StudioCockpitEventBridge:
                 "export_audit_console_refresh_contracts": True,
                 "export_integrity_workflow_state": True,
                 "safe_polling_bridge": True,
+                "detect_event_retention_gap": True,
+                "event_stream_drop_accounting": True,
                 "live_bridge_mutates_backend": False,
                 "submit_candidate": False,
                 "approve_driver": False,
@@ -225,6 +256,8 @@ class StudioCockpitEventBridge:
             events=tuple(self._events),
             refresh_contracts=studio_panel_refresh_contracts(),
             capability_matrix=self.capability_matrix(),
+            retained_cursor_floor=self.retained_cursor_floor,
+            dropped_event_count=self._dropped_event_count,
         )
 
     def refresh(self, *, reason: str = "manual refresh", timestamp: str = "undated") -> StudioLiveCockpitState:
@@ -397,6 +430,8 @@ class StudioCockpitEventBridge:
         console_hash: str | None,
         payload: Mapping[str, Any] | None = None,
     ) -> StudioLiveEvent:
+        if len(self._events) == self.max_events:
+            self._dropped_event_count += 1
         self._sequence += 1
         self._generation += 1
         event = StudioLiveEvent(

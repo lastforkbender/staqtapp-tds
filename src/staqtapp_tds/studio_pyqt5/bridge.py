@@ -278,13 +278,6 @@ class StudioQtBridge:
         return StudioExportIntegrityWorkflow(runtime=self.live_panel_runtime(max_events=max_events))
 
 
-    def manual_builder_ui_runtime(self):
-        """Create a v3.1.18 Manual Builder UI Runtime around this bridge."""
-
-        from .manual_builder_runtime import StudioManualBuilderUIRuntime
-
-        return StudioManualBuilderUIRuntime(bridge=self)
-
     def visual_quality_review(self):
         """Run the v3.1.18 static PyQt5 cockpit visual-quality review."""
 
