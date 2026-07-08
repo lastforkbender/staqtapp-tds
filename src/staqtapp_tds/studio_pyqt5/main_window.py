@@ -37,9 +37,14 @@ if QtWidgets is not None:  # pragma: no cover - optional GUI path.
             self.theme = theme or DEFAULT_STUDIO_QT_THEME
             self.manual_builder_runtime = self.bridge.manual_builder_ui_runtime()
             self.setWindowTitle("Staqtapp-TDS Driver Studio")
-            self.setMinimumSize(1440, 900)
+            self.setMinimumSize(1280, 800)
             self.resize(1560, 960)
             self.setStyleSheet(self.theme.stylesheet())
+            self.setDockOptions(
+                QtWidgets.QMainWindow.AllowNestedDocks
+                | QtWidgets.QMainWindow.AllowTabbedDocks
+                | QtWidgets.QMainWindow.AnimatedDocks
+            )
             self._panels: dict[StudioPanelKind, Any] = {}
             self._build_shell()
             self.refresh_state(self.bridge.shell_state())
@@ -47,8 +52,8 @@ if QtWidgets is not None:  # pragma: no cover - optional GUI path.
         def _build_shell(self) -> None:
             central = QtWidgets.QWidget()
             layout = QtWidgets.QVBoxLayout(central)
-            layout.setContentsMargins(14, 12, 14, 10)
-            layout.setSpacing(8)
+            layout.setContentsMargins(16, 14, 16, 12)
+            layout.setSpacing(10)
             header = QtWidgets.QLabel("Driver Studio Cockpit Shell")
             header.setObjectName("PanelTitle")
             self.status_label = QtWidgets.QLabel("No evidence bundle loaded")
@@ -61,7 +66,8 @@ if QtWidgets is not None:  # pragma: no cover - optional GUI path.
             for kind in StudioPanelKind:
                 dock = QtWidgets.QDockWidget(kind.value.replace("_", " ").title(), self)
                 dock.setObjectName(f"StudioDock_{kind.value}")
-                dock.setMinimumWidth(360 if kind is not StudioPanelKind.MANUAL_DRIVER_BUILDER else 520)
+                dock.setMinimumWidth(340 if kind is not StudioPanelKind.MANUAL_DRIVER_BUILDER else 560)
+                dock.setMinimumHeight(220)
                 dock.setFeatures(
                     QtWidgets.QDockWidget.DockWidgetMovable
                     | QtWidgets.QDockWidget.DockWidgetFloatable
@@ -115,8 +121,8 @@ if QtWidgets is not None:  # pragma: no cover - optional GUI path.
             self.kind = kind
             self.setObjectName("StudioPanel")
             layout = QtWidgets.QVBoxLayout(self)
-            layout.setContentsMargins(12, 12, 12, 12)
-            layout.setSpacing(8)
+            layout.setContentsMargins(14, 14, 14, 14)
+            layout.setSpacing(9)
             self.title = QtWidgets.QLabel(kind.value.replace("_", " ").title())
             self.title.setObjectName("PanelTitle")
             self.title.setWordWrap(True)
@@ -124,6 +130,7 @@ if QtWidgets is not None:  # pragma: no cover - optional GUI path.
             self.summary.setObjectName("PanelSummary")
             self.summary.setWordWrap(True)
             self.body = QtWidgets.QTextEdit()
+            self.body.setMinimumHeight(180)
             self.body.setReadOnly(True)
             self.body.setLineWrapMode(QtWidgets.QTextEdit.WidgetWidth)
             layout.addWidget(self.title)
@@ -163,8 +170,8 @@ if QtWidgets is not None:  # pragma: no cover - optional GUI path.
 
         def _build(self) -> None:
             outer = QtWidgets.QVBoxLayout(self)
-            outer.setContentsMargins(12, 12, 12, 12)
-            outer.setSpacing(8)
+            outer.setContentsMargins(14, 14, 14, 14)
+            outer.setSpacing(10)
             title = QtWidgets.QLabel("Manual Driver Builder")
             title.setObjectName("PanelTitle")
             title.setWordWrap(True)
@@ -180,11 +187,11 @@ if QtWidgets is not None:  # pragma: no cover - optional GUI path.
 
             self.form_scroll = QtWidgets.QScrollArea()
             self.form_scroll.setWidgetResizable(True)
-            self.form_scroll.setMinimumWidth(460)
+            self.form_scroll.setMinimumWidth(440)
             form_host = QtWidgets.QWidget()
             form_layout = QtWidgets.QVBoxLayout(form_host)
-            form_layout.setContentsMargins(6, 6, 10, 6)
-            form_layout.setSpacing(10)
+            form_layout.setContentsMargins(6, 6, 12, 6)
+            form_layout.setSpacing(12)
             core_box = QtWidgets.QGroupBox("Core Proposal Fields")
             advanced_box = QtWidgets.QGroupBox("Advanced Search / Extraction Fields")
             core_form = QtWidgets.QFormLayout(core_box)
@@ -194,7 +201,8 @@ if QtWidgets is not None:  # pragma: no cover - optional GUI path.
                 form.setFormAlignment(QtCore.Qt.AlignTop)
                 form.setFieldGrowthPolicy(QtWidgets.QFormLayout.ExpandingFieldsGrow)
                 form.setRowWrapPolicy(QtWidgets.QFormLayout.WrapLongRows)
-                form.setVerticalSpacing(8)
+                form.setVerticalSpacing(10)
+                form.setHorizontalSpacing(14)
             for field in self.runtime.form_fields():
                 row = self._field_row(field)
                 target = core_form if field.name in _CORE_FIELD_NAMES else advanced_form
@@ -207,17 +215,19 @@ if QtWidgets is not None:  # pragma: no cover - optional GUI path.
 
             right = QtWidgets.QWidget()
             right_layout = QtWidgets.QVBoxLayout(right)
-            right_layout.setContentsMargins(10, 6, 6, 6)
-            right_layout.setSpacing(8)
+            right_layout.setContentsMargins(12, 6, 6, 6)
+            right_layout.setSpacing(10)
             self.preview_text = QtWidgets.QPlainTextEdit()
+            self.preview_text.setObjectName("ManualBuilderPreview")
             self.preview_text.setReadOnly(True)
             self.preview_text.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
-            self.preview_text.setMinimumWidth(520)
+            self.preview_text.setMinimumWidth(500)
             self.preview_text.setPlaceholderText("Previewed deterministic TDDL appears here.")
             self.status = QtWidgets.QTextEdit()
             self.status.setReadOnly(True)
             self.status.setLineWrapMode(QtWidgets.QTextEdit.WidgetWidth)
             self.status.setMaximumHeight(170)
+            self.status.setMinimumHeight(120)
             button_row = QtWidgets.QHBoxLayout()
             self.preview_button = QtWidgets.QPushButton("Preview TDDL")
             self.propose_button = QtWidgets.QPushButton("Route to Foundry")
@@ -230,11 +240,14 @@ if QtWidgets is not None:  # pragma: no cover - optional GUI path.
             right_layout.addWidget(self.preview_text, stretch=2)
             right_layout.addWidget(self.status, stretch=0)
             splitter.addWidget(right)
-            splitter.setSizes([520, 760])
+            splitter.setStretchFactor(0, 1)
+            splitter.setStretchFactor(1, 2)
+            splitter.setSizes([540, 820])
 
         def _field_row(self, field: StudioFormField) -> tuple[Any, Any]:
             label = QtWidgets.QLabel(field.label + (" *" if field.required else ""))
             label.setWordWrap(True)
+            label.setMinimumWidth(128)
             wrapper = QtWidgets.QWidget()
             layout = QtWidgets.QVBoxLayout(wrapper)
             layout.setContentsMargins(0, 0, 0, 0)
@@ -281,7 +294,7 @@ if QtWidgets is not None:  # pragma: no cover - optional GUI path.
                 widget.setPlainText(str(field.default))
                 return widget
             widget = QtWidgets.QLineEdit(str(field.default))
-            widget.setMinimumWidth(260)
+            widget.setMinimumWidth(240)
             return widget
 
         def _values(self) -> Mapping[str, Any]:

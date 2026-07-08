@@ -1,9 +1,9 @@
-"""v3.1.23 Driver Studio PyQt5 cockpit shell and operational stress scenario surfaces.
+"""v3.1.25 Driver Studio PyQt5 cockpit shell and visual hardening surfaces.
 
 The package is import-safe without PyQt5. Headless tests and services can use
 ``StudioQtBridge`` and related view models; GUI launchers can construct
 ``DriverStudioMainWindow`` only when PyQt5 is installed. The live runtime remains
-bounded and observe-only, with explicit retention-gap reporting, operational stress evidence, and scenario-matrix coverage for GUI/browser polling.
+bounded and observe-only, with explicit retention-gap reporting, operational stress evidence, scenario-matrix coverage, and visual consistency hardening for GUI/browser polling.
 """
 from __future__ import annotations
 

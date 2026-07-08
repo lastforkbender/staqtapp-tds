@@ -54,10 +54,16 @@ class StudioQtTheme:
         QWidget {{ background: {self.background}; color: {self.text_primary}; font-family: Inter, Segoe UI, Arial; font-size: {self.body_font_px}px; }}
         QDockWidget {{ titlebar-close-icon: none; titlebar-normal-icon: none; color: {self.text_primary}; }}
         QDockWidget::title {{ background: {self.panel_raised}; padding: 6px; border: 1px solid {self.border}; }}
-        QFrame#StudioPanel {{ background: {self.panel_background}; border: 1px solid {self.border}; border-radius: 10px; }}
-        QLabel#PanelTitle {{ color: {self.text_primary}; font-size: {self.title_font_px}px; font-weight: 700; }}
-        QLabel#PanelSummary {{ color: {self.text_secondary}; font-size: {self.summary_font_px}px; }}
-        QPushButton {{ background: {self.panel_raised}; border: 1px solid {self.border}; border-radius: 6px; padding: 6px 10px; }}
+        QFrame#StudioPanel, QFrame#ManualBuilderPanel {{ background: {self.panel_background}; border: 1px solid {self.border}; border-radius: 10px; }}
+        QLabel {{ background: transparent; }}
+        QLabel#PanelTitle {{ color: {self.text_primary}; font-size: {self.title_font_px}px; font-weight: 700; padding-bottom: 2px; }}
+        QLabel#PanelSummary, QLabel#FieldHelp {{ color: {self.text_secondary}; font-size: {self.summary_font_px}px; line-height: 1.35; }}
+        QGroupBox {{ border: 1px solid {self.border}; border-radius: 8px; margin-top: 12px; padding: 12px 8px 8px 8px; color: {self.text_primary}; font-weight: 700; }}
+        QGroupBox::title {{ subcontrol-origin: margin; left: 10px; padding: 0 4px; color: {self.telemetry_blue}; }}
+        QScrollArea {{ border: 0; background: transparent; }}
+        QScrollBar:vertical {{ background: {self.background}; width: 10px; margin: 0; }}
+        QScrollBar::handle:vertical {{ background: {self.border}; border-radius: 5px; min-height: 28px; }}
+        QPushButton {{ background: {self.panel_raised}; border: 1px solid {self.border}; border-radius: 6px; padding: 7px 12px; min-height: 30px; }}
         QPushButton:hover {{ border-color: {self.telemetry_blue}; }}
         QPushButton#ApproveAction {{ border-color: {self.telemetry_blue}; }}
         QPushButton#HoldAction {{ border-color: {self.telemetry_orange}; }}
@@ -65,9 +71,10 @@ class StudioQtTheme:
         QPushButton#QuarantineAction {{ border-color: {self.telemetry_purple}; }}
         QTableWidget {{ background: {self.panel_background}; gridline-color: {self.border}; alternate-background-color: {self.panel_raised}; }}
         QHeaderView::section {{ background: {self.panel_raised}; color: {self.text_secondary}; border: 1px solid {self.border}; padding: 4px; }}
-        QTextEdit {{ background: {self.panel_background}; border: 1px solid {self.border}; border-radius: 8px; font-size: {self.monospace_font_px}px; }}
-        QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {{ min-height: 28px; padding: 4px 6px; border: 1px solid {self.border}; border-radius: 6px; background: {self.panel_raised}; }}
-        QTextEdit#ManualBuilderSource {{ min-height: 220px; }}
+        QTextEdit, QPlainTextEdit {{ background: {self.panel_background}; border: 1px solid {self.border}; border-radius: 8px; font-size: {self.monospace_font_px}px; padding: 6px; selection-background-color: {self.telemetry_purple}; }}
+        QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {{ min-height: 30px; padding: 4px 7px; border: 1px solid {self.border}; border-radius: 6px; background: {self.panel_raised}; }}
+        QCheckBox {{ spacing: 8px; }}
+        QTextEdit#ManualBuilderSource, QPlainTextEdit#ManualBuilderPreview {{ min-height: 220px; }}
         """.strip()
 
 
