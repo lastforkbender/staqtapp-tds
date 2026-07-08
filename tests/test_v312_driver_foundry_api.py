@@ -105,7 +105,7 @@ RECORDS = [
 
 
 def test_v312_version():
-    assert __version__ == "3.1.23"
+    assert __version__ == "3.1.25"
 
 
 def test_foundry_capability_matrix_denies_trust_authority():

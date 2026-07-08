@@ -7,7 +7,7 @@ from staqtapp_tds.admin.panel import AdminPanelServer, render_dashboard_html
 
 
 def test_v274_version():
-    assert __version__ == "3.1.23"
+    assert __version__ == "3.1.25"
 
 
 def test_recovery_planner_generates_advisory_actions_from_pressure_snapshot():
