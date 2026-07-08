@@ -146,3 +146,29 @@ body{
 .spiral-rank-spark i::after{font-size:9px;color:#dfe8ff;opacity:.72}
 @media(max-width:1180px){.spiral-rank-page{grid-template-columns:1fr}.spiral-rank-card{grid-row:auto}}
 @media(max-width:680px){.spiral-rank-summary{grid-template-columns:1fr}.spiral-rank-page .telemetry-kv p{grid-template-columns:1fr}.spiral-rank-page .telemetry-kv b{justify-content:flex-start;text-align:left}.spiral-rank-page .bar{max-width:140px}}
+
+/* v3.1.25 browser visual consistency hardening */
+.app-shell{grid-template-columns:248px minmax(0,1fr)}
+.sidebar{display:flex;flex-direction:column;height:100vh;overflow:hidden;min-width:0}
+.brand-block{flex:0 0 auto;min-width:0}
+.diagnostic-nav{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:0 4px 12px 0;scrollbar-width:thin}
+.nav-pill{width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 0 auto}
+.nav-pill img{flex:0 0 auto}.nav-pill span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.side-card{position:static;left:auto;right:auto;bottom:auto;flex:0 0 auto;margin-top:12px;max-width:100%}
+.side-card,.side-card *{min-width:0}.mini-stat{gap:8px}.mini-stat span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mini-stat b{text-align:right;white-space:nowrap}
+.hero-card{grid-template-columns:minmax(0,1fr) minmax(230px,280px);overflow:hidden}.hero-orbit{justify-self:center;align-self:center;width:min(100%,260px);min-height:196px;overflow:visible}.hero-orbit:before{inset:30px}.node-ai{width:62px;height:62px;left:34px;top:70px}.node-tds{width:78px;height:78px;left:108px;top:54px}.node-index{width:52px;height:52px;left:24px;top:30px}.node-store{width:56px;height:56px;right:28px;bottom:32px}
+.arch-map{grid-template-columns:repeat(6,minmax(0,1fr));overflow:hidden}.arch-node{min-width:0}.arch-node:after{right:-9px;width:8px}.arch-node b,.arch-node small{max-width:100%;overflow-wrap:anywhere}
+.workload-wrap{grid-template-columns:minmax(128px,156px) minmax(0,1fr);gap:12px}.donut{width:156px;height:156px;max-width:100%}.donut span{width:108px;height:108px}.legend{min-width:0}.legend p{gap:8px;min-width:0}.legend b{white-space:nowrap}.legend i{flex:0 0 auto}
+.panel-card,.metric-card,.architecture-card,.config-card,.timeline-card{overflow:hidden}.kv-list b{min-width:0;overflow-wrap:anywhere}.topbar,.top-actions{min-width:0}.chip,.api-link{max-width:100%;min-width:0}.section-head{min-width:0}.section-head>*{min-width:0}
+@media(max-width:1440px){.dashboard-grid,.quad-grid,.lower-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.hero-grid{grid-template-columns:1fr}.hero-card{grid-template-columns:1fr}.hero-orbit{display:none}.metric-row{grid-template-columns:repeat(3,minmax(0,1fr))}.arch-map{grid-template-columns:repeat(3,minmax(0,1fr))}.arch-node:after{display:none}}
+@media(max-width:1180px){.app-shell{grid-template-columns:82px minmax(0,1fr)}.sidebar{overflow:visible}.diagnostic-nav{overflow:visible;padding-right:0}.side-card{display:none}.nav-pill{height:34px;min-height:34px}.nav-pill span{display:none}}
+@media(max-width:760px){.app-shell{display:block}.sidebar{height:auto;overflow:visible}.diagnostic-nav{overflow:visible}.nav-pill{font-size:13px;white-space:normal;height:auto;min-height:34px}.nav-pill span{display:inline;white-space:normal}.metric-row,.dashboard-grid,.quad-grid,.lower-grid,.console-page-grid,.pressure-diagnostics-page{grid-template-columns:1fr}.arch-map{grid-template-columns:1fr}}
+
+/* v3.1.25 visual QA closure: strict containment pass */
+.sidebar{display:grid;grid-template-rows:auto minmax(0,1fr) auto;row-gap:10px;align-content:stretch}
+.diagnostic-nav{height:100%;max-height:none}
+.arch-node:after{display:none}
+.hero-orbit{min-height:216px;width:min(100%,270px)}
+.workload-wrap{grid-template-columns:minmax(118px,150px) minmax(0,1fr);gap:10px;overflow:hidden}.donut{width:150px;height:150px}.donut span{width:104px;height:104px}
+.legend p{overflow:hidden}.legend p span,.legend p b{min-width:0}
+@media(max-width:1180px){.sidebar{display:flex}.diagnostic-nav{height:auto}}
