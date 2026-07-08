@@ -1,3 +1,20 @@
+## 3.1.25 - Browser & Studio Visual Consistency Hardening
+
+- Added final-order Browser visual QA CSS rules for sidebar, navigation, panel, workload, hero-orbit, architecture-map, and compact desktop containment.
+- Moved the sidebar control-plane card out of absolute positioning and into normal flex flow to prevent nav/card overlap.
+- Restored compact desktop 2-column dashboard behavior after later CSS overrides and added 1280×800-safe telemetry page rendering rules.
+- Added `docs/screenshots/tds_browser_telemetry_overview_1280x800.png` and embedded it near the top of README.md / README_ja.md for GitHub rendering.
+- Improved optional PyQt5 Driver Studio visual consistency through safer minimum window sizing, dock layout behavior, panel minimums, group-box/help-label styling, and Manual Builder split/scroll containment.
+- Preserved Browser and Studio authority boundaries: no storage ownership, Registry trust mutation, driver approval/signing/activation, private-key storage, trusted VM authority execution, or policy bypass.
+
+Validation:
+
+```text
+393 passed, 11 skipped
+release check passed
+```
+
+
 ## 3.1.23 - Driver Studio Stress Scenario Matrix
 
 - Extended `staqtapp_tds.studio_pyqt5.operational_stress` with named stress scenarios and a default scenario matrix.
