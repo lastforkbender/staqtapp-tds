@@ -172,3 +172,12 @@ body{
 .workload-wrap{grid-template-columns:minmax(118px,150px) minmax(0,1fr);gap:10px;overflow:hidden}.donut{width:150px;height:150px}.donut span{width:104px;height:104px}
 .legend p{overflow:hidden}.legend p span,.legend p b{min-width:0}
 @media(max-width:1180px){.sidebar{display:flex}.diagnostic-nav{height:auto}}
+
+
+/* v3.1.25 screenshot QA closure: namespace and compact telemetry rendering */
+.namespace-row{grid-template-columns:minmax(154px,170px) minmax(70px,1fr) minmax(38px,max-content)}
+.namespace-row span{max-width:24ch}
+.namespace-row b{white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
+.comparison-tile b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal;font-variant-numeric:tabular-nums}
+#tds-language-select:invalid,#tds-language-select option:empty{color:#dbe7ff}
+@media(max-width:760px){.namespace-row{grid-template-columns:minmax(130px,1fr) minmax(56px,.7fr) minmax(36px,max-content)}.namespace-row span{max-width:24ch}}
