@@ -1,6 +1,6 @@
-# 🟦🟪🟧 Staqtapp-TDS v3.1.25
+# 🟦🟪🟧 Staqtapp-TDS v3.1.26
 
-[日本語版 / Japanese README](README_ja.md) · [API Surface Reference PDF](tds_api_docs/Staqtapp_TDS_v3_1_25_API_Surface_Reference.pdf)
+[日本語版 / Japanese README](README_ja.md) · [API Surface Reference PDF](tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf)
 
 <p align="center">
   <img src="docs/screenshots/tds_browser_telemetry_overview_1280x800.png" alt="Staqtapp-TDS Browser telemetry dashboard overview" width="100%">
@@ -8,9 +8,27 @@
 
 <p align="center"><em>Browser Operations Console — full telemetry-page overview captured at 1280×800.</em></p>
 
+## v3.1.26 Storage Engine Hardening for CSV / *stacked-app* Preparation
+
+TDS v3.1.26 promotes the storage-engine hardening patch into the repository version line. The code-level storage patch is the same hardened engine already applied in the previous package; this release updates the repository version and README surfaces so the hardened storage baseline is clearly named before unique CSV features and future *stacked-app* features build on it.
+
+The goal is simple: before CSV-oriented workflows or stacked application layers trust `.tds` persistence as a coordination substrate, the storage engine must reject ambiguous files, preserve payload identity, and keep sidecar metadata tied to the exact data snapshot it describes.
+
+Hardening conditions now covered:
+
+- malformed slot-index tails fail closed instead of exposing partial keys;
+- invalid slot counts, bad index offsets, EOF-overrun geometry, duplicate slot names, bad UTF-8 names, bad name hashes, and trailing index bytes are rejected;
+- compressed persisted payloads honor the stored entry codec instead of depending on the current process default codec;
+- sidecar metadata is generated from the same frozen data snapshot as the `.tds` file;
+- sidecar `content_hash` values are enforced on read, so altered payload bytes return a typed integrity result instead of a valid-looking mutated value;
+- JSON/text/raw durable values are frozen at write time so caller mutation before flush cannot alter persisted output;
+- sidecar writes use write-all, fsync, atomic replace, and parent-directory fsync for stronger durability.
+
+This hardening is intentionally concentrated at storage boundaries: open/load validation, persisted read integrity, snapshot generation, and flush durability. The native C storage/index hot path remains performance-preserved; the extra work appears where correctness requires it, not inside normal native lookup behavior.
+
 ## v3.1.25 Browser & Studio Visual Consistency Hardening
 
-Staqtapp(stacked-app) TDS v3.1.25 hardens the Browser dashboard and optional PyQt5 Driver Studio shell for visual consistency before the next persistence/edit-safety reliability layer.
+TDS v3.1.25 hardens the Browser dashboard and optional PyQt5 Driver Studio shell for visual consistency before the next persistence/edit-safety reliability layer.
 
 The Browser stylesheet now keeps the sidebar control-plane card in normal flow, gives the long navigation list its own contained scroll region, restores compact-desktop grid breakpoints after later CSS overrides, reduces workload-card width pressure, contains architecture connector rails, and bounds hero-orbit placement so panels do not overlap or overhang at 1560×960, 1440×900, or 1280×800 screenshot sizes.
 
@@ -65,14 +83,29 @@ Explicit DriverVMPerformanceHarness.run_package(...)
 ## Current validation status
 
 ```text
-393 passed, 11 skipped
-release check passed
+storage hardening regression coverage passed
+selected native/storage checks passed
+source-clean release check passed
 ```
 
 ## Current active development track
 
-Driver Studio / Studio & Evidence subsystem, now focused on operational stress confidence, simultaneous Browser/Studio observation, named stress scenario evidence, bounded event-pressure visibility, and non-authoritative stress reporting.
+Storage engine hardening for reliable CSV feature preparation, *stacked-app* feature preparation, and continued Driver Studio / Browser observation confidence without widening authority.
 
+
+## v3.1.26 adds
+
+- repository version promotion to `3.1.26`
+- README / README_ja storage-hardening release notes
+- explicit CSV and *stacked-app* preparation language
+- documented fail-closed slot-index parsing behavior
+- documented reader geometry validation coverage
+- documented stored-codec stability for persisted compressed payloads
+- documented sidecar/data snapshot coupling
+- documented payload `content_hash` enforcement on read
+- documented frozen JSON/text/raw write semantics
+- documented durable sidecar write path
+- documented native C hot-path preservation
 
 ## v3.1.23 adds
 

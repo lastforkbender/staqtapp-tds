@@ -1,3 +1,12 @@
+## Storage Engine Hardening Pre-CVS Patch
+
+- Hardened `.tds` file geometry and slot-index parsing to fail closed on truncated or inconsistent index records.
+- Enforced sidecar payload content hashes on read with typed persistence integrity result codes.
+- Made compressed persistence codec-stable by carrying entry codec through writer, reader, and lazy-entry paths.
+- Coupled sidecar metadata generation to the same frozen snapshot used for the data block and added sidecar epoch/file-size checks.
+- Added sidecar write-all/fsync/atomic-replace durability symmetry and mutable JSON/text/raw write snapshot freezing.
+- Added focused storage-hardening regression coverage for the pre-CVS reliability layer.
+
 ## 3.1.25 - Browser & Studio Visual Consistency Hardening
 
 - Added final-order Browser visual QA CSS rules for sidebar, navigation, panel, workload, hero-orbit, architecture-map, and compact desktop containment.
