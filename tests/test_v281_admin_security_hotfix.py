@@ -38,7 +38,7 @@ def _post(port: int, path: str, payload: str, headers: dict[str, str] | None = N
 
 
 def test_v281_version():
-    assert __version__ == "3.1.25"
+    assert __version__ == "3.1.26"
 
 
 def test_v281_dashboard_embeds_csrf_token_meta():

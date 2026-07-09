@@ -11,7 +11,7 @@ from staqtapp_tds.studio_pyqt5 import (
 
 
 def test_v3122_version():
-    assert __version__ == "3.1.25"
+    assert __version__ == "3.1.26"
 
 
 def test_operational_stress_capability_matrix_preserves_authority_boundaries():
@@ -98,12 +98,12 @@ def test_operational_stress_reports_bounded_event_gap_as_expected_pressure_not_f
 
 def test_v3122_readme_links_api_pdf_and_english_japanese_readmes():
     root = Path(__file__).resolve().parents[1]
-    pdf = root / "tds_api_docs" / "Staqtapp_TDS_v3_1_25_API_Surface_Reference.pdf"
+    pdf = root / "tds_api_docs" / "Staqtapp_TDS_API_Surface_Reference.pdf"
     readme = (root / "README.md").read_text(encoding="utf-8")
     readme_ja = (root / "README_ja.md").read_text(encoding="utf-8")
 
     assert pdf.exists()
-    assert "tds_api_docs/Staqtapp_TDS_v3_1_25_API_Surface_Reference.pdf" in readme
-    assert "tds_api_docs/Staqtapp_TDS_v3_1_25_API_Surface_Reference.pdf" in readme_ja
+    assert "tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf" in readme
+    assert "tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf" in readme_ja
     assert "README_ja.md" in readme
     assert "README.md" in readme_ja

@@ -113,7 +113,7 @@ def _kinds(state: StudioPanelRuntimeState):
 
 
 def test_v3113_version():
-    assert __version__ == "3.1.25"
+    assert __version__ == "3.1.26"
 
 
 def test_live_panel_runtime_capability_matrix_has_no_authority():

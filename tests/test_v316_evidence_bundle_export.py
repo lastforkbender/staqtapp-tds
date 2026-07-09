@@ -100,7 +100,7 @@ def _approval_ready_batch(report):
 
 
 def test_v316_version():
-    assert __version__ == "3.1.25"
+    assert __version__ == "3.1.26"
 
 
 def test_evidence_export_capability_matrix_is_read_only_and_key_safe():
@@ -144,7 +144,7 @@ def test_exporter_freezes_batch_review_decision_and_fixture_replay_summary():
     assert bundle.bundle_hash.startswith("sha256:")
     assert bundle.bundle_id.startswith("tds-evidence-")
     assert bundle.manifest.schema == "tds.driver.evidence.bundle.v1"
-    assert bundle.manifest.tds_version == "3.1.25"
+    assert bundle.manifest.tds_version == "3.1.26"
     assert bundle.manifest.private_keys_included is False
     assert bundle.manifest.mutable_authority is False
     assert bundle.audit_trail.status is AuditTrailStatus.COMPLETE

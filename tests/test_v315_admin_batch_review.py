@@ -100,7 +100,7 @@ def _failed_report():
 
 
 def test_v315_version():
-    assert __version__ == "3.1.25"
+    assert __version__ == "3.1.26"
 
 
 def test_batch_review_capability_matrix_denies_signing_activation_execution_and_storage():
