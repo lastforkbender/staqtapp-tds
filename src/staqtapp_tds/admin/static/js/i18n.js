@@ -18,13 +18,23 @@
   const originalText = new WeakMap();
   const originalAttrs = new WeakMap();
 
+  function languageChoices(){
+    const source = Array.isArray(manifest.languages) && manifest.languages.length ? manifest.languages : FALLBACK_LANGUAGES;
+    const choices = source.filter((lang) => lang && lang.code);
+    return choices.length ? choices : FALLBACK_LANGUAGES;
+  }
+  function defaultLanguageCode(){
+    const choices = languageChoices();
+    const preferred = manifest.default || DEFAULTS.language;
+    return choices.some((lang) => lang.code === preferred) ? preferred : (choices[0] && choices[0].code) || DEFAULTS.language;
+  }
   function sanitizeSettings(settings){
     const clean = Object.assign({}, DEFAULTS, settings || {});
     const allowedRefresh = new Set([0,250,500,1000,2000,5000]);
     clean.refreshMs = Number(clean.refreshMs);
     if (!allowedRefresh.has(clean.refreshMs)) clean.refreshMs = DEFAULTS.refreshMs;
-    const codes = new Set((manifest.languages || FALLBACK_LANGUAGES).map((lang) => lang.code));
-    if (!codes.has(clean.language)) clean.language = manifest.default || 'en';
+    const codes = new Set(languageChoices().map((lang) => lang.code));
+    if (!codes.has(clean.language)) clean.language = defaultLanguageCode();
     return clean;
   }
   function loadSettings(){
@@ -32,8 +42,8 @@
     catch (_) { return Object.assign({}, DEFAULTS); }
   }
   function saveSettings(settings){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(sanitizeSettings(settings))); }
-  function currentLanguage(){ return loadSettings().language || manifest.default || 'en'; }
-  function packFor(code){ return packs[code] || packs.en || {}; }
+  function currentLanguage(){ return loadSettings().language || defaultLanguageCode(); }
+  function packFor(code){ return packs[code] || packs[defaultLanguageCode()] || packs.en || {}; }
   function translate(value, code){
     if (value === undefined || value === null) return value;
     const key = String(value).trim();
@@ -107,13 +117,18 @@
     if (!select) return;
     const settings = loadSettings();
     select.innerHTML = '';
-    (manifest.languages || FALLBACK_LANGUAGES).forEach((lang) => {
+    languageChoices().forEach((lang) => {
       const option = document.createElement('option');
+      const nativeName = lang.nativeName || lang.englishName || String(lang.code).toUpperCase();
+      const englishName = lang.englishName || nativeName;
       option.value = lang.code;
-      option.textContent = lang.nativeName === lang.englishName ? lang.nativeName : `${lang.nativeName} (${lang.englishName})`;
+      option.textContent = nativeName === englishName ? nativeName : `${nativeName} (${englishName})`;
       select.appendChild(option);
     });
     select.value = settings.language;
+    if (select.value !== settings.language) select.value = defaultLanguageCode();
+    if (!select.value && select.options.length) select.selectedIndex = 0;
+    select.dataset.currentLanguage = select.value || defaultLanguageCode();
     select.onchange = () => {
       const next = loadSettings();
       next.language = select.value;

@@ -12,6 +12,34 @@ const fmt = (value, fallback = 0) => {
   if (typeof value === 'number') return Number.isInteger(value) ? value.toLocaleString() : value.toFixed(value < 10 ? 2 : 1);
   return value;
 };
+const truncateText = (value, limit = 24) => {
+  const text = String(value ?? '');
+  if (text.length <= limit) return text;
+  return `${text.slice(0, Math.max(1, limit - 1))}…`;
+};
+const compactCount = (value, fallback = 0) => {
+  if (value === undefined || value === null || value === '') return String(fallback);
+  const n = Number(value);
+  if (!Number.isFinite(n)) return String(value);
+  const abs = Math.abs(n);
+  const scaled = (divisor, suffix) => {
+    const amount = n / divisor;
+    const digits = Math.abs(amount) >= 10 ? 1 : 2;
+    return `${Number(amount.toFixed(digits)).toLocaleString()}${suffix}`;
+  };
+  if (abs >= 1_000_000_000_000) return scaled(1_000_000_000_000, 'T');
+  if (abs >= 1_000_000_000) return scaled(1_000_000_000, 'B');
+  if (abs >= 1_000_000) return scaled(1_000_000, 'M');
+  if (abs >= 1_000) return scaled(1_000, 'K');
+  return Number.isInteger(n) ? n.toLocaleString() : n.toFixed(abs < 10 ? 2 : 1);
+};
+const setCompactText = (id, value, fallback = 0) => {
+  const el = $(id);
+  if (!el) return;
+  el.textContent = tr(compactCount(value, fallback));
+  const n = Number(value);
+  el.title = Number.isFinite(n) ? n.toLocaleString() : String(value ?? fallback);
+};
 function secondsToHMS(sec){sec=Math.max(0,Number(sec)||0);const h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),s=Math.floor(sec%60);return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;}
 function percent(x){x=Number(x)||0;return x<=1?Math.round(x*1000)/10:Math.round(x*10)/10;}
 function titleCase(s){return String(s||'').replace(/[-_]/g,' ').replace(/\b\w/g,c=>c.toUpperCase());}
@@ -47,9 +75,10 @@ function renderNamespaces(behavior){
   items.slice(0,5).forEach(item=>{
     const pct=Math.max(4,Math.round((Number(item.ops)||0)/max*100));
     const row=document.createElement('div'); row.className='namespace-row';
-    const label=node('span', String(item.name)); label.title=String(item.name);
+    const fullName=String(item.name);
+    const label=node('span', truncateText(fullName, 24)); label.title=fullName;
     const bar=document.createElement('i'); bar.style.width=`${pct}%`;
-    const count=node('b', Number(item.ops||0).toLocaleString());
+    const count=node('b', compactCount(item.ops||0)); count.title=Number(item.ops||0).toLocaleString();
     row.append(label, bar, count);
     host.appendChild(row);
   });
@@ -247,7 +276,7 @@ function renderCompletedTelemetryPages(data){
   setText('lock-page-index-transitions', fmt(ndc.index_transitions,0));
   setText('compare-swiss-load', `${fmt(percent(swiss.load_factor),0)}%`);
   setText('compare-radix-depth', fmt(radix.average_lookup_steps||radix.average_depth,0));
-  setText('compare-storage-entries', fmt(storage.entries,0));
+  setCompactText('compare-storage-entries', storage.entries,0);
   setText('compare-native-exec', `${fmt(perf.native_execution_percent,0)}%`);
   setText('compare-probe-pressure', fmt(pressure.swiss_probe_pressure ?? 0,0));
   setText('compare-active-chunks', fmt(storage.active_chunks||storage.chunks_created,0));
