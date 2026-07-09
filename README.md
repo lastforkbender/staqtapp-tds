@@ -10,7 +10,7 @@
 
 ## v3.1.25 Browser & Studio Visual Consistency Hardening
 
-TDS v3.1.25 hardens the Browser dashboard and optional PyQt5 Driver Studio shell for visual consistency before the next persistence/edit-safety reliability layer.
+Staqtapp(stacked-app) TDS v3.1.25 hardens the Browser dashboard and optional PyQt5 Driver Studio shell for visual consistency before the next persistence/edit-safety reliability layer.
 
 The Browser stylesheet now keeps the sidebar control-plane card in normal flow, gives the long navigation list its own contained scroll region, restores compact-desktop grid breakpoints after later CSS overrides, reduces workload-card width pressure, contains architecture connector rails, and bounds hero-orbit placement so panels do not overlap or overhang at 1560×960, 1440×900, or 1280×800 screenshot sizes.
 
