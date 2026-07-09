@@ -54,8 +54,17 @@ else:
 | `PERSIST_BATCH_READ_ERROR` | `False` | TDSReader.read_many_result | None | persistence | error | `True` | Batch persistence read failed. |
 | `PERSIST_BATCH_READ_OK` | `True` | TDSReader.read_many_result | dict[name, object] | persistence | info | `False` | All requested persisted entries were read. |
 | `PERSIST_BATCH_READ_PARTIAL` | `False` | TDSReader.read_many_result | dict[name, object|TDSResult] | persistence | warn | `True` | Some persisted entries could not be read. |
+| `PERSIST_CODEC_UNAVAILABLE` | `False` | TDSReader.read | None | persistence | error | `False` | Required persisted compression codec is unavailable or could not decode the payload. |
+| `PERSIST_HEADER_CORRUPT` | `False` | TDSReader.open | None | persistence | critical | `False` | Persisted file header failed structural or checksum validation. |
+| `PERSIST_INDEX_CORRUPT` | `False` | TDSReader.open | None | persistence | critical | `False` | Persisted slot index failed fail-closed structural validation. |
+| `PERSIST_PAYLOAD_HASH_MISMATCH` | `False` | TDSReader.read | None | persistence | critical | `False` | Decoded payload bytes do not match sidecar content_hash. |
 | `PERSIST_READ_ERROR` | `False` | TDSReader.read_result | None | persistence | error | `True` | Persisted entry could not be read. |
 | `PERSIST_READ_OK` | `True` | TDSReader.read_result | persisted object | persistence | info | `False` | Persisted entry was read. |
+| `PERSIST_SIDECAR_CORRUPT` | `False` | TDSPersistence.load_node | None | persistence | error | `False` | Sidecar metadata could not be parsed or failed validation. |
+| `PERSIST_SIDECAR_STALE` | `False` | TDSPersistence.load_node | None | persistence | warn | `True` | Sidecar metadata is missing or older than the data snapshot. |
+| `PERSIST_SLOT_BOUNDS_ERROR` | `False` | TDSReader.open/read | None | persistence | critical | `False` | Persisted slot points outside the validated data block. |
+| `PERSIST_SNAPSHOT_EPOCH_MISMATCH` | `False` | TDSPersistence.load_node | None | persistence | error | `True` | Data and sidecar snapshot epochs disagree. |
+| `PERSIST_WRITE_ERROR` | `False` | TDSWriter | None | persistence | error | `True` | Persisted file could not be written durably. |
 | `PROVENANCE_RECORD_MISSING` | `False` | TDSDirectory.provenance_record_result | None | provenance | warn | `False` | Provenance record is unavailable because the entry is missing. |
 | `PROVENANCE_RECORD_OK` | `True` | TDSDirectory.provenance_record_result | numpy provenance record | provenance | info | `False` | Provenance record was read. |
 | `QUERY_ACCEPTED` | `True` | query_requires_selector | None | cluster | info | `False` | Cluster query selectors were accepted. |

@@ -188,6 +188,42 @@
     "surface": "TDSReader.read_many_result",
     "value": "dict[name, object|TDSResult]"
   },
+  "PERSIST_CODEC_UNAVAILABLE": {
+    "category": "persistence",
+    "description": "Required persisted compression codec is unavailable or could not decode the payload.",
+    "ok": false,
+    "retryable": false,
+    "severity": "error",
+    "surface": "TDSReader.read",
+    "value": null
+  },
+  "PERSIST_HEADER_CORRUPT": {
+    "category": "persistence",
+    "description": "Persisted file header failed structural or checksum validation.",
+    "ok": false,
+    "retryable": false,
+    "severity": "critical",
+    "surface": "TDSReader.open",
+    "value": null
+  },
+  "PERSIST_INDEX_CORRUPT": {
+    "category": "persistence",
+    "description": "Persisted slot index failed fail-closed structural validation.",
+    "ok": false,
+    "retryable": false,
+    "severity": "critical",
+    "surface": "TDSReader.open",
+    "value": null
+  },
+  "PERSIST_PAYLOAD_HASH_MISMATCH": {
+    "category": "persistence",
+    "description": "Decoded payload bytes do not match sidecar content_hash.",
+    "ok": false,
+    "retryable": false,
+    "severity": "critical",
+    "surface": "TDSReader.read",
+    "value": null
+  },
   "PERSIST_READ_ERROR": {
     "category": "persistence",
     "description": "Persisted entry could not be read.",
@@ -205,6 +241,51 @@
     "severity": "info",
     "surface": "TDSReader.read_result",
     "value": "persisted object"
+  },
+  "PERSIST_SIDECAR_CORRUPT": {
+    "category": "persistence",
+    "description": "Sidecar metadata could not be parsed or failed validation.",
+    "ok": false,
+    "retryable": false,
+    "severity": "error",
+    "surface": "TDSPersistence.load_node",
+    "value": null
+  },
+  "PERSIST_SIDECAR_STALE": {
+    "category": "persistence",
+    "description": "Sidecar metadata is missing or older than the data snapshot.",
+    "ok": false,
+    "retryable": true,
+    "severity": "warn",
+    "surface": "TDSPersistence.load_node",
+    "value": null
+  },
+  "PERSIST_SLOT_BOUNDS_ERROR": {
+    "category": "persistence",
+    "description": "Persisted slot points outside the validated data block.",
+    "ok": false,
+    "retryable": false,
+    "severity": "critical",
+    "surface": "TDSReader.open/read",
+    "value": null
+  },
+  "PERSIST_SNAPSHOT_EPOCH_MISMATCH": {
+    "category": "persistence",
+    "description": "Data and sidecar snapshot epochs disagree.",
+    "ok": false,
+    "retryable": true,
+    "severity": "error",
+    "surface": "TDSPersistence.load_node",
+    "value": null
+  },
+  "PERSIST_WRITE_ERROR": {
+    "category": "persistence",
+    "description": "Persisted file could not be written durably.",
+    "ok": false,
+    "retryable": true,
+    "severity": "error",
+    "surface": "TDSWriter",
+    "value": null
   },
   "PROVENANCE_RECORD_MISSING": {
     "category": "provenance",
