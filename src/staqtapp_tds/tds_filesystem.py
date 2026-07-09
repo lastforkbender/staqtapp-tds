@@ -962,8 +962,16 @@ class TDSDirectory:
         final_fmt = FmtID(raw_fmt | FmtID.COMPRESSED) if do_compress else raw_fmt
         stored = CompressorRegistry.compress(raw, codec) if do_compress else raw
         ptag = provenance if isinstance(provenance, ProvenanceTag) else (ProvenanceTag.create(provenance) if isinstance(provenance, str) else ProvenanceTag())
+        snapshot_value = value
+        if raw_fmt in (FmtID.RAW_BINARY, FmtID.TEXT_UTF8, FmtID.JSON_UTF8):
+            # Freeze durable value semantics at write time for stable lanes.
+            # This prevents caller-owned mutable objects from changing the next
+            # flushed snapshot after write_json/write_text/write_raw returned.
+            frozen = _deserialize_payload(raw, raw_fmt, codec)
+            if not (isinstance(frozen, TDSResult) and not frozen.ok):
+                snapshot_value = frozen
         entry = TDSEntry(
-            name=name, fmt_id=final_fmt, data=value, codec=codec,
+            name=name, fmt_id=final_fmt, data=snapshot_value, codec=codec,
             payload_kind=kind_name(int(raw_fmt)),
             content_hash=content_hash_bytes(raw),
             raw_size=len(raw), stored_size=len(stored), provenance=ptag,

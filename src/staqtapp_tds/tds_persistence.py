@@ -22,11 +22,13 @@ from staqtapp_tds.tds_filesystem import (
     TDSDirectory, TDSEntry, TDSFileSystem, FmtID, DirFlags, ConcurrencyPool,
     decode_header, encode_header, _compute_subdir_offsets,
     _serialize_payload, _deserialize_payload, HEADER_SIZE, TDS_MAGIC,
+    CompressorRegistry,
 )
 from staqtapp_tds.manifest import ManifestPolicy, load_manifest, write_default_manifest
 from staqtapp_tds.tds_json import dumps_canonical, loads_strict
 from staqtapp_tds.result import TDSResult, TDSResultCode
 from staqtapp_tds.telemetry import TelemetryMode
+from staqtapp_tds.serializers import content_hash_bytes
 
 try:
     from numba import njit, prange
@@ -48,6 +50,47 @@ FILE_HDR_FMT     = '>4sIQQQQI'
 FILE_HDR_SIZE    = struct.calcsize(FILE_HDR_FMT)    # 44 bytes
 SLOT_FIXED_FMT   = '>QQIHH'
 SLOT_FIXED_SIZE  = struct.calcsize(SLOT_FIXED_FMT)  # 24 bytes
+
+
+class TDSPersistenceIntegrityError(ValueError):
+    """Typed fail-closed persistence-integrity error.
+
+    Constructor/open paths still raise, preserving the existing hard-failure
+    contract for corrupt files, while read_result() can surface the stable
+    TDSResultCode carried here.
+    """
+
+    def __init__(self, code: TDSResultCode | str, message: str, **meta: Any):
+        super().__init__(message)
+        self.code = code
+        self.meta = dict(meta)
+
+
+def _raise_integrity(code: TDSResultCode | str, message: str, **meta: Any) -> None:
+    raise TDSPersistenceIntegrityError(code, message, **meta)
+
+
+def _write_all(fd: int, data: bytes | bytearray | memoryview) -> None:
+    view = memoryview(data)
+    total = len(view)
+    written = 0
+    while written < total:
+        n = os.write(fd, view[written:])
+        if n <= 0:
+            _raise_integrity(TDSResultCode.PERSIST_WRITE_ERROR, "Short write while emitting TDS persistence file", written=written, expected=total)
+        written += n
+
+
+def _fsync_parent_dir(path: Path) -> None:
+    try:
+        dir_fd = os.open(str(path.parent), os.O_RDONLY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
+    except Exception:
+        # Parent directory fsync is best-effort on platforms that do not permit it.
+        pass
 
 
 def _build_file_header(slot_count: int, index_offset: int,
@@ -153,6 +196,19 @@ class SlotRecord:
     fmt_id:    int
 
 
+@dataclass(frozen=True)
+class SnapshotSlot:
+    slot_key: str
+    short_name: str
+    payload: bytes
+    fmt_id: int
+    payload_kind: str = ''
+    content_hash: str = ''
+    raw_size: int = 0
+    stored_size: int = 0
+    codec: str = ''
+
+
 class SlotIndex:
     """
     O(1) slot lookup via dict primary path.
@@ -231,22 +287,73 @@ class SlotIndex:
 
     @classmethod
     def from_bytes(cls, buf: bytes, slot_count: int) -> 'SlotIndex':
+        """Parse a v1 slot index with fail-closed structural validation.
+
+        Older builds silently stopped when a fixed record was missing and sliced
+        whatever name bytes were available.  That let truncated indexes expose
+        malformed keys.  The hardening contract is exact: every declared slot
+        must parse, every variable name byte must exist, the name_hash must
+        match the key, names must be unique, and no trailing bytes are accepted.
         """
-        uses memoryview to avoid redundant byte copies on each record.
-        """
-        idx    = cls()
-        mv     = memoryview(buf)
+        idx = cls()
+        mv = memoryview(buf)
         cursor = 0
-        for _ in range(slot_count):
+        seen: set[str] = set()
+        for record_no in range(int(slot_count)):
             if cursor + SLOT_FIXED_SIZE > len(mv):
-                break
+                _raise_integrity(
+                    TDSResultCode.PERSIST_INDEX_CORRUPT,
+                    "Incomplete fixed slot header in TDS index",
+                    record_no=record_no, cursor=cursor, available=len(mv),
+                    expected_slot_count=int(slot_count), parsed_count=len(idx),
+                )
             name_hash, offset, length, fmt_id, name_len = struct.unpack_from(
                 SLOT_FIXED_FMT, mv, cursor)
             cursor += SLOT_FIXED_SIZE
-            name    = bytes(mv[cursor: cursor + name_len]).decode('utf-8')
-            cursor += name_len
-            idx.add(SlotRecord(name=name, name_hash=name_hash,
-                               offset=offset, length=length, fmt_id=fmt_id))
+            if cursor + int(name_len) > len(mv):
+                _raise_integrity(
+                    TDSResultCode.PERSIST_INDEX_CORRUPT,
+                    "Incomplete variable slot-name bytes in TDS index",
+                    record_no=record_no, cursor=cursor, name_len=int(name_len), available=len(mv),
+                )
+            raw_name = bytes(mv[cursor: cursor + int(name_len)])
+            cursor += int(name_len)
+            try:
+                name = raw_name.decode('utf-8')
+            except UnicodeDecodeError as exc:
+                _raise_integrity(
+                    TDSResultCode.PERSIST_INDEX_CORRUPT,
+                    "Slot name is not valid UTF-8",
+                    record_no=record_no, exception_type=type(exc).__name__, exception_message=str(exc),
+                )
+            expected_hash = zlib.adler32(raw_name) & 0x7FFFFFFFFFFFFFFF
+            if int(name_hash) != int(expected_hash):
+                _raise_integrity(
+                    TDSResultCode.PERSIST_INDEX_CORRUPT,
+                    "Slot name_hash mismatch",
+                    record_no=record_no, name=name, stored_hash=int(name_hash), expected_hash=int(expected_hash),
+                )
+            if name in seen:
+                _raise_integrity(
+                    TDSResultCode.PERSIST_INDEX_CORRUPT,
+                    "Duplicate slot name in TDS index",
+                    record_no=record_no, name=name,
+                )
+            seen.add(name)
+            idx.add(SlotRecord(name=name, name_hash=int(name_hash),
+                               offset=int(offset), length=int(length), fmt_id=int(fmt_id)))
+        if cursor != len(mv):
+            _raise_integrity(
+                TDSResultCode.PERSIST_INDEX_CORRUPT,
+                "Trailing bytes after declared TDS slot index",
+                parsed_count=len(idx), trailing_bytes=len(mv) - cursor,
+            )
+        if len(idx) != int(slot_count):
+            _raise_integrity(
+                TDSResultCode.PERSIST_INDEX_CORRUPT,
+                "Parsed slot count does not match file header",
+                parsed_count=len(idx), expected_slot_count=int(slot_count),
+            )
         return idx
 
 
@@ -271,20 +378,118 @@ class TDSReader:
         self._mm: Any = None
         self._hdr: dict = {}
         self._idx: SlotIndex = SlotIndex()
+        self._file_size = 0
+        self._sidecar_meta: dict[str, Any] = {}
+        self._entry_meta: dict[str, dict[str, Any]] = {}
         self._open()
 
     def _open(self) -> None:
-        self._f  = open(self.path, 'rb')
+        self._f = open(self.path, 'rb')
+        self._file_size = os.fstat(self._f.fileno()).st_size
+        if self._file_size < FILE_HDR_SIZE:
+            _raise_integrity(
+                TDSResultCode.PERSIST_HEADER_CORRUPT,
+                "TDS file is smaller than the fixed file header",
+                file_size=self._file_size, header_size=FILE_HDR_SIZE,
+            )
         self._mm = mmap.mmap(self._f.fileno(), 0, access=mmap.ACCESS_READ)
-        self._hdr = _parse_file_header(bytes(self._mm[:FILE_HDR_SIZE]))
+        try:
+            self._hdr = _parse_file_header(bytes(self._mm[:FILE_HDR_SIZE]))
+        except TDSPersistenceIntegrityError:
+            raise
+        except Exception as exc:
+            _raise_integrity(
+                TDSResultCode.PERSIST_HEADER_CORRUPT,
+                str(exc), exception_type=type(exc).__name__, exception_message=str(exc),
+            )
+        self._validate_file_geometry()
         self._idx = self._load_index()
+        self._validate_slot_geometry()
+        self._load_sidecar()
+
+    def _validate_file_geometry(self) -> None:
+        data_off = int(self._hdr['data_offset'])
+        idx_off = int(self._hdr['index_offset'])
+        slot_count = int(self._hdr['slot_count'])
+        if data_off < FILE_HDR_SIZE:
+            _raise_integrity(
+                TDSResultCode.PERSIST_HEADER_CORRUPT,
+                "TDS data_offset points inside the file header",
+                data_offset=data_off, header_size=FILE_HDR_SIZE,
+            )
+        if idx_off < data_off:
+            _raise_integrity(
+                TDSResultCode.PERSIST_INDEX_CORRUPT,
+                "TDS index_offset precedes data_offset",
+                data_offset=data_off, index_offset=idx_off,
+            )
+        if idx_off > self._file_size:
+            _raise_integrity(
+                TDSResultCode.PERSIST_INDEX_CORRUPT,
+                "TDS index_offset points past EOF",
+                index_offset=idx_off, file_size=self._file_size,
+            )
+        if slot_count < 0:
+            _raise_integrity(TDSResultCode.PERSIST_INDEX_CORRUPT, "TDS slot_count is negative", slot_count=slot_count)
 
     def _load_index(self) -> SlotIndex:
-        idx_off    = self._hdr['index_offset']
-        slot_count = self._hdr['slot_count']
-        # memoryview slice — no copy
-        idx_bytes  = bytes(self._mm[idx_off:])
+        idx_off = int(self._hdr['index_offset'])
+        slot_count = int(self._hdr['slot_count'])
+        idx_bytes = bytes(self._mm[idx_off:self._file_size])
         return SlotIndex.from_bytes(idx_bytes, slot_count)
+
+    def _validate_slot_geometry(self) -> None:
+        data_off = int(self._hdr['data_offset'])
+        data_len = int(self._hdr['index_offset']) - data_off
+        for rec in self._idx.all_records():
+            if rec.offset < 0 or rec.length < 0:
+                _raise_integrity(
+                    TDSResultCode.PERSIST_SLOT_BOUNDS_ERROR,
+                    "Negative slot offset or length", name=rec.name, offset=rec.offset, length=rec.length,
+                )
+            if rec.offset > data_len or rec.offset + rec.length > data_len:
+                _raise_integrity(
+                    TDSResultCode.PERSIST_SLOT_BOUNDS_ERROR,
+                    "Slot payload range extends outside data block",
+                    name=rec.name, offset=rec.offset, length=rec.length, data_len=data_len,
+                )
+
+    def _load_sidecar(self) -> None:
+        meta_path = self.path.with_suffix('.tds.meta')
+        self._sidecar_meta = {}
+        self._entry_meta = {}
+        if not meta_path.exists():
+            return
+        try:
+            meta, _json_backend = loads_strict(meta_path.read_bytes(), expected_type=dict)
+        except Exception as exc:
+            _raise_integrity(
+                TDSResultCode.PERSIST_SIDECAR_CORRUPT,
+                "TDS sidecar metadata could not be parsed",
+                meta_path=str(meta_path), exception_type=type(exc).__name__, exception_message=str(exc),
+            )
+        if not isinstance(meta, dict):
+            _raise_integrity(TDSResultCode.PERSIST_SIDECAR_CORRUPT, "TDS sidecar root is not an object", meta_path=str(meta_path))
+        # New hardening fields are enforced when present and ignored for older sidecars.
+        meta_ts = meta.get('tds_header_ts')
+        if meta_ts is not None and int(meta_ts) != int(self._hdr.get('ts', 0)):
+            _raise_integrity(
+                TDSResultCode.PERSIST_SNAPSHOT_EPOCH_MISMATCH,
+                "TDS data file and sidecar metadata describe different snapshots",
+                file_ts=int(self._hdr.get('ts', 0)), meta_ts=int(meta_ts), meta_path=str(meta_path),
+            )
+        meta_size = meta.get('tds_file_size')
+        if meta_size is not None and int(meta_size) != int(self._file_size):
+            _raise_integrity(
+                TDSResultCode.PERSIST_SNAPSHOT_EPOCH_MISMATCH,
+                "TDS data file size and sidecar metadata size disagree",
+                file_size=int(self._file_size), meta_file_size=int(meta_size), meta_path=str(meta_path),
+            )
+        entries = meta.get('entries', {}) or {}
+        if not isinstance(entries, dict):
+            _raise_integrity(TDSResultCode.PERSIST_SIDECAR_CORRUPT, "TDS sidecar entries field is not an object", meta_path=str(meta_path))
+        self._sidecar_meta = meta
+        self._entry_meta = {str(k): dict(v) for k, v in entries.items() if isinstance(v, dict)}
 
     def reload(self) -> None:
         with self._lock:
@@ -292,24 +497,86 @@ class TDSReader:
             self._f.close()
             self._open()
 
-    def read(self, name: str) -> Any:
+    def _short_name(self, slot_key: str) -> str:
+        return slot_key.rsplit('/', 1)[-1]
+
+    def _meta_for_slot(self, slot_key: str) -> dict[str, Any]:
+        return self._entry_meta.get(self._short_name(slot_key), {})
+
+    def _stored_payload(self, rec: SlotRecord) -> bytes:
+        data_base = int(self._hdr['data_offset'])
+        abs_off = data_base + int(rec.offset)
+        abs_end = abs_off + int(rec.length)
+        if abs_off < data_base or abs_end > int(self._hdr['index_offset']) or abs_end > self._file_size:
+            _raise_integrity(
+                TDSResultCode.PERSIST_SLOT_BOUNDS_ERROR,
+                "Slot payload range failed read-time bounds validation",
+                name=rec.name, abs_off=abs_off, abs_end=abs_end, index_offset=int(self._hdr['index_offset']), file_size=self._file_size,
+            )
+        with self._lock:
+            payload = bytes(self._mm[abs_off:abs_end])
+        if len(payload) != int(rec.length):
+            _raise_integrity(
+                TDSResultCode.PERSIST_SLOT_BOUNDS_ERROR,
+                "Short payload read from memory map",
+                name=rec.name, expected=int(rec.length), actual=len(payload),
+            )
+        return payload
+
+    def _plain_payload_for_hash(self, stored: bytes, fmt_id: FmtID, codec: str) -> bytes | TDSResult:
+        if fmt_id & FmtID.COMPRESSED:
+            try:
+                return CompressorRegistry.decompress(stored, codec)
+            except Exception as exc:
+                return TDSResult.fail(
+                    TDSResultCode.PERSIST_CODEC_UNAVAILABLE,
+                    "Compressed payload could not be decoded with its persisted codec.",
+                    path=str(self.path),
+                    meta={
+                        'fmt_id': int(fmt_id),
+                        'codec': codec or '',
+                        'stored_size': len(stored),
+                        'exception_type': type(exc).__name__,
+                        'exception_message': str(exc),
+                    },
+                )
+        return stored
+
+    def _validate_payload_hash(self, slot_key: str, plain_raw: bytes, expected_hash: str) -> Optional[TDSResult]:
+        if not expected_hash:
+            return None
+        actual_hash = content_hash_bytes(plain_raw)
+        if actual_hash != expected_hash:
+            return TDSResult.fail(
+                TDSResultCode.PERSIST_PAYLOAD_HASH_MISMATCH,
+                "Persisted payload content_hash mismatch; data not returned.",
+                name=slot_key,
+                path=str(self.path),
+                meta={'expected_hash': expected_hash, 'actual_hash': actual_hash, 'raw_size': len(plain_raw)},
+            )
+        return None
+
+    def read(self, name: str, *, codec: str | None = None, content_hash: str | None = None) -> Any:
         rec = self._idx.lookup(name)
         if rec is None:
             raise KeyError(f"Entry '{name}' not found in {self.path.name!r}")
-        data_base = self._hdr['data_offset']
-        abs_off   = data_base + rec.offset
-        with self._lock:
-            payload = bytes(self._mm[abs_off: abs_off + rec.length])
-        return _deserialize_payload(payload, FmtID(rec.fmt_id))
+        meta = self._meta_for_slot(name)
+        effective_codec = str(codec if codec is not None else meta.get('codec', '') or '')
+        expected_hash = str(content_hash if content_hash is not None else meta.get('content_hash', '') or '')
+        stored = self._stored_payload(rec)
+        plain_raw = self._plain_payload_for_hash(stored, FmtID(rec.fmt_id), effective_codec)
+        if isinstance(plain_raw, TDSResult):
+            return plain_raw
+        hash_failure = self._validate_payload_hash(name, plain_raw, expected_hash)
+        if hash_failure is not None:
+            return hash_failure
+        return _deserialize_payload(stored, FmtID(rec.fmt_id), effective_codec)
 
     def read_raw(self, name: str) -> bytes:
         rec = self._idx.lookup(name)
         if rec is None:
             raise KeyError(name)
-        data_base = self._hdr['data_offset']
-        abs_off   = data_base + rec.offset
-        with self._lock:
-            return bytes(self._mm[abs_off: abs_off + rec.length])
+        return self._stored_payload(rec)
 
     def read_result(self, name: str) -> TDSResult:
         """Public non-halting persistence read surface: always return TDSResult."""
@@ -318,6 +585,8 @@ class TDSReader:
             if isinstance(value, TDSResult) and not value.ok:
                 return value
             return TDSResult.success(TDSResultCode.PERSIST_READ_OK, "Persisted entry read.", name=name, path=str(self.path), value=value)
+        except TDSPersistenceIntegrityError as exc:
+            return TDSResult.fail(exc.code, str(exc), name=name, path=str(self.path), meta=exc.meta)
         except Exception as exc:
             return TDSResult.from_exception(TDSResultCode.PERSIST_READ_ERROR, exc, name=name, path=str(self.path))
 
@@ -385,41 +654,57 @@ class TDSWriter:
 
     @staticmethod
     def _serialize_entry(entry: TDSEntry) -> bytes:
-        # SlotRecord stores fmt_id but not per-entry codec. Persist compressed
-        # entries with the default codec so TDSReader can always decode them.
-        return _serialize_payload(entry.data, entry.fmt_id, '')
+        # Persist compressed entries with their selected codec, not whichever
+        # process-wide default happens to be active during flush/load.
+        return _serialize_payload(entry.data, entry.fmt_id, getattr(entry, 'codec', '') or '')
+
+    @staticmethod
+    def _snapshot_slot(node_path: str, entry: TDSEntry, payload: bytes) -> SnapshotSlot:
+        return SnapshotSlot(
+            slot_key=TDSWriter._slot_key(node_path, entry.name),
+            short_name=entry.name,
+            payload=payload,
+            fmt_id=int(entry.fmt_id),
+            payload_kind=str(getattr(entry, 'payload_kind', '') or ''),
+            content_hash=str(getattr(entry, 'content_hash', '') or ''),
+            raw_size=int(getattr(entry, 'raw_size', 0) or 0),
+            stored_size=int(getattr(entry, 'stored_size', 0) or len(payload)),
+            codec=str(getattr(entry, 'codec', '') or ''),
+        )
 
     @staticmethod
     def _slot_key(node_path: str, entry_name: str) -> str:
         return f"{node_path}/{entry_name}"
 
     def write(self, directory: TDSDirectory, recurse: bool = True) -> int:
-        idx:        SlotIndex       = SlotIndex()
-        data_parts: List[bytes]     = []
+        idx: SlotIndex = SlotIndex()
+        snapshot: List[SnapshotSlot] = []
         cursor = 0
 
         def _walk(node: TDSDirectory) -> None:
             nonlocal cursor
+            node_path = node.path()
             with node._lock:
-                entries  = list(node._entries.values())
+                entries = list(node._entries.values())
                 children = list(node._children.values())
             for entry in entries:
-                payload  = self._serialize_entry(entry)
-                slot_key = self._slot_key(node.path(), entry.name)
-                h = zlib.adler32(slot_key.encode()) & 0x7FFFFFFFFFFFFFFF
-                idx.add(SlotRecord(name=slot_key, name_hash=h,
+                payload = self._serialize_entry(entry)
+                snap = self._snapshot_slot(node_path, entry, payload)
+                h = zlib.adler32(snap.slot_key.encode()) & 0x7FFFFFFFFFFFFFFF
+                idx.add(SlotRecord(name=snap.slot_key, name_hash=h,
                                    offset=cursor, length=len(payload),
                                    fmt_id=int(entry.fmt_id)))
-                data_parts.append(payload)
+                snapshot.append(snap)
                 cursor += len(payload)
             if recurse:
                 for child in children:
                     _walk(child)
 
         _walk(directory)
-        return self._finalise(idx, data_parts, directory)
+        return self._finalise(idx, snapshot, directory)
 
     def write_parallel(self, directory: TDSDirectory) -> int:
+        node_path = directory.path()
         with directory._lock:
             entries = list(directory._entries.values())
         pool = ConcurrencyPool.acquire()
@@ -430,56 +715,53 @@ class TDSWriter:
             (entries[i], futures[i].result()) for i in range(len(futures))
         ]
 
-        idx:        SlotIndex   = SlotIndex()
-        data_parts: List[bytes] = []
+        idx: SlotIndex = SlotIndex()
+        snapshot: List[SnapshotSlot] = []
         cursor = 0
         for entry, payload in serialized:
-            slot_key = self._slot_key(directory.path(), entry.name)
-            h = zlib.adler32(slot_key.encode()) & 0x7FFFFFFFFFFFFFFF
-            idx.add(SlotRecord(name=slot_key, name_hash=h,
+            snap = self._snapshot_slot(node_path, entry, payload)
+            h = zlib.adler32(snap.slot_key.encode()) & 0x7FFFFFFFFFFFFFFF
+            idx.add(SlotRecord(name=snap.slot_key, name_hash=h,
                                offset=cursor, length=len(payload),
                                fmt_id=int(entry.fmt_id)))
-            data_parts.append(payload)
+            snapshot.append(snap)
             cursor += len(payload)
-        return self._finalise(idx, data_parts, directory)
+        return self._finalise(idx, snapshot, directory)
 
-    def _finalise(self, idx: SlotIndex, data_parts: List[bytes],
+    def _finalise(self, idx: SlotIndex, snapshot: List[SnapshotSlot],
                   directory: TDSDirectory) -> int:
+        """Emit data and sidecar from the same frozen entry snapshot.
+
+        The data file keeps the existing shadow-write/fsync/replace sequence.
+        The sidecar now follows the same write-all/fsync/replace/parent-fsync
+        discipline and describes only the entries actually serialized into the
+        just-committed data block.
         """
-        pre-allocate full bytearray, fill via memoryview slices,
-        write in a single os.write() call (one syscall, one kernel copy).
-        """
-        data_block   = b''.join(data_parts)
-        index_block  = idx.to_bytes()
-        data_offset  = FILE_HDR_SIZE
+        data_block = b''.join(s.payload for s in snapshot)
+        index_block = idx.to_bytes()
+        data_offset = FILE_HDR_SIZE
         index_offset = data_offset + len(data_block)
-        file_header  = _build_file_header(len(idx), index_offset, data_offset)
+        file_header = _build_file_header(len(idx), index_offset, data_offset)
+        header_meta = _parse_file_header(file_header)
 
         total = len(file_header) + len(data_block) + len(index_block)
-        buf   = bytearray(total)
-        mv    = memoryview(buf)
-        pos   = 0
-        mv[pos: pos + len(file_header)]  = file_header;  pos += len(file_header)
-        mv[pos: pos + len(data_block)]   = data_block;   pos += len(data_block)
-        mv[pos: pos + len(index_block)]  = index_block
+        buf = bytearray(total)
+        mv = memoryview(buf)
+        pos = 0
+        mv[pos: pos + len(file_header)] = file_header; pos += len(file_header)
+        mv[pos: pos + len(data_block)] = data_block; pos += len(data_block)
+        mv[pos: pos + len(index_block)] = index_block
 
         try:
             fd = os.open(str(self._shadow),
                          os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
             try:
-                os.write(fd, buf)
+                _write_all(fd, buf)
                 os.fsync(fd)
             finally:
                 os.close(fd)
             os.replace(str(self._shadow), str(self.path))
-            try:
-                dir_fd = os.open(str(self.path.parent), os.O_RDONLY)
-                try:
-                    os.fsync(dir_fd)
-                finally:
-                    os.close(dir_fd)
-            except Exception:
-                pass
+            _fsync_parent_dir(self.path)
         except Exception:
             try:
                 self._shadow.unlink(missing_ok=True)
@@ -487,7 +769,15 @@ class TDSWriter:
                 pass
             raise
 
+        snapshot_epoch = int(header_meta['ts'])
         meta = {
+            'schema': 'tds.sidecar.v1',
+            'snapshot_epoch': snapshot_epoch,
+            'tds_header_ts': snapshot_epoch,
+            'tds_file_size': total,
+            'tds_slot_count': len(idx),
+            'tds_index_offset': index_offset,
+            'tds_data_offset': data_offset,
             'flags':     directory.flags,
             'fmt_id':    int(directory.fmt_id),
             'dir_id':    directory.dir_id,
@@ -498,17 +788,34 @@ class TDSWriter:
             'capabilities': directory.capability_names(),
             'reserved_namespaces': directory.reserved_namespaces.to_dict(),
             'variables': directory.variable_control_snapshot(),
-            'entries': {e.name: {
-                'payload_kind': getattr(e, 'payload_kind', ''),
-                'content_hash': getattr(e, 'content_hash', ''),
-                'raw_size': int(getattr(e, 'raw_size', 0) or 0),
-                'stored_size': int(getattr(e, 'stored_size', 0) or 0),
-                'codec': getattr(e, 'codec', ''),
-            } for e in directory._entries.values()},
+            'entries': {s.short_name: {
+                'payload_kind': s.payload_kind,
+                'content_hash': s.content_hash,
+                'raw_size': int(s.raw_size),
+                'stored_size': int(s.stored_size),
+                'codec': s.codec,
+                'slot_key': s.slot_key,
+                'fmt_id': int(s.fmt_id),
+                'snapshot_epoch': snapshot_epoch,
+            } for s in snapshot},
         }
         meta_tmp = self._meta.with_suffix(self._meta.suffix + '.tmp')
-        meta_tmp.write_bytes(dumps_canonical(meta)[0])
-        os.replace(str(meta_tmp), str(self._meta))
+        meta_bytes = dumps_canonical(meta)[0]
+        try:
+            fd = os.open(str(meta_tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
+            try:
+                _write_all(fd, meta_bytes)
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+            os.replace(str(meta_tmp), str(self._meta))
+            _fsync_parent_dir(self._meta)
+        except Exception:
+            try:
+                meta_tmp.unlink(missing_ok=True)
+            except Exception:
+                pass
+            raise
         return total
 
 
@@ -707,7 +1014,9 @@ class _LazyEntry(TDSEntry):
                 if not object.__getattribute__(self, '_loaded'):
                     reader   = object.__getattribute__(self, '_reader')
                     slot_key = object.__getattribute__(self, '_slot_key')
-                    object.__setattr__(self, 'data', reader.read(slot_key))
+                    codec = object.__getattribute__(self, 'codec')
+                    content_hash = object.__getattribute__(self, 'content_hash')
+                    object.__setattr__(self, 'data', reader.read(slot_key, codec=codec, content_hash=content_hash))
                     object.__setattr__(self, '_loaded', True)
             return object.__getattribute__(self, 'data')
         return object.__getattribute__(self, item)

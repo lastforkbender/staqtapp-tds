@@ -36,6 +36,15 @@ class TDSResultCode(str, Enum):
     PROVENANCE_RECORD_MISSING = "PROVENANCE_RECORD_MISSING"
     PERSIST_READ_OK = "PERSIST_READ_OK"
     PERSIST_READ_ERROR = "PERSIST_READ_ERROR"
+    PERSIST_WRITE_ERROR = "PERSIST_WRITE_ERROR"
+    PERSIST_HEADER_CORRUPT = "PERSIST_HEADER_CORRUPT"
+    PERSIST_INDEX_CORRUPT = "PERSIST_INDEX_CORRUPT"
+    PERSIST_SLOT_BOUNDS_ERROR = "PERSIST_SLOT_BOUNDS_ERROR"
+    PERSIST_PAYLOAD_HASH_MISMATCH = "PERSIST_PAYLOAD_HASH_MISMATCH"
+    PERSIST_CODEC_UNAVAILABLE = "PERSIST_CODEC_UNAVAILABLE"
+    PERSIST_SIDECAR_STALE = "PERSIST_SIDECAR_STALE"
+    PERSIST_SIDECAR_CORRUPT = "PERSIST_SIDECAR_CORRUPT"
+    PERSIST_SNAPSHOT_EPOCH_MISMATCH = "PERSIST_SNAPSHOT_EPOCH_MISMATCH"
     PERSIST_BATCH_READ_OK = "PERSIST_BATCH_READ_OK"
     PERSIST_BATCH_READ_PARTIAL = "PERSIST_BATCH_READ_PARTIAL"
     PERSIST_BATCH_READ_ERROR = "PERSIST_BATCH_READ_ERROR"
@@ -126,6 +135,15 @@ TDS_RESULT_REGISTRY: Mapping[TDSResultCode, TDSResultInfo] = {
     TDSResultCode.PROVENANCE_RECORD_MISSING: _info(False, "TDSDirectory.provenance_record_result", None, "provenance", "warn", False, "Provenance record is unavailable because the entry is missing."),
     TDSResultCode.PERSIST_READ_OK: _info(True, "TDSReader.read_result", "persisted object", "persistence", "info", False, "Persisted entry was read."),
     TDSResultCode.PERSIST_READ_ERROR: _info(False, "TDSReader.read_result", None, "persistence", "error", True, "Persisted entry could not be read."),
+    TDSResultCode.PERSIST_WRITE_ERROR: _info(False, "TDSWriter", None, "persistence", "error", True, "Persisted file could not be written durably."),
+    TDSResultCode.PERSIST_HEADER_CORRUPT: _info(False, "TDSReader.open", None, "persistence", "critical", False, "Persisted file header failed structural or checksum validation."),
+    TDSResultCode.PERSIST_INDEX_CORRUPT: _info(False, "TDSReader.open", None, "persistence", "critical", False, "Persisted slot index failed fail-closed structural validation."),
+    TDSResultCode.PERSIST_SLOT_BOUNDS_ERROR: _info(False, "TDSReader.open/read", None, "persistence", "critical", False, "Persisted slot points outside the validated data block."),
+    TDSResultCode.PERSIST_PAYLOAD_HASH_MISMATCH: _info(False, "TDSReader.read", None, "persistence", "critical", False, "Decoded payload bytes do not match sidecar content_hash."),
+    TDSResultCode.PERSIST_CODEC_UNAVAILABLE: _info(False, "TDSReader.read", None, "persistence", "error", False, "Required persisted compression codec is unavailable or could not decode the payload."),
+    TDSResultCode.PERSIST_SIDECAR_STALE: _info(False, "TDSPersistence.load_node", None, "persistence", "warn", True, "Sidecar metadata is missing or older than the data snapshot."),
+    TDSResultCode.PERSIST_SIDECAR_CORRUPT: _info(False, "TDSPersistence.load_node", None, "persistence", "error", False, "Sidecar metadata could not be parsed or failed validation."),
+    TDSResultCode.PERSIST_SNAPSHOT_EPOCH_MISMATCH: _info(False, "TDSPersistence.load_node", None, "persistence", "error", True, "Data and sidecar snapshot epochs disagree."),
     TDSResultCode.PERSIST_BATCH_READ_OK: _info(True, "TDSReader.read_many_result", "dict[name, object]", "persistence", "info", False, "All requested persisted entries were read."),
     TDSResultCode.PERSIST_BATCH_READ_PARTIAL: _info(False, "TDSReader.read_many_result", "dict[name, object|TDSResult]", "persistence", "warn", True, "Some persisted entries could not be read."),
     TDSResultCode.PERSIST_BATCH_READ_ERROR: _info(False, "TDSReader.read_many_result", None, "persistence", "error", True, "Batch persistence read failed."),
