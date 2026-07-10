@@ -8,7 +8,7 @@
   <img src="docs/screenshots/tds_browser_telemetry_overview_1280x800.png" alt="Staqtapp-TDS Browser" width="100%">
 </p>
 
-<p align="center"><em>Browser Operations Console - 集中型 Browser の全 19 navigation page を個別に capture し、縦方向に配置しています。Page 07 では、CSV Interpole が選択され、データが設定された CSV Interpole Monitor を明確に確認できます。</em></p>
+<p align="center"><em>Browser Operations Console </em></p>
 
 [English README](README.md) | [Complete API Surface Reference PDF](tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf) | [Changelog](CHANGELOG.md)
 
