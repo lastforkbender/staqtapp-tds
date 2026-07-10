@@ -30,6 +30,7 @@
         <a class="nav-pill" href="#timeline" aria-label="Transition Timeline" title="Transition Timeline"><img src="/static/icons/timeline.svg" alt="">Transition Timeline</a>
         <a class="nav-pill" href="#diagnostics" aria-label="Event Ring Monitor" title="Event Ring Monitor"><img src="/static/icons/diagnostics.svg" alt="">Event Ring Monitor</a>
         <a class="nav-pill" href="#pressure" aria-label="Pressure Diagnostics" title="Pressure Diagnostics"><img src="/static/icons/pressure.svg" alt="">Pressure Diagnostics</a>
+        <a class="nav-pill" href="#csv-interpole" aria-label="CSV Interpole Monitor" title="CSV Interpole Monitor"><img src="/static/icons/csv-interpole.svg" alt="">CSV Interpole</a>
         <a class="nav-pill" href="#snapshots" aria-label="Snapshot Explorer" title="Snapshot Explorer"><img src="/static/icons/snapshot.svg" alt="">Snapshot Explorer</a>
         <a class="nav-pill" href="#locks" aria-label="Lock Contention" title="Lock Contention"><img src="/static/icons/clock.svg" alt="">Lock Contention</a>
         <div class="nav-section-label">Analytics</div>
@@ -281,6 +282,48 @@
 
 
 
+      <section id="csv-interpole" class="csv-interpole-page console-page-grid telemetry-page" aria-label="CSV Interpole Monitor">
+        <article class="panel-card glass wide-panel csv-interpole-hero">
+          <div class="section-head"><div><p class="eyebrow">CSV INTERPOLE MONITOR</p><h2>Evidence-fixed semantic-readiness telemetry</h2></div><span class="chip blue-chip" id="csv-interpole-status">WAITING</span></div>
+          <div class="csv-monitor-strip">
+            <div class="csv-status-pill"><img src="/static/icons/csv-timeline-ring.svg" alt=""><span>Ring State</span><b id="csv-monitor-ring-state">waiting</b></div>
+            <div class="csv-status-pill"><img src="/static/icons/csv-mirror-delta.svg" alt=""><span>Mirror Feedback</span><b id="csv-monitor-mirror-state">waiting</b></div>
+            <div class="csv-status-pill"><img src="/static/icons/csv-readiness-gate.svg" alt=""><span>Kernel Readiness</span><b id="csv-monitor-kernel-state">waiting</b></div>
+            <div class="csv-status-pill"><img src="/static/icons/csv-performance-gate.svg" alt=""><span>Performance Gates</span><b id="csv-monitor-performance-state">waiting</b></div>
+          </div>
+          <div class="csv-ring-layout">
+            <div class="csv-ring-visual" aria-label="CSV Interpole timeline ring"><div id="csv-ring-score" class="csv-ring-core">0%</div></div>
+            <div class="csv-mirror-panel">
+              <p><span>Ring fingerprint</span><b id="csv-ring-fingerprint">—</b></p>
+              <p><span>Mirror fingerprint</span><b id="csv-mirror-fingerprint">—</b></p>
+              <p><span>IR readiness</span><b id="csv-monitor-ir-score">0%</b></p>
+              <p><span>Feedback</span><b id="csv-monitor-mirror-feedback">waiting</b></p>
+            </div>
+          </div>
+          <p class="panel-note">Read-only Browser snapshot: pressure and readiness are displayed with no schema inference, no entity inference, no Interpole mutation, and no formal IR commitment.</p>
+        </article>
+        <article class="panel-card glass wide-panel csv-monitor-cards-panel">
+          <div class="section-head"><div><p class="eyebrow">STATUS CARDS</p><h2>Monitor surfaces</h2></div><span class="chip">snapshot only</span></div>
+          <div id="csv-monitor-cards" class="csv-monitor-cards"></div>
+        </article>
+        <article class="panel-card glass wide-panel csv-ring-node-panel">
+          <div class="section-head"><div><p class="eyebrow">TIMELINE RING</p><h2>Stage movement nodes</h2></div><span class="chip blue-chip">evidence neutral</span></div>
+          <div id="csv-ring-nodes" class="csv-ring-nodes"></div>
+        </article>
+        <article class="panel-card glass wide-panel csv-gate-stack-panel">
+          <div class="section-head"><div><p class="eyebrow">GATE STACK</p><h2>Readiness and parity gates</h2></div><span class="chip orange-chip">fail closed</span></div>
+          <div id="csv-gate-stack" class="csv-gate-stack"></div>
+        </article>
+        <article class="panel-card glass wide-panel csv-signal-lanes-panel">
+          <div class="section-head"><div><p class="eyebrow">DETERMINANT LANES</p><h2>Pressure signals</h2></div><span class="chip">no semantics</span></div>
+          <div id="csv-signal-lanes" class="csv-signal-lanes"></div>
+        </article>
+        <article class="panel-card glass wide-panel csv-event-log-panel">
+          <div class="section-head"><div><p class="eyebrow">SNAPSHOT LOG</p><h2>Compact monitor events</h2></div><span class="chip" id="csv-event-chip">read only</span></div>
+          <div id="csv-event-log" class="csv-event-log"></div>
+        </article>
+      </section>
+
       <section id="spiral-rank" class="console-page-grid telemetry-page spiral-rank-page" aria-label="Analytics Spiral Rank telemetry">
         <article class="panel-card glass wide-panel telemetry-card spiral-rank-card">
           <div class="section-head"><div><p class="eyebrow">ANALYTICS · NATIVE SPIRAL RANK ENGINE</p><h2>Ranking feedback telemetry</h2></div><span class="chip blue-chip" id="spiral-rank-status">WAITING</span></div>
@@ -402,6 +445,7 @@
             <option value="performance" data-i18n="page.realtimeMetrics">Real-time Metrics</option>
             <option value="diagnostics" data-i18n="page.eventRingMonitor">Event Ring Monitor</option>
             <option value="pressure" data-i18n="page.pressureDiagnostics">Pressure Diagnostics</option>
+            <option value="csv-interpole">CSV Interpole</option>
             <option value="recovery" data-i18n="page.recoveryPlanner">Recovery Planner</option>
             <option value="security" data-i18n="page.security">Security</option>
             <option value="configuration" data-i18n="nav.settings">Settings</option>
