@@ -1,191 +1,217 @@
-# 🟦🟪🟧 Staqtapp-TDS v3.1.26
+# Staqtapp-TDS v3.5.2
 
-[日本語版 / Japanese README](README_ja.md) · [API Surface Reference PDF](tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf)
+**Temporal Directory System - native-indexed `.tds` storage, controlled variables, trace ranking, CSV evidence operations, semantic review, and centralized observability for AI systems.**
+
+**Programmer start here:** [Staqtapp-TDS Programmer Core API Guide (PDF)](tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf)
 
 <p align="center">
-  <img src="docs/screenshots/tds_browser_telemetry_overview_1280x800.png" alt="Staqtapp-TDS Browser telemetry dashboard overview" width="100%">
+  <img src="docs/screenshots/tds_browser_telemetry_overview_1280x800.png" alt="All 19 Staqtapp-TDS Browser pages captured individually, with CSV Interpole Monitor shown as page 07" width="100%">
 </p>
 
-<p align="center"><em>Browser Operations Console — full telemetry-page overview captured at 1280×800.</em></p>
+<p align="center"><em>Browser Operations Console - all 19 centralized Browser navigation pages, captured individually and stacked vertically. Page 07 visibly shows the populated CSV Interpole Monitor with its navigation item selected.</em></p>
 
-## v3.1.26 Storage Engine Hardening for CSV / *stacked-app* Preparation
+[日本語 README](README_ja.md) | [Complete API Surface Reference PDF](tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf) | [Changelog](CHANGELOG.md)
 
-TDS v3.1.26 promotes the storage-engine hardening patch into the repository version line. The code-level storage patch is the same hardened engine already applied in the previous package; this release updates the repository version and README surfaces so the hardened storage baseline is clearly named before unique CSV features and future *stacked-app* features build on it.
+## What TDS provides
 
-The goal is simple: before CSV-oriented workflows or stacked application layers trust `.tds` persistence as a coordination substrate, the storage engine must reject ambiguous files, preserve payload identity, and keep sidecar metadata tied to the exact data snapshot it describes.
+Staqtapp-TDS is a directory-first storage and operations layer for AI applications. It stores Python values, text, JSON, binary payloads, trace evidence, driver evidence, and managed CSV artifacts in a structured in-memory hierarchy that can be flushed to and mounted from `.tds` files.
 
-Hardening conditions now covered:
+TDS is designed around a narrow storage hot path. Native indexing, lookup, persistence, and optional CSV scan kernels stay separate from diagnostics, Browser rendering, Driver Studio, Semantic IR review, and policy-facing evidence workflows.
 
-- malformed slot-index tails fail closed instead of exposing partial keys;
-- invalid slot counts, bad index offsets, EOF-overrun geometry, duplicate slot names, bad UTF-8 names, bad name hashes, and trailing index bytes are rejected;
-- compressed persisted payloads honor the stored entry codec instead of depending on the current process default codec;
-- sidecar metadata is generated from the same frozen data snapshot as the `.tds` file;
-- sidecar `content_hash` values are enforced on read, so altered payload bytes return a typed integrity result instead of a valid-looking mutated value;
-- JSON/text/raw durable values are frozen at write time so caller mutation before flush cannot alter persisted output;
-- sidecar writes use write-all, fsync, atomic replace, and parent-directory fsync for stronger durability.
+## Current advantages
 
-This hardening is intentionally concentrated at storage boundaries: open/load validation, persisted read integrity, snapshot generation, and flush durability. The native C storage/index hot path remains performance-preserved; the extra work appears where correctness requires it, not inside normal native lookup behavior.
+| Capability | Practical advantage |
+|---|---|
+| `.tds` persistence | Atomic file replacement, mmap random access, sidecar integrity metadata, mounted-reader lifecycle, and deterministic directory snapshots. |
+| Direct variable control | Add, edit, lock, unlock, find, load, and append through stalk chains without inventing a separate application database API. |
+| Non-halting result model | Result-first calls return `TDSResult` with stable codes, messages, values, and metadata instead of forcing ordinary application failures to halt an AI runtime. |
+| Native-indexed storage | Optional compiled index and checksum paths with deterministic Python fallbacks and explicit native capability reporting. |
+| Trace ranking | Deterministic Spiral-compatible trace ranking with confidence, depth, age, top-N limiting, statistics, and native/Python parity. |
+| CSV Suite | Original-byte preservation, dialect evidence, logical row offsets, row anchors, scan parity, artifact transactions, storage binding, native scan evidence, Interpole telemetry, Semantic IR candidates, lifecycle transitions, and atomic batch review. |
+| Evidence-bound semantics | TDS records explicit caller declarations and authorized review transitions; it does not silently infer or commit semantic truth. |
+| Driver platform | TDDL validation, deterministic bytecode, bounded Driver VM execution, Foundry proposal/test flows, regression evidence, review bundles, and read-only Studio integration. |
+| Centralized Browser | One local Browser surface for engine health, pressure, event rings, CSV Interpole, Spiral Rank, snapshots, indexes, storage, recovery, alerts, security, and settings. |
+| Observer isolation | Browser, telemetry, diagnostics, and Studio consume snapshots or copied events rather than controlling storage locks. |
 
-## v3.1.25 Browser & Studio Visual Consistency Hardening
+## Install
 
-TDS v3.1.25 hardens the Browser dashboard and optional PyQt5 Driver Studio shell for visual consistency before the next persistence/edit-safety reliability layer.
+```bash
+python -m pip install .
 
-The Browser stylesheet now keeps the sidebar control-plane card in normal flow, gives the long navigation list its own contained scroll region, restores compact-desktop grid breakpoints after later CSS overrides, reduces workload-card width pressure, contains architecture connector rails, and bounds hero-orbit placement so panels do not overlap or overhang at 1560×960, 1440×900, or 1280×800 screenshot sizes.
-
-The Studio PyQt5 shell keeps its observe-only authority model while improving visual readiness: the main window now supports a 1280×800 minimum, safer dock nesting/tabbing, stronger panel minimums, clearer group-box and help-label styling, bounded scroll areas, readable text-edit padding, and better Manual Builder split sizing.
-
-
-## v3.1.23 Driver Studio Stress Scenario Matrix
-
-TDS v3.1.23 extends the v3.1.22 operational stress harness with a deterministic scenario matrix for named Browser, Studio, Manual Builder, `.tds` persistence, combined observation, and authority-denial stress paths.
-
-The scenario matrix returns `StudioOperationalStressScenarioMatrix` evidence instead of halting host operation. It makes each stress path individually addressable while preserving the combined Browser + Studio + `.tds` proof path.
-
-## v3.1.22 Driver Studio Operational Stress Harness
-
-TDS v3.1.22 adds a headless operational stress harness for the completed Driver Studio runtime and Browser-style observer path. It exercises Browser snapshot polling, bounded Studio live-event overflow, Manual Builder JSON/signal payload safety, and `.tds` atomic persistence reader checks without widening Studio or Browser authority.
-
-The harness returns `StudioOperationalStressReport` evidence instead of halting host operation. Event overflow is treated as acceptable pressure when it is explicitly counted, warned, and recoverable from the current immutable snapshot.
-
-## v3.1.21 Driver Studio Runtime Hardening
-
-TDS v3.1.21 strengthens the optional Driver Studio runtime after the v3.1.20 Export Integrity Workflow completion. It adds bounded live-event drop accounting, retained cursor floor reporting, retention-gap warnings for slow GUI polling, JSON-safe Manual Builder signal payload normalization, and focused runtime-hardening tests.
-
-This is a confidence and safety release for the Studio cockpit runtime. Studio still only observes, hydrates, explains, verifies, and prepares intent. It does not approve, reject, quarantine, sign, activate, mutate Registry state, execute trusted drivers, write storage, store private keys, or bypass Runtime Manager / Foundry / Review Board / Registry policy.
-
-## v3.1.20 Driver Studio Export Integrity Workflow
-
-TDS v3.1.20 adds a Driver Studio Export Integrity Workflow above the v3.1.19 Export / Audit Console. It recomputes manifest and packet hashes, compares optional expected manifest/packet hashes, progresses export checklist checkpoints, and emits a review-safe readiness gate for external export tooling.
-
-The workflow verifies and explains evidence readiness. It does not approve, reject, quarantine, sign, activate, mutate Registry state, execute trusted drivers, write storage, store private keys, or bypass Runtime Manager / Foundry / Review Board / Registry policy.
-
-### v3.1.17 Driver VM Performance Evidence Harness
-
-TDS v3.1.17 added an opt-in Driver VM Performance Evidence Harness. The harness gives TDS controlled insight into Python Driver VM search/extraction performance today and creates the parity target for a later optional native C Driver VM backend.
-
-The design keeps normal Python driver performance clean:
-
-```text
-Normal DriverVMRuntime.execute()
-  -> unchanged
-  -> no benchmark loop
-  -> no per-record timer hooks
-  -> no automatic profiling
-
-Explicit DriverVMPerformanceHarness.run_package(...)
-  -> controlled repetitions
-  -> direct Python VM timing
-  -> optional Runtime Manager timing
-  -> optional native C backend slot
-  -> parity/performance evidence report
+# Optional PyQt5 Driver Studio
+python -m pip install ".[gui]"
 ```
 
-## Current validation status
+Python 3.10 or newer and NumPy are required. The C extensions are optional; supported operations retain deterministic Python fallback paths unless a caller explicitly forces native-only execution.
 
-```text
-storage hardening regression coverage passed
-selected native/storage checks passed
-source-clean release check passed
+## Core storage quick start
+
+```python
+from pathlib import Path
+from staqtapp_tds import TDSFileSystem, TDSPersistence
+
+fs = TDSFileSystem("agent_state")
+models = fs.makedirs("/models/runtime")
+
+models.write_text("system_prompt", "You are a careful planning agent.")
+models.write_json("settings", {"temperature": 0.2, "tools": True})
+models.write_result("step_count", 7)
+
+result = models.read_result("settings")
+if result.ok:
+    settings = result.value
+
+store = TDSPersistence(Path("./tds_store"))
+store.flush(fs, parallel_nodes=False)
+
+# Load one persisted node from agent_state.tds
+loaded_runtime = store.load_node(
+    Path("./tds_store/agent_state__models__runtime.tds")
+)
+assert loaded_runtime.read_value("step_count") == 7
 ```
 
-## Current active development track
+## Variable manipulation quick start
 
-Storage engine hardening for reliable CSV feature preparation, *stacked-app* feature preparation, and continued Driver Studio / Browser observation confidence without widening authority.
+```python
+state = fs.makedirs("/agent/state")
 
+state.addvar("reward", 1.0)
+state.editvar("reward", 1.25)
+state.lockvar("reward")
 
-## v3.1.26 adds
+found = state.findvar("reward")
+assert found.ok and found.value == 1.25
 
-- repository version promotion to `3.1.26`
-- README / README_ja storage-hardening release notes
-- explicit CSV and *stacked-app* preparation language
-- documented fail-closed slot-index parsing behavior
-- documented reader geometry validation coverage
-- documented stored-codec stability for persisted compressed payloads
-- documented sidecar/data snapshot coupling
-- documented payload `content_hash` enforcement on read
-- documented frozen JSON/text/raw write semantics
-- documented durable sidecar write path
-- documented native C hot-path preservation
+state.unlockvar("reward")
+state.addvar("context", ["initial"])
+state.stalkvar("~context", ["observation-1"])
+state.stalkvar("~context", ["observation-2"])
+latest_context = state.loadvar("context_0002")
+```
 
-## v3.1.23 adds
+## Trace ranking quick start
 
-- `StudioOperationalStressScenario`
-- `StudioOperationalStressScenarioResult`
-- `StudioOperationalStressScenarioMatrix`
-- `DEFAULT_OPERATIONAL_STRESS_SCENARIOS`
-- `StudioOperationalStressHarness.run_scenario(...)`
-- `StudioOperationalStressHarness.run_scenario_matrix(...)`
-- named Browser polling stress scenario
-- named Studio live-event overflow stress scenario
-- named Manual Builder payload stress scenario
-- named `.tds` persistence atomicity stress scenario
-- combined Browser + Studio + `.tds` observation stress scenario
-- explicit authority-boundary denial scenario
-- JSON/signal-safe scenario matrix payloads
-- updated API reference PDF under `tds_api_docs/`
-- README / README_ja cross-links and API PDF links
+```python
+from staqtapp_tds.spiral import rank_traces
 
-## v3.1.22 adds
+ranked = rank_traces(
+    ["trace-a", "trace-b", "trace-c"],
+    [0.82, 0.95, 0.95],
+    confidences=[0.90, 0.92, 0.92],
+    depths=[2, 3, 1],
+    limit=2,
+)
 
-- `staqtapp_tds.studio_pyqt5.operational_stress`
-- `StudioOperationalStressHarness`
-- `StudioOperationalStressReport`
-- `StudioOperationalStressObservation`
-- `StudioOperationalStressStatus`
-- `studio_operational_stress_capability_matrix()`
-- Browser-style `AdminControl.status()` polling stress
-- bounded Studio live-event overflow stress
-- Manual Builder JSON/signal payload stress
-- `.tds` atomic persistence reader/writer stress
-- API reference PDF under `tds_api_docs/`
-- README / README_ja cross-links and API PDF links
-- authority-boundary preservation for all stress surfaces
+for record in ranked:
+    print(record.rank, record.trace_id, record.rank_score)
+```
 
-## v3.1.21 adds
+## CSV quick start
 
-- bounded live-event stream drop accounting
-- retained cursor floor reporting
-- dropped event count reporting
-- runtime retention-gap warnings
-- JSON/signal-safe Manual Builder form payload normalization
-- bridge/runtime/manual-builder factory cleanup
-- focused Driver Studio runtime hardening tests
-- authority-boundary preservation for all Studio runtime surfaces
+```python
+from staqtapp_tds.csv_layer import (
+    export_original_csv,
+    import_csv_bytes,
+    prove_original_roundtrip,
+    validate_csv_artifacts,
+)
 
-## v3.1.20 adds
+csv_dir = fs.makedirs("/datasets")
+manifest = import_csv_bytes(
+    csv_dir,
+    b"id,name,score\n1,Ada,99\n2,Grace,98\n",
+    source_name="people.csv",
+)
 
-- `staqtapp_tds.studio_pyqt5.export_integrity_workflow`
-- `StudioExportIntegrityWorkflow`
-- `StudioExportIntegrityWorkflowState`
-- `StudioExportIntegrityCheckpoint`
-- `StudioExportIntegrityCheckpointStatus`
-- `StudioExportIntegrityManifestComparison`
-- `StudioExportIntegrityReviewGate`
-- `StudioExportIntegrityWorkflowStatus`
-- manifest hash recomputation
-- packet hash recomputation
-- expected manifest/hash comparison
-- progressive export checkpoint rows
-- review-safe export handoff gate
-- deterministic export workflow hash
-- bridge/runtime constructors for the workflow
+validation = validate_csv_artifacts(csv_dir, manifest.csv_id)
+assert validation.ok
+assert export_original_csv(csv_dir, manifest.csv_id).startswith("id,name")
+assert prove_original_roundtrip(csv_dir, manifest.csv_id).byte_equivalent
+```
 
-## v3.1.17 adds
+The CSV layer stores the source and derived evidence as bounded TDS artifacts. It does not write one TDS entry per cell and does not turn the native storage engine into a CSV parser or semantic reasoner.
 
-- `staqtapp_tds.drivers.performance`
-- `DriverVMPerformanceHarness`
-- `DriverVMPerformancePolicy`
-- `DriverVMPerformanceReport`
-- `DriverVMPerformanceRun`
-- `DriverVMPerformanceSummary`
-- `DriverVMPerformanceComparison`
-- `DriverVMPerformanceStatus`
-- `DriverVMPerformanceBackend`
-- `driver_vm_performance_capability_matrix()`
-- `driver_vm_performance_enabled()`
-- direct Python VM benchmark evidence
-- optional Runtime Manager overhead comparison
-- optional native C backend parity slot
-- deterministic result hash comparison
-- records/sec, emitted/sec, and cost/sec metrics
-- performance evidence hash
+## Centralized Browser
+
+```bash
+staqtapp-tds-admin status
+staqtapp-tds-admin verify --sample
+staqtapp-tds-admin serve-panel --host 127.0.0.1 --port 8765
+```
+
+Open `http://127.0.0.1:8765/`. The Browser is local-only by default, requires same-origin and CSRF checks for configuration actions, and reads cached status snapshots rather than walking storage structures on each refresh.
+
+## Architecture boundary
+
+```text
+AI application / service
+        |
+        +-- TDSResult-first storage and variable calls
+        +-- trace ranking and provenance
+        +-- CSV evidence and Semantic IR review
+        +-- Driver Foundry / Runtime Manager / Studio
+        |
+        v
+Python TDS orchestration layer
+        |
+        +-- immutable snapshots and copied diagnostics --> centralized Browser
+        |
+        v
+native index / optional CSV kernels / .tds persistence
+```
+
+Native storage is responsible for narrow mechanical work. Diagnostics, Semantic IR, Driver Studio, and Browser rendering do not control native storage locks.
+
+## Programmer documentation
+
+The new [Programmer Core API Guide](tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf) is the recommended starting point. It organizes direct calls by task and includes implementation snippets for:
+
+- directory and entry operations;
+- `.tds` writing, reading, mounting, and integrity behavior;
+- variable manipulation and stalk chains;
+- text, JSON, serialization, provenance, and result handling;
+- telemetry, verification, pressure, recovery, and native diagnostics;
+- trace creation and ranking;
+- the complete operational CSV call chain;
+- Semantic IR candidates, lifecycle transitions, and atomic batches;
+- Driver Foundry, VM, Runtime Manager, regression, review, evidence, Browser, and Driver Studio calls.
+
+The [API Surface Reference](tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf) remains available for broad class-by-class inspection.
+
+## Safety and authority boundaries
+
+TDS intentionally distinguishes preparation, evidence, review, and authority:
+
+- CSV Semantic IR calls do not autonomously declare semantic truth.
+- v3.5.2 admits `proposed`, `validated`, and `contested`; it does not admit `committed` or `superseded`.
+- Driver Foundry may validate, compile, audit, test, and submit candidates; it does not sign or activate drivers.
+- Driver Studio observes, explains, prepares proposals, and routes review requests; it does not bypass Registry, Review Board, Runtime Manager, or signature policy.
+- Browser telemetry is snapshot-based and is not a storage control loop.
+
+## Validation status
+
+The v3.5.2 delivery baseline was validated with:
+
+- 683 fallback/source tests passed and 11 native-only tests skipped;
+- 694 tests passed with both C extensions built;
+- 61 packaged Semantic IR tests passed;
+- fresh-archive release checking and packaged native builds passed;
+- no compiled objects or cache directories included in the source archive.
+
+## Repository map
+
+```text
+src/staqtapp_tds/          core storage, persistence, telemetry, native management
+src/staqtapp_tds/csv_layer CSV evidence, transactions, Interpole, Semantic IR
+src/staqtapp_tds/drivers/  TDDL, bytecode, VM, Foundry, review and evidence
+src/staqtapp_tds/studio_pyqt5/ optional Driver Studio cockpit
+src/staqtapp_tds/admin/    centralized Browser and local admin control
+examples/                  runnable examples
+docs/                      architecture and release contract documents
+tds_api_docs/              programmer and full API PDFs
+```
+
+## License
+
+See [LICENSE](LICENSE).

@@ -22,6 +22,12 @@ setup(
             ["src/staqtapp_tds/_native_index.c"],
             extra_compile_args=extra_compile_args,
             extra_link_args=extra_link_args,
+        ),
+        Extension(
+            "staqtapp_tds._csv_scan_kernel",
+            ["src/staqtapp_tds/_csv_scan_kernel.c"],
+            extra_compile_args=extra_compile_args,
+            extra_link_args=extra_link_args,
         )
     ]
 )

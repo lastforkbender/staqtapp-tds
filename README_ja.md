@@ -1,170 +1,215 @@
-# 🟦🟪🟧 Staqtapp-TDS v3.1.26
+# Staqtapp-TDS v3.5.2
 
-[English README](README.md) · [API Surface Reference PDF](tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf)
+**Temporal Directory System - AI システム向けの native-indexed `.tds` ストレージ、変数制御、トレース順位付け、CSV evidence 操作、semantic review、集中型 observability。**
+
+**プログラマー向けの最初の資料:** [Staqtapp-TDS Programmer Core API Guide (PDF)](tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf)
 
 <p align="center">
-  <img src="docs/screenshots/tds_browser_telemetry_overview_1280x800.png" alt="Staqtapp-TDS Browser telemetry dashboard overview" width="100%">
+  <img src="docs/screenshots/tds_browser_telemetry_overview_1280x800.png" alt="Staqtapp-TDS Browser の全 19 ページを個別に表示し、07 番目に CSV Interpole Monitor を表示" width="100%">
 </p>
 
-<p align="center"><em>Browser Operations Console — 1280×800 で取得した telemetry page 全体の overview。</em></p>
+<p align="center"><em>Browser Operations Console - 集中型 Browser の全 19 navigation page を個別に capture し、縦方向に配置しています。Page 07 では、CSV Interpole が選択され、データが設定された CSV Interpole Monitor を明確に確認できます。</em></p>
 
-## v3.1.26 Storage Engine Hardening for CSV / *stacked-app* Preparation
+[English README](README.md) | [Complete API Surface Reference PDF](tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf) | [Changelog](CHANGELOG.md)
 
-TDS v3.1.26 は、前回 package で適用済みの storage-engine hardening patch を repository version line として明確化する release です。code-level storage patch は同じ hardened engine のままで、この更新では version metadata と README surface を v3.1.26 に揃え、unique CSV features と将来の *stacked-app* features の前提となる hardened storage baseline を明示します。
+## TDS が提供するもの
 
-目的は単純です。CSV-oriented workflow や stacked application layer が `.tds` persistence を coordination substrate として信頼する前に、storage engine は曖昧な file を拒否し、payload identity を守り、sidecar metadata をそれが説明する実際の data snapshot に結びつける必要があります。
+Staqtapp-TDS は AI アプリケーション向けの directory-first storage / operations layer です。Python value、text、JSON、binary payload、trace evidence、driver evidence、管理対象 CSV artifact を階層化された in-memory directory に保持し、その状態を `.tds` file へ flush、または `.tds` file から mount できます。
 
-今回明記した hardening condition:
+TDS は storage hot path を狭く保つ設計です。Native index、lookup、persistence、optional CSV scan kernel は、diagnostics、Browser rendering、Driver Studio、Semantic IR review、policy-facing evidence workflow から分離されています。
 
-- malformed slot-index tail は partial key を出さず fail closed する;
-- invalid slot count、bad index offset、EOF-overrun geometry、duplicate slot name、bad UTF-8 name、bad name hash、trailing index bytes を reject する;
-- compressed persisted payload は current process default codec ではなく stored entry codec を使う;
-- sidecar metadata は `.tds` file と同じ frozen data snapshot から生成される;
-- sidecar `content_hash` は read 時に enforce され、altered payload bytes は valid-looking mutated value ではなく typed integrity result を返す;
-- JSON/text/raw durable value は write 時に freeze され、flush 前の caller mutation が persisted output を変えない;
-- sidecar write path は write-all、fsync、atomic replace、parent-directory fsync を使い durability を強める。
+## 現在の主な利点
 
-この hardening は意図的に storage boundary に集中しています。対象は open/load validation、persisted read integrity、snapshot generation、flush durability です。native C storage/index hot path は performance-preserved のままで、追加 work は normal native lookup behavior の内部ではなく correctness が必要な境界で発生します。
+| Capability | 実装上の利点 |
+|---|---|
+| `.tds` persistence | Atomic file replacement、mmap random access、sidecar integrity metadata、mounted-reader lifecycle、deterministic directory snapshot。 |
+| 直接的な変数制御 | 別の application database API を作らずに、add、edit、lock、unlock、find、load、stalk chain append を実行できます。 |
+| Non-halting result model | Result-first call は `TDSResult` を返し、安定した code、message、value、metadata により AI runtime の通常エラーを停止に直結させません。 |
+| Native-indexed storage | Optional compiled index/checksum path、deterministic Python fallback、明示的な native capability report。 |
+| Trace ranking | Confidence、depth、age、top-N、statistics、native/Python parity を持つ deterministic Spiral-compatible ranking。 |
+| CSV Suite | Original-byte preservation、dialect evidence、logical row offset、row anchor、scan parity、artifact transaction、storage binding、native scan evidence、Interpole telemetry、Semantic IR candidate、lifecycle transition、atomic batch review。 |
+| Evidence-bound semantics | Caller が明示した declaration と承認済み review transition を記録し、semantic truth を自動推論または自動 commit しません。 |
+| Driver platform | TDDL validation、deterministic bytecode、bounded Driver VM、Foundry proposal/test、regression evidence、review bundle、read-only Studio integration。 |
+| 集中型 Browser | Engine health、pressure、event ring、CSV Interpole、Spiral Rank、snapshot、index、storage、recovery、alert、security、settings を 1 つの local Browser で表示します。 |
+| Observer isolation | Browser、telemetry、diagnostics、Studio は snapshot または copied event を利用し、storage lock を制御しません。 |
 
-## v3.1.25 Browser & Studio Visual Consistency Hardening
+## インストール
 
-TDS v3.1.25 では、次の persistence / edit-safety reliability layer に進む前に、Browser dashboard と optional PyQt5 Driver Studio shell の visual consistency を強化しました。
+```bash
+python -m pip install .
 
-Browser stylesheet では、sidebar の control-plane card を通常 flow に戻し、長い navigation list に独立した scroll region を与え、後続 CSS override 後にも compact desktop breakpoint が効くようにし、workload card の width pressure、architecture connector rail、hero-orbit の overhang risk を抑えました。これにより 1560×960、1440×900、1280×800 の screenshot size で panel overlap / text overhang / unfitted resizing risk を減らします。
-
-Studio PyQt5 shell は observe-only authority model を維持しながら、1280×800 minimum、dock nesting/tabbing、panel minimum、group-box/help-label styling、bounded scroll area、text-edit padding、Manual Builder split sizing を改善しました。
-
-
-## v3.1.23 Driver Studio Stress Scenario Matrix
-
-TDS v3.1.23 では、v3.1.22 の operational stress harness を拡張し、Browser、Studio、Manual Builder、`.tds` persistence、combined observation、authority-denial の各 stress path を named scenario として実行できる deterministic scenario matrix を追加しました。
-
-この scenario matrix は host operation を停止せず、`StudioOperationalStressScenarioMatrix` として evidence を返します。各 stress path を個別に検証でき、同時に Browser + Studio + `.tds` の combined proof path も保持します。
-
-## v3.1.22 Driver Studio Operational Stress Harness
-
-TDS v3.1.22 では、完成済みの Driver Studio runtime と Browser-style observer path のために、headless operational stress harness を追加しました。Browser snapshot polling、bounded Studio live-event overflow、Manual Builder の JSON/signal payload safety、`.tds` atomic persistence reader check を、Studio / Browser の authority を広げずに検証します。
-
-この harness は host operation を停止せず、`StudioOperationalStressReport` として evidence を返します。event overflow は、drop count、warning、current immutable snapshot からの recovery が明示される限り、正常な pressure condition として扱います。
-
-## v3.1.21 Driver Studio Runtime Hardening
-
-TDS v3.1.21 では、v3.1.20 の Export Integrity Workflow 完了後の optional Driver Studio runtime を強化しました。bounded live-event stream の drop accounting、retained cursor floor、GUI polling が遅れた場合の retention-gap warning、Manual Builder signal payload の JSON-safe normalization、runtime hardening test を追加しています。
-
-これは Studio cockpit runtime の信頼性を高めるための release です。Studio は引き続き observe、hydrate、explain、verify、intent preparation のみを行います。approve、reject、quarantine、sign、activate、Registry mutation、trusted driver execution、storage write、private key storage、Runtime Manager / Foundry / Review Board / Registry policy bypass は行いません。
-
-## v3.1.20 Driver Studio Export Integrity Workflow
-
-TDS v3.1.20 では、v3.1.19 の Export / Audit Console の上に Driver Studio Export Integrity Workflow を追加しました。manifest hash と packet hash を再計算し、任意の expected manifest / packet hash と比較し、export checklist を checkpoint として進行表示し、外部 export tooling へ渡すための review-safe readiness gate を生成します。
-
-この Workflow は evidence readiness を verify/explain するだけです。approve、reject、quarantine、sign、activate、Registry mutation、trusted driver execution、storage write、private key storage、Runtime Manager / Foundry / Review Board / Registry policy bypass は行いません。
-
-### v3.1.17 Driver VM Performance Evidence Harness
-
-TDS v3.1.17 では、任意実行の Driver VM Performance Evidence Harness を追加しました。この harness は、現在の Python Driver VM の検索/抽出性能を制御された形で測定し、将来の optional native C Driver VM backend に対する parity target を作ります。
-
-通常の Python driver 実行経路は変更しません。
-
-```text
-通常の DriverVMRuntime.execute()
-  -> 変更なし
-  -> benchmark loop なし
-  -> per-record timer hook なし
-  -> automatic profiling なし
-
-明示的な DriverVMPerformanceHarness.run_package(...)
-  -> controlled repetitions
-  -> direct Python VM timing
-  -> optional Runtime Manager timing
-  -> optional native C backend slot
-  -> parity/performance evidence report
+# Optional PyQt5 Driver Studio
+python -m pip install ".[gui]"
 ```
 
-## 現在の検証状態
+Python 3.10 以上と NumPy が必要です。C extension は optional です。Caller が native-only を明示的に強制しない限り、対応する operation には deterministic Python fallback があります。
 
-```text
-storage hardening regression coverage passed
-selected native/storage checks passed
-source-clean release check passed
+## Core storage quick start
+
+```python
+from pathlib import Path
+from staqtapp_tds import TDSFileSystem, TDSPersistence
+
+fs = TDSFileSystem("agent_state")
+models = fs.makedirs("/models/runtime")
+
+models.write_text("system_prompt", "You are a careful planning agent.")
+models.write_json("settings", {"temperature": 0.2, "tools": True})
+models.write_result("step_count", 7)
+
+result = models.read_result("settings")
+if result.ok:
+    settings = result.value
+
+store = TDSPersistence(Path("./tds_store"))
+store.flush(fs, parallel_nodes=False)
+loaded_runtime = store.load_node(
+    Path("./tds_store/agent_state__models__runtime.tds")
+)
+assert loaded_runtime.read_value("step_count") == 7
 ```
 
-## 現在の active development track
+## 変数操作 quick start
 
-CSV feature preparation と *stacked-app* feature preparation のための storage engine hardening、および authority を広げない Driver Studio / Browser observation confidence の継続。
+```python
+state = fs.makedirs("/agent/state")
 
-## v3.1.26 の追加要素
+state.addvar("reward", 1.0)
+state.editvar("reward", 1.25)
+state.lockvar("reward")
 
-- repository version promotion to `3.1.26`
-- README / README_ja storage-hardening release notes
-- explicit CSV and *stacked-app* preparation language
-- documented fail-closed slot-index parsing behavior
-- documented reader geometry validation coverage
-- documented stored-codec stability for persisted compressed payloads
-- documented sidecar/data snapshot coupling
-- documented payload `content_hash` enforcement on read
-- documented frozen JSON/text/raw write semantics
-- documented durable sidecar write path
-- documented native C hot-path preservation
+found = state.findvar("reward")
+assert found.ok and found.value == 1.25
 
-## v3.1.23 の追加要素
+state.unlockvar("reward")
+state.addvar("context", ["initial"])
+state.stalkvar("~context", ["observation-1"])
+state.stalkvar("~context", ["observation-2"])
+latest_context = state.loadvar("context_0002")
+```
 
-- `StudioOperationalStressScenario`
-- `StudioOperationalStressScenarioResult`
-- `StudioOperationalStressScenarioMatrix`
-- `DEFAULT_OPERATIONAL_STRESS_SCENARIOS`
-- `StudioOperationalStressHarness.run_scenario(...)`
-- `StudioOperationalStressHarness.run_scenario_matrix(...)`
-- named Browser polling stress scenario
-- named Studio live-event overflow stress scenario
-- named Manual Builder payload stress scenario
-- named `.tds` persistence atomicity stress scenario
-- combined Browser + Studio + `.tds` observation stress scenario
-- explicit authority-boundary denial scenario
-- JSON/signal-safe scenario matrix payload
-- `tds_api_docs/` 以下の更新済み API reference PDF
-- README / README_ja の相互リンクと API PDF リンク
+## Trace ranking quick start
 
-## v3.1.22 の追加要素
+```python
+from staqtapp_tds.spiral import rank_traces
 
-- `staqtapp_tds.studio_pyqt5.operational_stress`
-- `StudioOperationalStressHarness`
-- `StudioOperationalStressReport`
-- `StudioOperationalStressObservation`
-- `StudioOperationalStressStatus`
-- `studio_operational_stress_capability_matrix()`
-- Browser-style `AdminControl.status()` polling stress
-- bounded Studio live-event overflow stress
-- Manual Builder JSON/signal payload stress
-- `.tds` atomic persistence reader/writer stress
-- `tds_api_docs/` 以下の API reference PDF
-- README / README_ja の相互リンクと API PDF リンク
-- すべての stress surface での authority-boundary preservation
+ranked = rank_traces(
+    ["trace-a", "trace-b", "trace-c"],
+    [0.82, 0.95, 0.95],
+    confidences=[0.90, 0.92, 0.92],
+    depths=[2, 3, 1],
+    limit=2,
+)
 
-## v3.1.21 の追加要素
+for record in ranked:
+    print(record.rank, record.trace_id, record.rank_score)
+```
 
-- bounded live-event stream drop accounting
-- retained cursor floor reporting
-- dropped event count reporting
-- runtime retention-gap warnings
-- JSON/signal-safe Manual Builder form payload normalization
-- bridge/runtime/manual-builder factory cleanup
-- focused Driver Studio runtime hardening tests
-- Studio runtime authority-boundary preservation
+## CSV quick start
 
-## v3.1.20 の追加要素
+```python
+from staqtapp_tds.csv_layer import (
+    export_original_csv,
+    import_csv_bytes,
+    prove_original_roundtrip,
+    validate_csv_artifacts,
+)
 
-- `staqtapp_tds.studio_pyqt5.export_integrity_workflow`
-- `StudioExportIntegrityWorkflow`
-- `StudioExportIntegrityWorkflowState`
-- `StudioExportIntegrityCheckpoint`
-- `StudioExportIntegrityCheckpointStatus`
-- `StudioExportIntegrityManifestComparison`
-- `StudioExportIntegrityReviewGate`
-- `StudioExportIntegrityWorkflowStatus`
-- manifest hash recomputation
-- packet hash recomputation
-- expected manifest/hash comparison
-- progressive export checkpoint rows
-- review-safe export handoff gate
-- deterministic export workflow hash
-- bridge/runtime constructors for the workflow
+csv_dir = fs.makedirs("/datasets")
+manifest = import_csv_bytes(
+    csv_dir,
+    b"id,name,score\n1,Ada,99\n2,Grace,98\n",
+    source_name="people.csv",
+)
+
+validation = validate_csv_artifacts(csv_dir, manifest.csv_id)
+assert validation.ok
+assert export_original_csv(csv_dir, manifest.csv_id).startswith("id,name")
+assert prove_original_roundtrip(csv_dir, manifest.csv_id).byte_equivalent
+```
+
+CSV layer は source と derived evidence を bounded TDS artifact として保存します。Cell ごとの TDS entry は作成せず、native storage engine を CSV parser や semantic reasoner にしません。
+
+## 集中型 Browser
+
+```bash
+staqtapp-tds-admin status
+staqtapp-tds-admin verify --sample
+staqtapp-tds-admin serve-panel --host 127.0.0.1 --port 8765
+```
+
+`http://127.0.0.1:8765/` を開きます。Browser は default で local-only です。Configuration action には same-origin と CSRF check が必要で、refresh ごとに storage structure を walk せず cached status snapshot を読みます。
+
+## Architecture boundary
+
+```text
+AI application / service
+        |
+        +-- TDSResult-first storage and variable calls
+        +-- trace ranking and provenance
+        +-- CSV evidence and Semantic IR review
+        +-- Driver Foundry / Runtime Manager / Studio
+        |
+        v
+Python TDS orchestration layer
+        |
+        +-- immutable snapshots and copied diagnostics --> centralized Browser
+        |
+        v
+native index / optional CSV kernels / .tds persistence
+```
+
+Native storage は限定された mechanical work を担当します。Diagnostics、Semantic IR、Driver Studio、Browser rendering は native storage lock を制御しません。
+
+## Programmer documentation
+
+新しい [Programmer Core API Guide](tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf) を最初に参照してください。Task ごとに direct call を整理し、次の実装 snippet を含みます。
+
+- directory / entry operation;
+- `.tds` write、read、mount、integrity behavior;
+- variable manipulation と stalk chain;
+- text、JSON、serialization、provenance、result handling;
+- telemetry、verification、pressure、recovery、native diagnostics;
+- trace creation と ranking;
+- complete operational CSV call chain;
+- Semantic IR candidate、lifecycle transition、atomic batch;
+- Driver Foundry、VM、Runtime Manager、regression、review、evidence、Browser、Driver Studio call。
+
+[API Surface Reference](tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf) は class-by-class の広範な確認用として引き続き利用できます。
+
+## Safety / authority boundary
+
+TDS は preparation、evidence、review、authority を明確に分離します。
+
+- CSV Semantic IR call は semantic truth を自動宣言しません。
+- v3.5.2 が許可する state は `proposed`、`validated`、`contested` です。`committed` と `superseded` は許可しません。
+- Driver Foundry は validate、compile、audit、test、candidate submit を行えますが、sign または activate は行いません。
+- Driver Studio は observe、explain、proposal preparation、review request routing を行いますが、Registry、Review Board、Runtime Manager、signature policy を bypass しません。
+- Browser telemetry は snapshot-based であり storage control loop ではありません。
+
+## Validation status
+
+v3.5.2 delivery baseline の検証結果:
+
+- fallback/source: 683 passed、native-only 11 skipped;
+- 両方の C extension build: 694 passed;
+- packaged Semantic IR: 61 passed;
+- fresh archive release check と packaged native build: passed;
+- source archive に compiled object / cache directory なし。
+
+## Repository map
+
+```text
+src/staqtapp_tds/          core storage, persistence, telemetry, native management
+src/staqtapp_tds/csv_layer CSV evidence, transactions, Interpole, Semantic IR
+src/staqtapp_tds/drivers/  TDDL, bytecode, VM, Foundry, review and evidence
+src/staqtapp_tds/studio_pyqt5/ optional Driver Studio cockpit
+src/staqtapp_tds/admin/    centralized Browser and local admin control
+examples/                  runnable examples
+docs/                      architecture and release contract documents
+tds_api_docs/              programmer and full API PDFs
+```
+
+## License
+
+[LICENSE](LICENSE) を参照してください。
