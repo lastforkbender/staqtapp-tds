@@ -307,6 +307,98 @@ function renderAlertsPage(data){
   setText('alerts-chip', alerts.length && alerts[0][0]!=='info' ? 'attention' : 'ring-buffer aware');
 }
 
+
+function percentText(value){ return `${Math.max(0, Math.min(100, Math.round((Number(value)||0)*100)))}%`; }
+function csvIcon(name){ return `/static/icons/${name || 'csv-compact-snapshot'}.svg`; }
+function csvStatusClass(status){
+  const s=String(status||'').toLowerCase();
+  if(['stable','ready','passed','valid','coherent','guarded','monitor_ready'].includes(s)) return 'ok';
+  if(['watch','declared','waiting'].includes(s)) return 'watch';
+  return 'critical';
+}
+function renderCSVInterpoleMonitor(data){
+  const monitor = data.csv_interpole_monitor || (data.observation && data.observation.csv_interpole_monitor) || null;
+  const status = monitor ? String(monitor.status || 'waiting') : 'waiting';
+  setText('csv-interpole-status', titleCase(status));
+  setText('csv-monitor-ring-state', titleCase(monitor ? monitor.ring_state : 'waiting'));
+  setText('csv-monitor-mirror-state', titleCase(monitor ? monitor.mirror_state : 'waiting'));
+  setText('csv-monitor-kernel-state', titleCase(monitor ? monitor.kernel_readiness_state : 'waiting'));
+  setText('csv-monitor-performance-state', titleCase(monitor ? monitor.performance_gate_state : 'waiting'));
+  setText('csv-ring-fingerprint', monitor ? truncateText(monitor.ring_fingerprint || '—', 18) : '—');
+  setText('csv-mirror-fingerprint', monitor ? truncateText(monitor.mirror_fingerprint || '—', 18) : '—');
+  setText('csv-monitor-ir-score', monitor ? percentText(monitor.ring_ir_readiness_score) : '0%');
+  setText('csv-monitor-mirror-feedback', monitor && Array.isArray(monitor.discrete_feedback) && monitor.discrete_feedback.length ? monitor.discrete_feedback.join(' · ') : 'waiting');
+  const score=Math.max(0,Math.min(100,Math.round(Number(monitor && monitor.ring_stability_score || 0)*100)));
+  setText('csv-ring-score', `${score}%`);
+  const ring=$('csv-ring-score'); if(ring && ring.parentElement) ring.parentElement.style.background=`conic-gradient(var(--blue) 0 ${score}%, rgba(255,255,255,.10) ${score}% 100%)`;
+
+  const cards=$('csv-monitor-cards'); if(cards){
+    clear(cards);
+    const items=monitor && Array.isArray(monitor.cards)?monitor.cards:[];
+    if(!items.length){
+      const row=document.createElement('div'); row.className='csv-monitor-card watch';
+      const img=document.createElement('img'); img.src='/static/icons/csv-compact-snapshot.svg'; img.alt='';
+      const div=document.createElement('div'); div.appendChild(node('span','Monitor Snapshot')); div.appendChild(node('b','waiting')); div.appendChild(node('small','No CSV Interpole snapshot is present in the current status payload.'));
+      row.append(img, div); cards.appendChild(row);
+    } else {
+      items.forEach(card=>{
+        const row=document.createElement('div'); row.className=`csv-monitor-card ${String(card.severity||csvStatusClass(card.status)).toLowerCase()}`;
+        const img=document.createElement('img'); img.src=csvIcon(card.icon_name); img.alt='';
+        const div=document.createElement('div'); div.appendChild(node('span', card.card_name)); div.appendChild(node('b', card.value || titleCase(card.status))); div.appendChild(node('small', card.detail || titleCase(card.status)));
+        row.append(img,div); cards.appendChild(row);
+      });
+    }
+  }
+
+  const nodes=$('csv-ring-nodes'); if(nodes){
+    clear(nodes);
+    const items=monitor && Array.isArray(monitor.ring_nodes)?monitor.ring_nodes:[];
+    if(!items.length) appendPairRow(nodes,'csv-node-row watch','Ring waiting','Committed Interpole ring evidence has not been surfaced to this Browser snapshot.');
+    items.forEach(item=>{
+      const row=document.createElement('div'); row.className=`csv-node-row ${csvStatusClass(item.status)}`;
+      row.appendChild(node('b', `${item.node_index}. ${titleCase(item.stage_name)}`));
+      row.appendChild(node('span', `${titleCase(item.status)} · ${titleCase(item.direction)} · ${item.feedback_hint}`));
+      const meter=document.createElement('em'); meter.className='bar'; const fill=document.createElement('i'); fill.style.width=`${Math.round((Number(item.ir_readiness_pressure)||0)*100)}%`; meter.appendChild(fill);
+      const small=node('small', `signals ${item.signal_count} · fp ${item.node_fingerprint_suffix || '—'} · IR ${percentText(item.ir_readiness_pressure)}`); small.prepend(meter);
+      row.appendChild(small); nodes.appendChild(row);
+    });
+  }
+
+  const gates=$('csv-gate-stack'); if(gates){
+    clear(gates);
+    const items=monitor && Array.isArray(monitor.gate_rows)?monitor.gate_rows:[];
+    if(!items.length) appendPairRow(gates,'csv-gate-row watch','Gate stack waiting','Performance and readiness gates are not yet present in this Browser snapshot.');
+    items.forEach(gate=>{
+      const row=document.createElement('div'); row.className=`csv-gate-row ${csvStatusClass(gate.status)}`;
+      const img=document.createElement('img'); img.src=csvIcon(gate.icon_name); img.alt='';
+      const div=document.createElement('div'); div.appendChild(node('b', titleCase(gate.gate_name))); div.appendChild(node('span', `${titleCase(gate.status)} · ${gate.detail || 'gate evidence'}`)); div.appendChild(node('small', gate.fingerprint_suffix ? `fp ${gate.fingerprint_suffix}` : 'compact gate row'));
+      row.append(img,div); gates.appendChild(row);
+    });
+  }
+
+  const lanes=$('csv-signal-lanes'); if(lanes){
+    clear(lanes);
+    const items=monitor && Array.isArray(monitor.signal_lanes)?monitor.signal_lanes:[];
+    if(!items.length) appendPairRow(lanes,'csv-signal-row watch','Signals waiting','Determinant pressure lanes have not been surfaced yet.');
+    items.forEach(lane=>{
+      const row=document.createElement('div'); row.className=`csv-signal-row ${csvStatusClass(lane.pressure_label)}`;
+      const img=document.createElement('img'); img.src=csvIcon(lane.icon_name); img.alt='';
+      const div=document.createElement('div'); div.appendChild(node('b', titleCase(lane.lane_name))); div.appendChild(node('span', `${titleCase(lane.source_stage_name)} · ${titleCase(lane.direction)} · confidence ${percentText(lane.confidence)}`));
+      const meter=document.createElement('em'); meter.className='bar'; const fill=document.createElement('i'); fill.style.width=`${Math.round((Number(lane.weighted_magnitude)||0)*100)}%`; meter.appendChild(fill);
+      const small=node('small', `${titleCase(lane.pressure_label)} · fp ${lane.fingerprint_suffix || '—'}`); small.prepend(meter);
+      div.appendChild(small); row.append(img,div); lanes.appendChild(row);
+    });
+  }
+
+  const events=$('csv-event-log'); if(events){
+    clear(events);
+    const items=monitor && Array.isArray(monitor.event_rows)?monitor.event_rows:[];
+    setText('csv-event-chip', items.length ? `${items.length} rows` : 'read only');
+    if(!items.length) appendPairRow(events,'csv-event-row watch','Waiting','No CSV Interpole monitor events in the current snapshot.');
+    items.forEach(ev=>appendPairRow(events,`csv-event-row ${csvStatusClass(ev.status)}`,`${ev.event_index}. ${titleCase(ev.event_kind)}`,`${titleCase(ev.status)} · ${ev.message || ''}${ev.fingerprint_suffix ? ' · fp '+ev.fingerprint_suffix : ''}`));
+  }
+}
+
 function render(data){
   try{
     const n=normalize(data), active=n.active, perf=n.perf, storage=n.storage, indexes=n.indexes, behavior=n.behavior, pressure=n.pressure||{}, nativeDiag=n.nativeDiagnostics||{}, recovery=n.recovery||{};
@@ -345,7 +437,7 @@ function render(data){
     setText('radix-nodes', fmt(radix.routers||radix.nodes,0)); setText('radix-depth', fmt(radix.average_lookup_steps||radix.average_depth,0)); setText('radix-max-depth', fmt(radix.max_depth,0));
     setText('storage-entries', fmt(storage.entries,0)); setText('chunks-created', fmt(storage.chunks_created,0)); setText('active-chunks', fmt(storage.active_chunks||storage.chunks_created,0)); setText('avg-chunk-size', bytesLabel(storage.avg_chunk_size)); setText('largest-chunk', bytesLabel(storage.largest_chunk)); setText('compression-enabled', active.compression_enabled===false||storage.compression_enabled===false?'Disabled':'Enabled'); setText('total-data-size', bytesLabel(storage.total_data_size)); setText('on-disk-size', bytesLabel(storage.on_disk_size));
     const ndc=nativeDiag.counters||{}; setText('native-diag-status', nativeDiag.degraded?'DEGRADED':(nativeDiag.enabled?'ENABLED':'DISABLED')); setText('native-diag-seq', fmt(nativeDiag.sequence,0)); setText('native-diag-build', fmt(nativeDiag.snapshot_build_ns,0)); setText('native-diag-dropped', fmt(ndc.events_dropped,0)); setText('native-diag-ring-occ', fmt(ndc.ring_occupancy,0)); setText('native-diag-ring-cap', fmt(ndc.ring_capacity,0)); setWidth('native-diag-ring-meter', (Number(ndc.ring_occupancy||0)/Math.max(1,Number(ndc.ring_capacity||1)))*100); setText('native-diag-gil', fmt(ndc.gil_released_calls,0)); setText('native-diag-transitions', fmt(ndc.python_native_transitions,0)); setText('native-diag-slot-transitions', fmt(ndc.slot_transitions,0)); setText('native-diag-index-transitions', fmt(ndc.index_transitions,0)); setText('native-diag-memory-transitions', fmt(ndc.memory_transitions,0)); renderNativeDiagEvents(nativeDiag); setText('diagnostics-status', nativeDiag.degraded?'Degraded':(nativeDiag.enabled?'Enabled':'Disabled')); setText('uptime', secondsToHMS(n.uptime)); setText('side-uptime', secondsToHMS(n.uptime)); setText('backend', String(swiss.backend||'native').includes('python')?'Python':'Native'); setText('native-exec-pct', `${fmt(perf.native_execution_percent,0)}%`); setWidth('native-exec-bar', perf.native_execution_percent||0); setText('python-exec-pct', `${fmt(perf.python_execution_percent,0)}%`); setText('gil-released-pct', `${fmt(perf.gil_released_percent,0)}%`); setText('native-transitions', fmt(perf.python_native_transitions_per_sec ?? perf.python_native_transitions,0)); setText('native-batch-ops', fmt(perf.native_batch_ops_per_sec ?? perf.native_batch_ops,0)); setText('pool-reuse', `${fmt(perf.pool_reuse_percent,0)}%`); setText('allocator-calls', fmt(perf.pool_allocator_calls,0)); setText('gil-ops', fmt(perf.gil_released_ops_per_sec ?? perf.gil_released_ops ?? perf.native_backend_ops,0)); setText('py-fallback', fmt(perf.python_backend_ops,0)); setText('snapshot-age', snapshotAge(n.created));
-    applyComponentStatus(n.components, storage); renderCompletedTelemetryPages(data); renderRecommendations(data); renderTimeline(data);
+    applyComponentStatus(n.components, storage); renderCSVInterpoleMonitor(data); renderCompletedTelemetryPages(data); renderRecommendations(data); renderTimeline(data);
   }catch(err){ setText('health-main','PANEL ERROR'); console.error(err); }
 }
 async function refreshDashboard(){try{const resp=await fetch('/status.json',{cache:'no-store'}); if(!resp.ok) throw new Error(`status ${resp.status}`); render(await resp.json());}catch(err){setText('health-main','DISCONNECTED'); setText('health-sub','Waiting for local admin server'); console.error(err);}}
