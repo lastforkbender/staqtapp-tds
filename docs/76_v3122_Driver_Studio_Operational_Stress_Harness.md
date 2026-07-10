@@ -92,10 +92,10 @@ Stress tooling increases confidence, not authority.
 
 ## API PDF repository location
 
-The generated API reference PDF is now stored in the repository under:
+The canonical generated API reference PDF is stored in the repository under:
 
 ```text
-tds_api_docs/Staqtapp_TDS_v3_1_22_API_Surface_Reference.pdf
+tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf
 ```
 
 Both `README.md` and `README_ja.md` link to this PDF and to each other.
