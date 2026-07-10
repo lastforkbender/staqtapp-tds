@@ -83,7 +83,7 @@ def _native_runner_alias(package, snapshot, policy):
 
 
 def test_v3117_version():
-    assert __version__ == "3.1.26"
+    assert __version__ == "3.5.2"
 
 
 def test_performance_harness_is_opt_in_and_not_a_hot_path_hook():

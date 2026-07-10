@@ -109,7 +109,7 @@ def _task() -> StudioManualDriverTask:
 
 
 def test_v3112_version():
-    assert __version__ == "3.1.26"
+    assert __version__ == "3.5.2"
 
 
 def test_live_bridge_capability_matrix_and_refresh_contracts_do_not_grant_authority():

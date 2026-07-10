@@ -11,7 +11,7 @@ from staqtapp_tds.studio_pyqt5 import (
 
 
 def test_v3122_version():
-    assert __version__ == "3.1.26"
+    assert __version__ == "3.5.2"
 
 
 def test_operational_stress_capability_matrix_preserves_authority_boundaries():

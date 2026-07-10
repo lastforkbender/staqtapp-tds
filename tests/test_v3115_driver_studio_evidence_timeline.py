@@ -98,7 +98,7 @@ def _bundle():
 
 
 def test_v3115_version():
-    assert __version__ == "3.1.26"
+    assert __version__ == "3.5.2"
 
 
 def test_evidence_timeline_capability_matrix_is_observe_only():

@@ -38,7 +38,7 @@ def _task() -> StudioManualDriverTask:
 
 
 def test_v3110_version():
-    assert __version__ == "3.1.26"
+    assert __version__ == "3.5.2"
 
 
 def test_manual_builder_capability_matrix_has_proposal_power_not_trust_authority():
