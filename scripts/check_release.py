@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "3.1.26"
+EXPECTED_VERSION = "3.5.2"
 BANNED_SUFFIXES = {".so", ".pyd", ".dll", ".dylib", ".pyc"}
 BANNED_DIRS = {"__pycache__", ".pytest_cache"}
 
