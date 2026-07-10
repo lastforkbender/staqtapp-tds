@@ -105,7 +105,7 @@ RECORDS = [
 
 
 def test_v310_version():
-    assert __version__ == "3.1.26"
+    assert __version__ == "3.5.2"
 
 
 def test_runtime_executes_validated_search_driver_deterministically():
