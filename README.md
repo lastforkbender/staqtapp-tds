@@ -5,7 +5,7 @@
 **Programmer start here:** [Staqtapp-TDS Programmer Core API Guide (PDF)](tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf)
 
 <p align="center">
-  <img src="docs/screenshots/tds_browser_telemetry_overview_1280x800.png" alt="All 19 Staqtapp-TDS Browser pages captured individually, with CSV Interpole Monitor shown as page 07" width="100%">
+  <img src="docs/screenshots/tds_browser_telemetry_overview_1280x800.png" alt="Staqtapp-TDS Browser" width="100%">
 </p>
 
 <p align="center"><em>Browser Operations Console - all 19 centralized Browser navigation pages, captured individually and stacked vertically. Page 07 visibly shows the populated CSV Interpole Monitor with its navigation item selected.</em></p>
