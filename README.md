@@ -12,7 +12,7 @@
   <img src="docs/screenshots/tds_browser_telemetry_overview_1280x800.png" alt="All 19 Staqtapp-TDS Browser pages captured individually, with CSV Interpole Monitor shown as page 07" width="100%">
 </p>
 
-<p align="center"><em>Browser Operations Console - all 19 centralized Browser navigation pages, captured individually and stacked vertically. Page 07 visibly shows the populated CSV Interpole Monitor with its navigation item selected.</em></p>
+<p align="center"><em>Browser Operations Console</em></p>
 
 [日本語 README](README_ja.md) | [Complete API Surface Reference PDF](tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf) | [Changelog](CHANGELOG.md)
 
