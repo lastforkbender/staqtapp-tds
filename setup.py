@@ -15,8 +15,9 @@ if sanitize:
     extra_compile_args.extend(flags)
     extra_link_args.extend([f for f in flags if f.startswith("-fsanitize")])
 
-setup(
-    ext_modules=[
+native_enabled = os.environ.get("STAQTAPP_TDS_BUILD_NATIVE", "").strip().lower() in {"1", "true", "yes", "on"}
+
+ext_modules = [
         Extension(
             "staqtapp_tds._native_index",
             ["src/staqtapp_tds/_native_index.c"],
@@ -30,4 +31,5 @@ setup(
             extra_link_args=extra_link_args,
         )
     ]
-)
+
+setup(ext_modules=ext_modules if native_enabled else [])

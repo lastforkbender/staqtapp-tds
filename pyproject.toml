@@ -4,11 +4,31 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "staqtapp-tds"
-version = "3.5.2"
+dynamic = ["version"]
 description = "Staqtapp-TDS Temporal Directory System VFS"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{name = "Staqtapp-TDS contributors"}]
+keywords = ["storage", "virtual-filesystem", "telemetry", "database", "python"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Operating System :: OS Independent",
+]
+
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = ["numpy>=1.23"]
+
+[project.urls]
+Homepage = "https://github.com/staqtapp/staqtapp-tds"
+Repository = "https://github.com/staqtapp/staqtapp-tds"
+Issues = "https://github.com/staqtapp/staqtapp-tds/issues"
 
 [project.optional-dependencies]
 fast = ["numba>=0.58"]
@@ -28,3 +48,6 @@ staqtapp-tds-admin = "staqtapp_tds.admin.console:main"
 
 [tool.setuptools.package-data]
 "staqtapp_tds.admin" = ["templates/*.html", "static/css/*.css", "static/js/*.js", "static/icons/*.svg", "static/i18n/*.json"]
+
+[tool.setuptools.dynamic]
+version = {attr = "staqtapp_tds.version.__version__"}

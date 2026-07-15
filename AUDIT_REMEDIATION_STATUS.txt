@@ -1,0 +1,82 @@
+STAQTAPP-TDS v3.5.2 — PYPI READINESS AUDIT REMEDIATION STATUS
+Date: 2026-07-14
+
+DECISION
+Public PyPI release remains NO-GO. Driver and Driver Studio feature improvements must remain frozen.
+This archive is a bounded remediation build, not a public release candidate.
+
+VERIFIED FIXES IMPLEMENTED
+1. R1 license and metadata
+   - Replaced incomplete license with canonical MIT text.
+   - PEP 639 License-Expression: MIT verified in built wheel metadata.
+   - Added authors, keywords, classifiers, and project URLs.
+
+2. R2 namespace identity
+   - Directory filenames now preserve legacy-readable names while escaping delimiter-bearing components.
+   - /root/a/b and /root/a__b no longer collide.
+   - Sidecar records node_name and node_path.
+   - Entry loading resolves exact sidecar slot_key identities, so a/x and x both round-trip.
+   - Duplicate mkdir now fails closed; invalid directory names are rejected.
+
+3. R3 false encryption contract
+   - DirFlags.ENCRYPTED now fails closed with NotImplementedError.
+   - README explicitly states at-rest encryption is not implemented.
+   - No caller can request encryption and silently receive plaintext persistence.
+
+4. R4 mutable snapshot drift
+   - Every serialization lane is frozen at successful write time, including NumPy and pickle.
+   - Persistence no longer reserializes a caller-owned mutable object.
+
+5. R6 lock bypass and concurrency defects
+   - Generic public write/delete now honor variable locks.
+   - Successful public deletion clears lock state.
+   - Per-key variable lock creation is guarded.
+   - addvar and lockvar use the per-key lock boundary.
+
+6. R7 optional-native installation contract
+   - Default wheel is pure Python and builds without a compiler.
+   - Native extensions are opt-in through STAQTAPP_TDS_BUILD_NATIVE=1.
+   - Verified output: staqtapp_tds-3.5.2-py3-none-any.whl.
+
+7. R8 packaging baseline
+   - Added MANIFEST.in for documentation, tests, examples, scripts, tools, API docs, and workflows.
+   - Pure-Python wheel build completed successfully.
+   - Wheel metadata verified for MIT license expression and project URLs.
+
+8. Additional audit corrections
+   - Unknown codecs now fail explicitly instead of silently substituting zlib.
+   - TDSFileSystem.VERSION is sourced from the package version module.
+   - awrite return annotation corrected to TDSResult.
+   - parallel_batch_write now returns every item result.
+   - ConcurrencyPool shutdown closes and joins its loop and clears the singleton.
+   - New mount directories default to 0700; persistence files and sidecars default to 0600.
+   - New persistence format version 2 requires the integrity sidecar; version 1 remains readable.
+
+VERIFICATION
+- Python compileall: PASS.
+- Audit regression suite: 9 passed.
+- Pure-Python wheel build: PASS.
+- Wheel metadata License-Expression: MIT: PASS.
+- Broad project suite: progressed beyond 90% twice with no observed failure; both runs were terminated by the execution time ceiling. This is not recorded as a complete suite pass.
+
+REMAINING RELEASE BLOCKERS — NOT MISREPRESENTED AS FIXED
+1. R5 atomic recoverable generation
+   - v2 now prevents silent integrity downgrade by requiring its sidecar.
+   - Data and sidecar are still not committed through an immutable-generation pointer with old/new crash recovery.
+   - Required next architecture: immutable generation pair, fsync, atomic manifest pointer swap, retained prior generation, and fault injection at every boundary.
+
+2. Native portability and C memory safety
+   - Default installation no longer requires native compilation.
+   - Windows pthread portability, diagnostic-ring publication ordering, C atomics/seqlock design, ASan/UBSan/TSan, and cross-platform native wheels remain open.
+
+3. Untrusted-input resource budgets
+   - Explicit decompression ratio, decoded-size, NumPy dimension/allocation, entry-count, and total-read budgets remain open.
+
+4. Remote admin security
+   - Non-loopback prohibition/authenticated HTTPS, strict POST body caps, request timeouts, and parsed-origin equality remain open.
+
+5. Chunked-text transactionality
+   - Generation-staged chunk overwrite and collision-resistant internal identities remain open.
+
+RELEASE RULE
+Do not publish this build to PyPI and do not resume Driver/Driver Studio feature expansion until the remaining blockers above have dedicated implementation and verification evidence.

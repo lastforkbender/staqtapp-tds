@@ -5,10 +5,10 @@
 **プログラマー向けの最初の資料:** [Staqtapp-TDS Programmer Core API Guide (PDF)](tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf)
 
 <p align="center">
-  <img src="docs/screenshots/tds_browser_telemetry_overview_1280x800.png" alt="Staqtapp-TDS Browser" width="100%">
+  <img src="docs/screenshots/tds_browser_telemetry_overview_1280x800.png" alt="Staqtapp-TDS Browser の全 19 ページを個別に表示し、07 番目に CSV Interpole Monitor を表示" width="100%">
 </p>
 
-<p align="center"><em>Browser Operations Console </em></p>
+<p align="center"><em>Browser Operations Console - 集中型 Browser の全 19 navigation page を個別に capture し、縦方向に配置しています。Page 07 では、CSV Interpole が選択され、データが設定された CSV Interpole Monitor を明確に確認できます。</em></p>
 
 [English README](README.md) | [Complete API Surface Reference PDF](tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf) | [Changelog](CHANGELOG.md)
 

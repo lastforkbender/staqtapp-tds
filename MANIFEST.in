@@ -1,0 +1,9 @@
+include LICENSE README.md README_ja.md CHANGELOG.md pyproject.toml setup.py
+recursive-include src *.py *.c *.h *.html *.css *.js *.svg *.json
+recursive-include docs *
+recursive-include examples *
+recursive-include scripts *
+recursive-include tools *
+recursive-include tds_api_docs *
+recursive-include tests *.py
+recursive-include .github *.yml *.yaml

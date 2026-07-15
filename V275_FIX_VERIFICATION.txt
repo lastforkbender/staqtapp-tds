@@ -1,0 +1,17 @@
+Staqtapp-TDS v2.7.5 verification
+
+Applied fixes:
+- admin/panel.py imports dumps_pretty, restoring /status.json JSON responses.
+- diagnostics section uses diagnostics-grid instead of misaligned quad-grid.
+- health ring updates its conic-gradient from the live health score.
+- workload maintenance percentage is wired to dashboard.js and donut rendering.
+- workload percentages use a derived final bucket to avoid rounding drift.
+- collapsed sidebar links include title and aria-label values.
+- hidden js-json compatibility markup was removed from the body.
+- unused pick() JavaScript helper was removed.
+- stale CSS sidebar variable and shadowed pressure-grid column rule were cleaned.
+
+Validation in this environment:
+- python -m compileall -q src tests
+- python -m pytest -q
+- Result: 104 passed

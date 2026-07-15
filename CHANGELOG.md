@@ -2,7 +2,8 @@
 
 - Added `tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf`.
 - Replaced cumulative release-note READMEs with current capability, quick-start, architecture, authority-boundary, and validation summaries in English and Japanese.
-- Retained the complete API Surface Reference PDF for exhaustive class inspection. (Does not include the most advanced CSV Semantics Suit Surface API)
+- Updated the centralized Browser overview screenshot to include every telemetry page, including CSV Interpole.
+- Retained the complete API Surface Reference PDF for exhaustive class inspection.
 
 ## v3.5.2 — Semantic IR Atomic Batch Review Contract
 

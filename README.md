@@ -1,3 +1,7 @@
+> **v3.5.2 remediation security contract**
+>
+> At-rest encryption is not implemented. Requests using `DirFlags.ENCRYPTED` fail closed instead of storing plaintext. New v2 persistence files require their integrity sidecar. `.tds` input should be treated as trusted until explicit resource-budget hardening is complete. Native extensions are optional and are built only when `STAQTAPP_TDS_BUILD_NATIVE=1` is set.
+
 # Staqtapp-TDS v3.5.2
 
 **Temporal Directory System - native-indexed `.tds` storage, controlled variables, trace ranking, CSV evidence operations, semantic review, and centralized observability for AI systems.**
@@ -5,10 +9,10 @@
 **Programmer start here:** [Staqtapp-TDS Programmer Core API Guide (PDF)](tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf)
 
 <p align="center">
-  <img src="docs/screenshots/tds_browser_telemetry_overview_1280x800.png" alt="Staqtapp-TDS Browser" width="100%">
+  <img src="docs/screenshots/tds_browser_telemetry_overview_1280x800.png" alt="All 19 Staqtapp-TDS Browser pages captured individually, with CSV Interpole Monitor shown as page 07" width="100%">
 </p>
 
-<p align="center"><em>Browser Operations Console </em></p>
+<p align="center"><em>Browser Operations Console - all 19 centralized Browser navigation pages, captured individually and stacked vertically. Page 07 visibly shows the populated CSV Interpole Monitor with its navigation item selected.</em></p>
 
 [日本語 README](README_ja.md) | [Complete API Surface Reference PDF](tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf) | [Changelog](CHANGELOG.md)
 
