@@ -136,14 +136,20 @@ class CompressorRegistry:
     def compress(cls, data: bytes, codec: str = '') -> bytes:
         if not codec or codec == cls._default:
             return cls._compress_fn(data)
-        fn, _ = cls._codecs.get(codec, cls._codecs['zlib'])
+        try:
+            fn, _ = cls._codecs[codec]
+        except KeyError as exc:
+            raise KeyError(f"Codec {codec!r} is not registered") from exc
         return fn(data)
 
     @classmethod
     def decompress(cls, data: bytes, codec: str = '') -> bytes:
         if not codec or codec == cls._default:
             return cls._decompress_fn(data)
-        _, fn = cls._codecs.get(codec, cls._codecs['zlib'])
+        try:
+            _, fn = cls._codecs[codec]
+        except KeyError as exc:
+            raise KeyError(f"Codec {codec!r} is not registered") from exc
         return fn(data)
 
     @classmethod
@@ -579,6 +585,7 @@ class ConcurrencyPool:
         self._event_loop:  Optional[asyncio.AbstractEventLoop] = None
         self._loop_thread: Optional[threading.Thread] = None
         self._loop_lock   = threading.Lock()
+        self._closed = False
 
     def _ensure_loop(self) -> asyncio.AbstractEventLoop:
         with self._loop_lock:
@@ -598,6 +605,8 @@ class ConcurrencyPool:
         return cls._global_instance
 
     def submit_thread(self, fn, *args, **kwargs):
+        if self._closed:
+            raise RuntimeError('ConcurrencyPool is shut down')
         return self._thread_pool.submit(fn, *args, **kwargs)
 
     async def gather_async(self, *coros):
@@ -611,9 +620,19 @@ class ConcurrencyPool:
         return list(self._thread_pool.map(fn, items))
 
     def shutdown(self):
+        if self._closed:
+            return
+        self._closed = True
         self._thread_pool.shutdown(wait=True)
         if self._event_loop is not None:
             self._event_loop.call_soon_threadsafe(self._event_loop.stop)
+            if self._loop_thread is not None:
+                self._loop_thread.join(timeout=5.0)
+            if not self._event_loop.is_closed():
+                self._event_loop.close()
+        with type(self)._init_lock:
+            if type(self)._global_instance is self:
+                type(self)._global_instance = None
 
 
 # ////////////////////////////////////////////////////////////////////////////////
@@ -845,6 +864,8 @@ class TDSDirectory:
                  config_registry: Optional[ConfigRegistry] = None,
                  crypto_provider: Optional[CryptoProvider] = None,
                  telemetry_manager: Optional[TelemetryManager] = None):
+        if int(flags) & int(DirFlags.ENCRYPTED):
+            raise NotImplementedError('At-rest encryption is not implemented; ENCRYPTED directories are rejected fail-closed.')
         self.name    = name
         self.fmt_id  = fmt_id
         self.flags   = flags
@@ -962,14 +983,12 @@ class TDSDirectory:
         final_fmt = FmtID(raw_fmt | FmtID.COMPRESSED) if do_compress else raw_fmt
         stored = CompressorRegistry.compress(raw, codec) if do_compress else raw
         ptag = provenance if isinstance(provenance, ProvenanceTag) else (ProvenanceTag.create(provenance) if isinstance(provenance, str) else ProvenanceTag())
-        snapshot_value = value
-        if raw_fmt in (FmtID.RAW_BINARY, FmtID.TEXT_UTF8, FmtID.JSON_UTF8):
-            # Freeze durable value semantics at write time for stable lanes.
-            # This prevents caller-owned mutable objects from changing the next
-            # flushed snapshot after write_json/write_text/write_raw returned.
-            frozen = _deserialize_payload(raw, raw_fmt, codec)
-            if not (isinstance(frozen, TDSResult) and not frozen.ok):
-                snapshot_value = frozen
+        # Freeze every durable lane at acknowledgement time. The persistence
+        # writer must never re-serialize a caller-owned mutable object later.
+        frozen = _deserialize_payload(raw, raw_fmt, codec)
+        if isinstance(frozen, TDSResult) and not frozen.ok:
+            raise ValueError(frozen.message)
+        snapshot_value = frozen
         entry = TDSEntry(
             name=name, fmt_id=final_fmt, data=snapshot_value, codec=codec,
             payload_kind=kind_name(int(raw_fmt)),
@@ -1252,6 +1271,8 @@ class TDSDirectory:
                      codec: str = '', provenance: ProvenanceTag | str | None = None) -> TDSResult:
         """AI-safe write surface: always return TDSResult, never raise."""
         try:
+            if self.variables.is_locked(name):
+                return TDSResult.fail(TDSResultCode.VAR_LOCKED, 'Variable is locked.', name=name, path=self.path())
             entry = self._write_entry(name, value, fmt_id=fmt_id, compress=compress, codec=codec, provenance=provenance)
             return TDSResult.success(TDSResultCode.WRITE_OK, 'Entry written.', name=name, path=self.path(), value=value, meta={
                 'fmt_id': int(entry.fmt_id),
@@ -1267,8 +1288,11 @@ class TDSDirectory:
     def delete_result(self, name: str) -> TDSResult:
         """AI-safe delete surface: always return TDSResult, never raise."""
         try:
+            if self.variables.is_locked(name):
+                return TDSResult.fail(TDSResultCode.VAR_LOCKED, 'Variable is locked.', name=name, path=self.path())
             existed = name in self._entries
             self.delete_entry(name)
+            self.variables.lockvars.pop(name, None)
             return TDSResult.success(TDSResultCode.DELETE_OK if existed else TDSResultCode.DELETE_MISSING, 'Delete completed.' if existed else 'Entry was already absent.', name=name, path=self.path(), meta={'existed': bool(existed)})
         except Exception as exc:
             self.telemetry_manager.record_error()
@@ -1291,7 +1315,7 @@ class TDSDirectory:
 
     # --- async surface ---
 
-    async def awrite(self, name: str, value: Any, **kwargs) -> 'TDSEntry':
+    async def awrite(self, name: str, value: Any, **kwargs) -> TDSResult:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
             None, lambda: self.write_result(name, value, **kwargs))
@@ -1304,12 +1328,17 @@ class TDSDirectory:
 
     def mkdir(self, name: str, **kwargs) -> 'TDSDirectory':
         allow_reserved = bool(kwargs.pop('allow_reserved', False))
+        if not isinstance(name, str) or not name or name in {'.', '..'} or '/' in name or '\\' in name or '\x00' in name:
+            raise ValueError(f'Invalid directory name: {name!r}')
         if self.is_reserved_namespace(name) and not allow_reserved:
             raise ValueError(f"Directory name {name!r} is reserved by manifest policy")
         kwargs.setdefault('manifest_policy', self.manifest_policy)
         kwargs.setdefault('config_registry', self.config_registry)
         kwargs.setdefault('crypto_provider', self.crypto_provider)
         kwargs.setdefault('telemetry_manager', self.telemetry_manager)
+        with self._lock:
+            if name in self._children:
+                raise FileExistsError(f"Sub-directory {name!r} already exists in {self.name!r}")
         child = TDSDirectory(name=name, parent=self, **kwargs)
         with self._lock:
             self._children[name] = child
@@ -1472,7 +1501,7 @@ class TDSFileSystem:
         asyncio.run(db.awrite("key", value))
         value = asyncio.run(db.aread("key"))
     """
-    VERSION = (2, 9, 3)
+    from staqtapp_tds.version import VERSION_INFO as VERSION
 
     def __init__(self, name: str = "tds_root", manifest_policy: Optional[ManifestPolicy] = None, runtime_config: Optional[RuntimeConfig] = None, config_registry: Optional[ConfigRegistry] = None, crypto_provider: Optional[CryptoProvider] = None, telemetry_manager: Optional[TelemetryManager] = None):
         self.manifest_policy = manifest_policy or ManifestPolicy.default()
@@ -1614,11 +1643,11 @@ class TDSFileSystem:
                 node = node.mkdir(part, **kwargs)
         return node
 
-    def parallel_batch_write(self, writes: List[Tuple[str, str, Any]]) -> None:
+    def parallel_batch_write(self, writes: List[Tuple[str, str, Any]]) -> List[TDSResult]:
         def _do_write(args):
             path, name, value = args
-            self.resolve(path).write_result(name, value)
-        self._pool.map_parallel(_do_write, writes)
+            return self.resolve(path).write_result(name, value)
+        return self._pool.map_parallel(_do_write, writes)
 
     def snapshot_headers(self) -> Dict[str, dict]:
         result: Dict[str, dict] = {}

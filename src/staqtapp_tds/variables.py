@@ -54,17 +54,19 @@ class VariableControl:
         self.lockvars: Dict[str, bool] = {}
         self.stalkvars: Dict[str, StalkState] = {}
         self._locks: Dict[str, threading.RLock] = {}
+        self._locks_guard = threading.Lock()
         self.errors = ErrorTelemetry(error_mode)
 
     def _path(self) -> str:
         return self.directory.path() if hasattr(self.directory, "path") else ""
 
     def _chain_lock(self, base: str) -> threading.RLock:
-        lock = self._locks.get(base)
-        if lock is None:
-            lock = threading.RLock()
-            self._locks[base] = lock
-        return lock
+        with self._locks_guard:
+            lock = self._locks.get(base)
+            if lock is None:
+                lock = threading.RLock()
+                self._locks[base] = lock
+            return lock
 
     def _exists(self, name: str) -> bool:
         return name in self.directory._entries
@@ -76,6 +78,10 @@ class VariableControl:
         return bool(self.lockvars.get(name, False))
 
     def addvar(self, name: str, data: Any) -> TDSResult:
+        with self._chain_lock(name):
+            return self._addvar_locked(name, data)
+
+    def _addvar_locked(self, name: str, data: Any) -> TDSResult:
         if self._exists(name):
             self.errors.record(TDSResultCode.VAR_EXISTS, path=self._path(), name=name)
             return TDSResult.fail(TDSResultCode.VAR_EXISTS, "Variable already exists; use editvar() to replace.", name=name, path=self._path())
@@ -96,6 +102,10 @@ class VariableControl:
         return TDSResult.success(TDSResultCode.VAR_EDITED, "Variable edited.", name=name, path=self._path(), value=data)
 
     def lockvar(self, name: str, locked: bool = True) -> TDSResult:
+        with self._chain_lock(name):
+            return self._lockvar_locked(name, locked)
+
+    def _lockvar_locked(self, name: str, locked: bool = True) -> TDSResult:
         if not self._exists(name):
             self.errors.record(TDSResultCode.VAR_MISSING, path=self._path(), name=name)
             return TDSResult.fail(TDSResultCode.VAR_MISSING, "Variable does not exist.", name=name, path=self._path())

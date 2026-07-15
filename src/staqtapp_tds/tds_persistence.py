@@ -6,6 +6,7 @@ leaving higher-level workflow semantics to optional modules.
 
 from __future__ import annotations
 import mmap
+import base64
 import os
 import shutil
 import struct
@@ -45,7 +46,7 @@ except ImportError:
 # ////////////////////////////////////////////////////////////////////////////////
 
 FILE_MAGIC       = b'TDSX'
-FILE_VERSION     = 1
+FILE_VERSION     = 2
 FILE_HDR_FMT     = '>4sIQQQQI'
 FILE_HDR_SIZE    = struct.calcsize(FILE_HDR_FMT)    # 44 bytes
 SLOT_FIXED_FMT   = '>QQIHH'
@@ -110,13 +111,13 @@ def _parse_file_header(raw: bytes) -> dict:
         struct.unpack(FILE_HDR_FMT, raw[:FILE_HDR_SIZE])
     if magic != FILE_MAGIC:
         raise ValueError(f"Bad file magic: {magic!r}")
-    if ver != FILE_VERSION:
+    if ver not in (1, FILE_VERSION):
         raise ValueError(f"Unsupported TDS file version: {ver}")
     check = struct.pack(FILE_HDR_FMT, magic, ver, slot_count,
                         idx_off, data_off, ts, 0)
     if (zlib.crc32(check) & 0xFFFFFFFF) != crc:
         raise ValueError("File header CRC mismatch")
-    return dict(slot_count=slot_count, index_offset=idx_off,
+    return dict(version=ver, slot_count=slot_count, index_offset=idx_off,
                 data_offset=data_off, ts=ts)
 
 
@@ -459,6 +460,8 @@ class TDSReader:
         self._sidecar_meta = {}
         self._entry_meta = {}
         if not meta_path.exists():
+            if int(self._hdr.get('version', 1)) >= 2:
+                _raise_integrity(TDSResultCode.PERSIST_SIDECAR_CORRUPT, 'Required TDS v2 integrity sidecar is missing', meta_path=str(meta_path))
             return
         try:
             meta, _json_backend = loads_strict(meta_path.read_bytes(), expected_type=dict)
@@ -501,6 +504,9 @@ class TDSReader:
         return slot_key.rsplit('/', 1)[-1]
 
     def _meta_for_slot(self, slot_key: str) -> dict[str, Any]:
+        for name, meta in self._entry_meta.items():
+            if str(meta.get('slot_key', '')) == slot_key:
+                return meta
         return self._entry_meta.get(self._short_name(slot_key), {})
 
     def _stored_payload(self, rec: SlotRecord) -> bytes:
@@ -754,7 +760,7 @@ class TDSWriter:
 
         try:
             fd = os.open(str(self._shadow),
-                         os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
+                         os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
             try:
                 _write_all(fd, buf)
                 os.fsync(fd)
@@ -778,6 +784,8 @@ class TDSWriter:
             'tds_slot_count': len(idx),
             'tds_index_offset': index_offset,
             'tds_data_offset': data_offset,
+            'node_name': directory.name,
+            'node_path': directory.path(),
             'flags':     directory.flags,
             'fmt_id':    int(directory.fmt_id),
             'dir_id':    directory.dir_id,
@@ -802,7 +810,7 @@ class TDSWriter:
         meta_tmp = self._meta.with_suffix(self._meta.suffix + '.tmp')
         meta_bytes = dumps_canonical(meta)[0]
         try:
-            fd = os.open(str(meta_tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
+            fd = os.open(str(meta_tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
             try:
                 _write_all(fd, meta_bytes)
                 os.fsync(fd)
@@ -836,7 +844,11 @@ class TDSPersistence:
 
     def __init__(self, mount_dir, *, create_manifest: bool = True):
         self.mount_dir = Path(mount_dir)
-        self.mount_dir.mkdir(parents=True, exist_ok=True)
+        self.mount_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        try:
+            os.chmod(self.mount_dir, 0o700)
+        except OSError:
+            pass
         if create_manifest:
             write_default_manifest(self.mount_dir, overwrite=False)
         self.manifest_policy: ManifestPolicy = load_manifest(self.mount_dir, inherit=True)
@@ -845,7 +857,13 @@ class TDSPersistence:
         self._fs:  Optional[TDSFileSystem] = None
 
     def _node_path_to_filename(self, node_path: str) -> Path:
-        safe = node_path.strip('/').replace('/', '__')
+        # Preserve legacy-readable filenames for ordinary components while
+        # escaping delimiter-bearing components so distinct paths stay distinct.
+        def encode_component(component: str) -> str:
+            component = component.replace('%', '%25')
+            return component.replace('__', '%5F%5F')
+        parts = [encode_component(p) for p in node_path.strip('/').split('/') if p]
+        safe = '__'.join(parts)
         return self.mount_dir / f"{safe}.tds"
 
     def flush_node(self, node: TDSDirectory,
@@ -895,6 +913,7 @@ class TDSPersistence:
         if meta_path.exists():
             try:
                 meta, _json_backend = loads_strict(meta_path.read_bytes(), expected_type=dict)
+                name      = str(meta.get('node_name', name))
                 flags     = meta.get('flags', int(DirFlags.NONE))
                 fmt_id    = FmtID(meta.get('fmt_id', int(FmtID.RAW_BINARY)))
                 dir_id    = meta.get('dir_id')
@@ -926,8 +945,9 @@ class TDSPersistence:
             self._readers[str(tds_path)] = reader
 
         # iterate records directly — no keys() + lookup round-trip
+        slot_to_name = {str(v.get('slot_key')): str(k) for k, v in entry_meta.items() if isinstance(v, dict) and v.get('slot_key')}
         for rec in reader._idx.all_records():
-            short_name = rec.name.rsplit('/', 1)[-1]
+            short_name = slot_to_name.get(rec.name, rec.name.rsplit('/', 1)[-1])
             entry = _LazyEntry(
                 slot_key   = rec.name,
                 short_name = short_name,
