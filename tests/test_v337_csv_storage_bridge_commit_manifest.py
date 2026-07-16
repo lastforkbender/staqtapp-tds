@@ -15,7 +15,7 @@ from staqtapp_tds.csv_layer import (
 
 
 def test_version_337_csv_storage_bridge_commit_manifest():
-    assert __version__ == "3.5.3"
+    assert __version__ == "3.5.3.post1"
 
 
 def test_csv_storage_bridge_prepare_is_dry_run_and_writes_nothing():

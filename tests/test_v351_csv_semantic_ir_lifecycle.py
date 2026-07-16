@@ -155,7 +155,7 @@ def _request(
 
 
 def test_version_351_semantic_ir_lifecycle_contract():
-    assert __version__ == "3.5.3"
+    assert __version__ == "3.5.3.post1"
     assert CSV_SEMANTIC_IR_LIFECYCLE_VERSION == "1.0"
     assert CSV_SEMANTIC_IR_LIFECYCLE_PAYLOAD_BYTE_LIMIT == 524_288
     assert CSV_SEMANTIC_IR_MAX_TRANSITIONS == 256

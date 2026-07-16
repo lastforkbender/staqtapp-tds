@@ -15,7 +15,7 @@ from staqtapp_tds.csv_layer import (
 
 
 def test_version_339_csv_storage_adapter_commit_replay():
-    assert __version__ == "3.5.3"
+    assert __version__ == "3.5.3.post1"
 
 
 def test_csv_storage_adapter_replay_requires_binding_contract():

@@ -43,7 +43,7 @@ def _kernel_ready_csv(
 
 
 def test_version_345_csv_kernel_readiness_contract():
-    assert __version__ == "3.5.3"
+    assert __version__ == "3.5.3.post1"
 
 
 def test_csv_kernel_readiness_prepare_builds_contract_without_native_kernel():

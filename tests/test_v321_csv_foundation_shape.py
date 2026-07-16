@@ -27,7 +27,7 @@ class CountingDirectory(TDSDirectory):
 
 
 def test_version_321_csv_foundation_shape_pass():
-    assert __version__ == "3.5.3"
+    assert __version__ == "3.5.3.post1"
 
 
 def test_memoryview_row_offset_scanner_matches_text_contract_for_quoted_records():

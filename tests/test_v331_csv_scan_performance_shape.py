@@ -15,7 +15,7 @@ from staqtapp_tds.csv_layer.dialect import detect_csv_dialect
 
 
 def test_version_331_csv_scan_performance_shape_pass():
-    assert __version__ == "3.5.3"
+    assert __version__ == "3.5.3.post1"
 
 
 def test_csv_scan_accepts_buffer_inputs_with_same_profile(tmp_path):

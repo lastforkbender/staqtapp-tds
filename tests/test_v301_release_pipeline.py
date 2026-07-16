@@ -14,7 +14,7 @@ def test_release_pipeline_files_exist():
 
 
 def test_release_checker_enforces_clean_source_artifacts():
-    checker = (ROOT / "scripts" / "check_release.py").read_text()
+    checker = (ROOT / "scripts" / "check_release.py").read_text(encoding="utf-8")
     assert ".so" in checker
     assert ".pyd" in checker
     assert "__pycache__" in checker
@@ -22,7 +22,7 @@ def test_release_checker_enforces_clean_source_artifacts():
 
 
 def test_release_checker_supports_dynamic_version_metadata():
-    checker = (ROOT / "scripts" / "check_release.py").read_text()
+    checker = (ROOT / "scripts" / "check_release.py").read_text(encoding="utf-8")
     assert "tomllib.loads" in checker
     assert '"version" not in dynamic' in checker
     assert 'staqtapp_tds.version.__version__' in checker
@@ -84,7 +84,7 @@ def test_publishing_is_single_gated_trusted_publishing_job():
     ):
         assert f"- {required_job}" in aggregate
     assert "needs: release-gates-complete" in workflow
-    assert "github.ref_name == 'v3.5.3'" in workflow
+    assert "github.ref_name == 'v3.5.3.post1'" in workflow
     assert "id-token: write" in workflow
     assert "pypa/gh-action-pypi-publish@v1.14.0" in workflow
     assert "PYPI_TOKEN" not in workflow

@@ -19,7 +19,7 @@ from staqtapp_tds.csv_layer import (
 
 
 def test_version_320_csv_foundation():
-    assert __version__ == "3.5.3"
+    assert __version__ == "3.5.3.post1"
 
 
 def test_csv_import_preserves_original_and_writes_derived_artifacts():

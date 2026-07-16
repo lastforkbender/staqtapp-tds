@@ -1,5 +1,6 @@
 include LICENSE README.md README_ja.md CHANGELOG.md pyproject.toml setup.py
 include AUDIT_REMEDIATION_STATUS.txt DEV*_STATUS.txt
+include V353_POST1_PYPI_PRESENTATION_STATUS.txt
 recursive-include src *.py *.c *.h *.html *.css *.js *.svg *.json
 recursive-include docs *
 recursive-include examples *

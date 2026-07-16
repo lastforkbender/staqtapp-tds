@@ -29,7 +29,7 @@ def _native_ready_csv(fs: TDSFileSystem, payload: bytes = b"id,name\n1,Ada\n2,Gr
 
 
 def test_version_341_csv_native_storage_revalidation_drift_guard():
-    assert __version__ == "3.5.3"
+    assert __version__ == "3.5.3.post1"
 
 
 def test_csv_native_storage_revalidation_clean_snapshot_has_no_storage_writes():

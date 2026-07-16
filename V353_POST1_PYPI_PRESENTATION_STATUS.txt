@@ -1,0 +1,35 @@
+STAQTAPP-TDS v3.5.3.post1 — PYPI PRESENTATION CORRECTION
+Date: 2026-07-16
+
+PURPOSE
+
+Version 3.5.3.post1 is a corrective post-release for the PyPI presentation and
+source archive of v3.5.3. The storage algorithms, Phase 10 controlled
+activation, Phase 11 GC corrections, Browser captures, and API PDFs are the
+qualified v3.5.3 implementation. The post-release changes package identity,
+release metadata, and compatibility declarations only where required to carry
+the corrected version identity safely.
+
+CORRECTED CONTRACT
+
+- Every image and document target rendered in the PyPI long description uses
+  an absolute HTTPS URL. Binary evidence targets are pinned to the immutable
+  v3.5.3 source tag; corrected text targets resolve from protected `main`.
+- All 19 Browser images resolve to the genuine selected-page captures. Page 07
+  remains the real CSV Interpole Monitor in its Monitor Ready state.
+- The Japanese README, Programmer Core API Guide, historical API Surface PDF,
+  current Guaranteed Storage API reference, changelog, and license targets no
+  longer depend on PyPI resolving repository-relative paths.
+- The English and Japanese release summaries describe the completed v3.5.3
+  publication as history and contain no active tag-prohibition or pending-gate
+  claim.
+- Release hygiene rejects any future relative image or Markdown link in the
+  PyPI-facing README before a distribution can be built.
+
+IMMUTABILITY AND PUBLICATION
+
+The original v3.5.3 files and tag remain immutable. Version 3.5.3.post1 is built
+and published only from annotated tag `v3.5.3.post1` after the complete source,
+Python 3.10-3.14, Windows, macOS, Linux, native-extension, and distribution
+matrix succeeds. The tag-only job uses PyPI trusted publishing through the
+protected `pypi` environment.

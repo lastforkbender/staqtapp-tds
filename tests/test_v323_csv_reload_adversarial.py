@@ -28,7 +28,7 @@ class CountingDirectory(TDSDirectory):
 
 
 def test_version_323_csv_reload_adversarial_pass():
-    assert __version__ == "3.5.3"
+    assert __version__ == "3.5.3.post1"
 
 
 def test_csv_reload_artifacts_from_persisted_tds_snapshot_without_import_objects(tmp_path: Path):

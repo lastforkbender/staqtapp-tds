@@ -5,13 +5,14 @@ from __future__ import annotations
 import pathlib
 import hashlib
 import os
+import re
 import struct
 import tomllib
 import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "3.5.3"
+EXPECTED_VERSION = "3.5.3.post1"
 BANNED_SUFFIXES = {".so", ".pyd", ".dll", ".dylib", ".pyc"}
 BANNED_DIRS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "build", "dist"}
 BROWSER_CAPTURES = (
@@ -34,6 +35,18 @@ BROWSER_CAPTURES = (
     "17-alerts-events-1280x800.png",
     "18-security-1280x800.png",
     "19-settings-1280x800.png",
+)
+PYPI_README_IMAGE_PREFIX = (
+    "https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/"
+    "v3.5.3/docs/screenshots/browser_pages/"
+)
+PYPI_README_REQUIRED_LINKS = (
+    "https://github.com/lastforkbender/staqtapp-tds/blob/main/README_ja.md",
+    "https://github.com/lastforkbender/staqtapp-tds/blob/main/CHANGELOG.md",
+    "https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/LICENSE",
+    "https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/docs/reference/Programmers_API_Reference.md",
+    "https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf",
+    "https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf",
 )
 
 
@@ -78,6 +91,7 @@ def main() -> int:
         ROOT / "DEV9_INCREMENTAL_IMMUTABLE_SEGMENTS_STATUS.txt",
         ROOT / "DEV10_CONTROLLED_ACTIVATION_STATUS.txt",
         ROOT / "DEV11_RELEASE_QUALIFICATION_STATUS.txt",
+        ROOT / "V353_POST1_PYPI_PRESENTATION_STATUS.txt",
         ROOT / "docs" / "118_v353_dev10_Controlled_Activation.md",
         ROOT / "docs" / "119_v353_dev11_Release_Qualification.md",
     )
@@ -87,9 +101,13 @@ def main() -> int:
     phase11 = (ROOT / "DEV11_RELEASE_QUALIFICATION_STATUS.txt").read_text(encoding="utf-8")
     if "STATUS: LOCAL QUALIFICATION COMPLETE" not in phase11:
         return fail("Phase 11 local qualification is not recorded as complete")
+    if "REMOTE REVIEW GATES REQUIRED" in phase11:
+        return fail("Phase 11 still reports completed remote gates as pending")
     manifest = (ROOT / "MANIFEST.in").read_text(encoding="utf-8")
     if "include AUDIT_REMEDIATION_STATUS.txt DEV*_STATUS.txt" not in manifest:
         return fail("source distribution does not include immediate-root phase evidence")
+    if "include V353_POST1_PYPI_PRESENTATION_STATUS.txt" not in manifest:
+        return fail("source distribution does not include the post-release correction record")
 
     programmer_pdf = ROOT / "tds_api_docs" / "Staqtapp_TDS_Programmer_Core_API_Guide.pdf"
     if not programmer_pdf.is_file():
@@ -105,6 +123,30 @@ def main() -> int:
 
     capture_root = ROOT / "docs" / "screenshots" / "browser_pages"
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    image_targets = re.findall(r'<img\b[^>]*?\bsrc="([^"]+)"', readme, flags=re.IGNORECASE)
+    markdown_targets = re.findall(r"(?<!!)\[[^]]+\]\(([^)\s]+)", readme)
+    relative_targets = [
+        target
+        for target in (*image_targets, *markdown_targets)
+        if not target.startswith(("https://", "#", "mailto:"))
+    ]
+    if relative_targets:
+        return fail(
+            "PyPI README contains repository-relative targets: "
+            + ", ".join(relative_targets)
+        )
+    if len(image_targets) != len(BROWSER_CAPTURES):
+        return fail("PyPI README does not contain exactly 19 Browser images")
+    if any(not target.startswith(PYPI_README_IMAGE_PREFIX) for target in image_targets):
+        return fail("PyPI README Browser images are not pinned absolute HTTPS targets")
+    missing_links = [target for target in PYPI_README_REQUIRED_LINKS if target not in readme]
+    if missing_links:
+        return fail("PyPI README is missing absolute document targets: " + ", ".join(missing_links))
+    if "tag remains prohibited" in readme or "REMOTE REVIEW GATES REQUIRED" in readme:
+        return fail("PyPI README contains obsolete pre-publication status wording")
+    japanese_readme = (ROOT / "README_ja.md").read_text(encoding="utf-8")
+    if "tag を作成できません" in japanese_readme:
+        return fail("Japanese README contains obsolete pre-publication status wording")
     capture_digests: set[str] = set()
     for filename in BROWSER_CAPTURES:
         path = capture_root / filename
