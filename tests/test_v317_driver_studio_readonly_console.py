@@ -121,7 +121,7 @@ def _bundle(report, *, registry_approved=False):
 
 
 def test_v317_version():
-    assert __version__ == "3.5.2"
+    assert __version__ == "3.5.3"
 
 
 def test_studio_readonly_capability_matrix_denies_mutating_authority():

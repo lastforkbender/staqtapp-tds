@@ -19,7 +19,7 @@ class OddValue:
 
 
 def test_v3121_version():
-    assert __version__ == "3.5.2"
+    assert __version__ == "3.5.3"
 
 
 def test_live_event_bridge_accounts_for_bounded_stream_drops_without_mutation():

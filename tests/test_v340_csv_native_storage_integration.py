@@ -24,7 +24,7 @@ def _ready_csv(fs: TDSFileSystem, payload: bytes = b"id,name\n1,Ada\n2,Grace\n")
 
 
 def test_version_340_csv_native_storage_integration():
-    assert __version__ == "3.5.2"
+    assert __version__ == "3.5.3"
 
 
 def test_csv_native_storage_commit_requires_persisted_replay_proof():

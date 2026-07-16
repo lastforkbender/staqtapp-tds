@@ -946,7 +946,14 @@ static PyObject *module_spiral_rank_scores(PyObject *self, PyObject *args, PyObj
         double c = tds_clamp01(conf[i]);
         double d_pen = depth_penalty * depth[i];
         double a_pen = age_penalty * age[i];
-        out[i] = (base * score_weight) + (c * confidence_weight) - d_pen - a_pen;
+        /* Keep the operation boundaries identical to Python's evaluation.
+         * Apple Clang may otherwise contract the weighted terms into an FMA
+         * at -O3, producing a one-ULP platform-only parity difference. */
+        double weighted_score = base * score_weight;
+        double weighted_confidence = c * confidence_weight;
+        double weighted_total = weighted_score + weighted_confidence;
+        double after_depth = weighted_total - d_pen;
+        out[i] = after_depth - a_pen;
     }
     Py_END_ALLOW_THREADS
 

@@ -36,7 +36,7 @@ def _interpole_ready_csv(
 
 
 def test_version_342_csv_interpole_foundation():
-    assert __version__ == "3.5.2"
+    assert __version__ == "3.5.3"
 
 
 def test_csv_interpole_prepare_builds_no_write_foundation_timeline():

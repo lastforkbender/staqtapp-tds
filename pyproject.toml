@@ -26,9 +26,9 @@ requires-python = ">=3.10"
 dependencies = ["numpy>=1.23"]
 
 [project.urls]
-Homepage = "https://github.com/staqtapp/staqtapp-tds"
-Repository = "https://github.com/staqtapp/staqtapp-tds"
-Issues = "https://github.com/staqtapp/staqtapp-tds/issues"
+Homepage = "https://github.com/lastforkbender/staqtapp-tds"
+Repository = "https://github.com/lastforkbender/staqtapp-tds"
+Issues = "https://github.com/lastforkbender/staqtapp-tds/issues"
 
 [project.optional-dependencies]
 fast = ["numba>=0.58"]

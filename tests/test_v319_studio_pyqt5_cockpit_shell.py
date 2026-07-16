@@ -101,7 +101,7 @@ def _bundle():
 
 
 def test_v319_version():
-    assert __version__ == "3.5.2"
+    assert __version__ == "3.5.3"
 
 
 def test_studio_pyqt5_module_imports_without_requiring_qt():

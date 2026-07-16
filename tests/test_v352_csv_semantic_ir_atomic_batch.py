@@ -217,7 +217,7 @@ def _receipt(fs: TDSFileSystem, csv_id: str, candidate, requests=None, **kwargs)
 
 
 def test_version_352_atomic_batch_contract():
-    assert __version__ == "3.5.2"
+    assert __version__ == "3.5.3"
     assert CSV_SEMANTIC_IR_TRANSITION_BATCH_VERSION == "1.0"
     assert CSV_SEMANTIC_IR_MAX_BATCH_TRANSITIONS == 32
     assert CSV_SEMANTIC_IR_TRANSITION_BATCH_PAYLOAD_BYTE_LIMIT == 524_288
@@ -784,9 +784,9 @@ def test_v351_serialized_candidate_and_lifecycle_are_accepted_compatibly():
     assert legacy_candidate.ok is True
     assert legacy_lifecycle.ok is True
     assert receipt.ok is True
-    assert receipt.result_lifecycle.suite_release_version == "3.5.2"
+    assert receipt.result_lifecycle.suite_release_version == "3.5.3"
     assert len(receipt.result_lifecycle.history) == 2
-    assert any("compatible_release_replay:3.5.1->3.5.2" in w for w in receipt.warnings)
+    assert any("compatible_release_replay:3.5.1->3.5.3" in w for w in receipt.warnings)
 
 
 def test_batch_receipt_keeps_all_semantic_and_storage_boundaries_closed():

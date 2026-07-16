@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import staqtapp_tds.tds_persistence as tds_persistence
 from staqtapp_tds import __version__
 from staqtapp_tds.studio_pyqt5 import (
     StudioOperationalStressHarness,
@@ -11,7 +12,7 @@ from staqtapp_tds.studio_pyqt5 import (
 
 
 def test_v3122_version():
-    assert __version__ == "3.5.2"
+    assert __version__ == "3.5.3"
 
 
 def test_operational_stress_capability_matrix_preserves_authority_boundaries():
@@ -42,7 +43,10 @@ def test_operational_stress_capability_matrix_preserves_authority_boundaries():
         assert matrix[denied] is False
 
 
-def test_operational_stress_harness_runs_browser_and_studio_without_interrupting():
+def test_operational_stress_harness_runs_browser_and_studio_without_interrupting(monkeypatch):
+    # Exercise the detached Windows reader path on every CI platform. The old
+    # file-backed mmap kept the destination open and blocked os.replace there.
+    monkeypatch.setattr(tds_persistence, "_DETACH_READER_SNAPSHOTS", True)
     harness = StudioOperationalStressHarness(max_events=3)
     report = harness.run(iterations=10)
 

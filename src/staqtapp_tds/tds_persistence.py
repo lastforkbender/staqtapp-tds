@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
+from staqtapp_tds._binary_io import open_binary_fd
 from staqtapp_tds.tds_filesystem import (
     TDSDirectory, TDSEntry, TDSFileSystem, FmtID, DirFlags, ConcurrencyPool,
     decode_header, encode_header, _compute_subdir_offsets,
@@ -51,6 +52,7 @@ FILE_HDR_FMT     = '>4sIQQQQI'
 FILE_HDR_SIZE    = struct.calcsize(FILE_HDR_FMT)    # 44 bytes
 SLOT_FIXED_FMT   = '>QQIHH'
 SLOT_FIXED_SIZE  = struct.calcsize(SLOT_FIXED_FMT)  # 24 bytes
+_DETACH_READER_SNAPSHOTS = os.name == 'nt'
 
 
 class TDSPersistenceIntegrityError(ValueError):
@@ -364,10 +366,12 @@ class SlotIndex:
 
 class TDSReader:
     """
-    Mmap random-access reader for a .tds file.
+    Random-access reader for a .tds file.
 
-    _load_index() slices index bytes via memoryview to avoid a full
-    copy before passing to SlotIndex.from_bytes().
+    POSIX readers retain the file-backed mmap fast path. Windows readers detach
+    an immutable byte snapshot and close the source file before validation so
+    an atomic writer can replace the path while the existing snapshot remains
+    usable. _load_index() slices either backing without an extra full-file copy.
     """
 
     def __init__(self, path):
@@ -385,28 +389,57 @@ class TDSReader:
         self._open()
 
     def _open(self) -> None:
-        self._f = open(self.path, 'rb')
-        self._file_size = os.fstat(self._f.fileno()).st_size
-        if self._file_size < FILE_HDR_SIZE:
-            _raise_integrity(
-                TDSResultCode.PERSIST_HEADER_CORRUPT,
-                "TDS file is smaller than the fixed file header",
-                file_size=self._file_size, header_size=FILE_HDR_SIZE,
-            )
-        self._mm = mmap.mmap(self._f.fileno(), 0, access=mmap.ACCESS_READ)
         try:
-            self._hdr = _parse_file_header(bytes(self._mm[:FILE_HDR_SIZE]))
-        except TDSPersistenceIntegrityError:
+            self._f = open(self.path, 'rb')
+            self._file_size = os.fstat(self._f.fileno()).st_size
+            if self._file_size < FILE_HDR_SIZE:
+                _raise_integrity(
+                    TDSResultCode.PERSIST_HEADER_CORRUPT,
+                    "TDS file is smaller than the fixed file header",
+                    file_size=self._file_size, header_size=FILE_HDR_SIZE,
+                )
+            if _DETACH_READER_SNAPSHOTS:
+                snapshot = self._f.read()
+                self._f.close()
+                self._f = None
+                if len(snapshot) != self._file_size:
+                    _raise_integrity(
+                        TDSResultCode.PERSIST_READ_ERROR,
+                        "TDS file changed while detaching the reader snapshot",
+                        expected=self._file_size, actual=len(snapshot),
+                    )
+                self._mm = snapshot
+            else:
+                self._mm = mmap.mmap(self._f.fileno(), 0, access=mmap.ACCESS_READ)
+            try:
+                self._hdr = _parse_file_header(bytes(self._mm[:FILE_HDR_SIZE]))
+            except TDSPersistenceIntegrityError:
+                raise
+            except Exception as exc:
+                _raise_integrity(
+                    TDSResultCode.PERSIST_HEADER_CORRUPT,
+                    str(exc), exception_type=type(exc).__name__, exception_message=str(exc),
+                )
+            self._validate_file_geometry()
+            self._idx = self._load_index()
+            self._validate_slot_geometry()
+            self._load_sidecar()
+        except Exception:
+            self._release_backing()
             raise
-        except Exception as exc:
-            _raise_integrity(
-                TDSResultCode.PERSIST_HEADER_CORRUPT,
-                str(exc), exception_type=type(exc).__name__, exception_message=str(exc),
-            )
-        self._validate_file_geometry()
-        self._idx = self._load_index()
-        self._validate_slot_geometry()
-        self._load_sidecar()
+
+    def _release_backing(self) -> None:
+        backing = self._mm
+        handle = self._f
+        self._mm = None
+        self._f = None
+        try:
+            close_backing = getattr(backing, 'close', None)
+            if close_backing is not None:
+                close_backing()
+        finally:
+            if handle is not None:
+                handle.close()
 
     def _validate_file_geometry(self) -> None:
         data_off = int(self._hdr['data_offset'])
@@ -496,8 +529,7 @@ class TDSReader:
 
     def reload(self) -> None:
         with self._lock:
-            self._mm.close()
-            self._f.close()
+            self._release_backing()
             self._open()
 
     def _short_name(self, slot_key: str) -> str:
@@ -623,8 +655,8 @@ class TDSReader:
         return self._idx.lookup(name) is not None
 
     def close(self) -> None:
-        self._mm.close()
-        self._f.close()
+        with self._lock:
+            self._release_backing()
 
     def __enter__(self) -> 'TDSReader':
         return self
@@ -759,8 +791,9 @@ class TDSWriter:
         mv[pos: pos + len(index_block)] = index_block
 
         try:
-            fd = os.open(str(self._shadow),
-                         os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            fd = open_binary_fd(
+                self._shadow, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600
+            )
             try:
                 _write_all(fd, buf)
                 os.fsync(fd)
@@ -810,7 +843,9 @@ class TDSWriter:
         meta_tmp = self._meta.with_suffix(self._meta.suffix + '.tmp')
         meta_bytes = dumps_canonical(meta)[0]
         try:
-            fd = os.open(str(meta_tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            fd = open_binary_fd(
+                meta_tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600
+            )
             try:
                 _write_all(fd, meta_bytes)
                 os.fsync(fd)

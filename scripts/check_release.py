@@ -3,14 +3,38 @@
 from __future__ import annotations
 
 import pathlib
+import hashlib
 import os
+import struct
+import tomllib
 import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "3.5.2"
+EXPECTED_VERSION = "3.5.3"
 BANNED_SUFFIXES = {".so", ".pyd", ".dll", ".dylib", ".pyc"}
-BANNED_DIRS = {"__pycache__", ".pytest_cache"}
+BANNED_DIRS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "build", "dist"}
+BROWSER_CAPTURES = (
+    "01-dashboard-1280x800.png",
+    "02-engine-health-1280x800.png",
+    "03-real-time-metrics-1280x800.png",
+    "04-transition-timeline-1280x800.png",
+    "05-event-ring-monitor-1280x800.png",
+    "06-pressure-diagnostics-1280x800.png",
+    "07-csv-interpole-1280x800.png",
+    "08-snapshot-explorer-1280x800.png",
+    "09-lock-contention-1280x800.png",
+    "10-workload-analytics-1280x800.png",
+    "11-spiral-rank-1280x800.png",
+    "12-index-analytics-1280x800.png",
+    "13-storage-analytics-1280x800.png",
+    "14-comparative-views-1280x800.png",
+    "15-recovery-planner-1280x800.png",
+    "16-policy-proposals-1280x800.png",
+    "17-alerts-events-1280x800.png",
+    "18-security-1280x800.png",
+    "19-settings-1280x800.png",
+)
 
 
 def fail(message: str) -> int:
@@ -24,13 +48,88 @@ def main() -> int:
         return fail("src/staqtapp_tds/version.py has an unexpected version")
 
     pyproject = ROOT / "pyproject.toml"
-    if f'version = "{EXPECTED_VERSION}"' not in pyproject.read_text():
-        return fail("pyproject.toml has an unexpected version")
+    project_data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    project = project_data.get("project", {})
+    dynamic = project.get("dynamic", [])
+    dynamic_version = (
+        project_data.get("tool", {})
+        .get("setuptools", {})
+        .get("dynamic", {})
+        .get("version", {})
+        .get("attr")
+    )
+    if "version" not in dynamic:
+        return fail("pyproject.toml must declare version as dynamic")
+    if dynamic_version != "staqtapp_tds.version.__version__":
+        return fail("pyproject.toml has an unexpected dynamic version source")
+    urls = project.get("urls", {})
+    if any("lastforkbender/staqtapp-tds" not in str(url) for url in urls.values()):
+        return fail("project URLs do not target the release repository")
+
+    if os.environ.get("GITHUB_REF_TYPE") == "tag":
+        expected_tag = f"v{EXPECTED_VERSION}"
+        if os.environ.get("GITHUB_REF_NAME") != expected_tag:
+            return fail(f"release tag must be exactly {expected_tag}")
+
+    required_evidence = (
+        ROOT / "DEV6_GUARANTEED_STORAGE_TRANSITION_STATUS.txt",
+        ROOT / "DEV7_MATERIALIZATION_FAULT_QUALIFICATION_STATUS.txt",
+        ROOT / "DEV8_VERIFIED_ROUND_TRIP_MIGRATION_STATUS.txt",
+        ROOT / "DEV9_INCREMENTAL_IMMUTABLE_SEGMENTS_STATUS.txt",
+        ROOT / "DEV10_CONTROLLED_ACTIVATION_STATUS.txt",
+        ROOT / "DEV11_RELEASE_QUALIFICATION_STATUS.txt",
+        ROOT / "docs" / "118_v353_dev10_Controlled_Activation.md",
+        ROOT / "docs" / "119_v353_dev11_Release_Qualification.md",
+    )
+    missing_evidence = [str(path.relative_to(ROOT)) for path in required_evidence if not path.is_file()]
+    if missing_evidence:
+        return fail("missing Guaranteed Storage phase evidence: " + ", ".join(missing_evidence))
+    phase11 = (ROOT / "DEV11_RELEASE_QUALIFICATION_STATUS.txt").read_text(encoding="utf-8")
+    if "STATUS: LOCAL QUALIFICATION COMPLETE" not in phase11:
+        return fail("Phase 11 local qualification is not recorded as complete")
+    manifest = (ROOT / "MANIFEST.in").read_text(encoding="utf-8")
+    if "include AUDIT_REMEDIATION_STATUS.txt DEV*_STATUS.txt" not in manifest:
+        return fail("source distribution does not include immediate-root phase evidence")
+
+    programmer_pdf = ROOT / "tds_api_docs" / "Staqtapp_TDS_Programmer_Core_API_Guide.pdf"
+    if not programmer_pdf.is_file():
+        return fail("missing Programmer Core API Guide")
+    programmer_pdf_bytes = programmer_pdf.read_bytes()
+    if b"/TDSV353SupplementPages (3)" not in programmer_pdf_bytes:
+        return fail("Programmer Core API Guide is missing the v3.5.3 release supplement")
+    if b"/TDSLightBlueLabelSpacing (v1)" not in programmer_pdf_bytes:
+        return fail("Programmer Core API Guide is missing the corrected label-spacing marker")
+
+    if (ROOT / ".github" / "workflows" / "publish.yml").exists():
+        return fail("unsafe independent publish workflow still exists")
+
+    capture_root = ROOT / "docs" / "screenshots" / "browser_pages"
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    capture_digests: set[str] = set()
+    for filename in BROWSER_CAPTURES:
+        path = capture_root / filename
+        if not path.is_file():
+            return fail(f"missing Browser page capture: {filename}")
+        data = path.read_bytes()
+        if not data.startswith(b"\x89PNG\r\n\x1a\n") or len(data) < 24:
+            return fail(f"invalid Browser page PNG: {filename}")
+        if struct.unpack(">II", data[16:24]) != (1280, 800):
+            return fail(f"Browser page capture is not 1280x800: {filename}")
+        capture_digests.add(hashlib.sha256(data).hexdigest())
+        if f"docs/screenshots/browser_pages/{filename}" not in readme:
+            return fail(f"README does not embed Browser page capture: {filename}")
+    if len(capture_digests) != len(BROWSER_CAPTURES):
+        return fail("Browser page captures are not all distinct")
+    false_capture = ROOT / "docs" / "screenshots" / "tds_browser_telemetry_overview_1280x800.png"
+    if false_capture.exists() or false_capture.name in readme:
+        return fail("retired misleading Browser overview is still present")
 
     offenders: list[str] = []
     for path in ROOT.rglob("*"):
         rel = path.relative_to(ROOT)
-        if any(part in BANNED_DIRS for part in rel.parts):
+        if ".git" in rel.parts:
+            continue
+        if any(part in BANNED_DIRS or part.endswith(".egg-info") for part in rel.parts):
             offenders.append(str(rel))
         elif path.is_file() and path.suffix in BANNED_SUFFIXES:
             offenders.append(str(rel))

@@ -58,7 +58,7 @@ def _ready_csv(
 
 
 def test_version_3411_csv_suite_closure_semantic_ir_handoff():
-    assert __version__ == "3.5.2"
+    assert __version__ == "3.5.3"
     assert CSV_SEMANTIC_IR_HANDOFF_VERSION == "1.0"
     assert CSV_SEMANTIC_IR_HANDOFF_PAYLOAD_BYTE_LIMIT >= 131_072
     assert len(CSV_SEMANTIC_IR_REQUIRED_EVIDENCE_NAMES) == 19

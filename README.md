@@ -1,18 +1,74 @@
-> **v3.5.2 remediation security contract**
+> **v3.5.3 release security contract**
 >
 > At-rest encryption is not implemented. Requests using `DirFlags.ENCRYPTED` fail closed instead of storing plaintext. New v2 persistence files require their integrity sidecar. `.tds` input should be treated as trusted until explicit resource-budget hardening is complete. Native extensions are optional and are built only when `STAQTAPP_TDS_BUILD_NATIVE=1` is set.
 
-# Staqtapp-TDS v3.5.2
+# Staqtapp-TDS v3.5.3
 
 **Temporal Directory System - native-indexed `.tds` storage, controlled variables, trace ranking, CSV evidence operations, semantic review, and centralized observability for AI systems.**
 
 **Programmer start here:** [Staqtapp-TDS Programmer Core API Guide (PDF)](tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf)
 
-<p align="center">
-  <img src="docs/screenshots/tds_browser_telemetry_overview_1280x800.png" alt="All 19 Staqtapp-TDS Browser pages captured individually, with CSV Interpole Monitor shown as page 07" width="100%">
-</p>
+## Browser Operations Console — all 19 pages
 
-<p align="center"><em>Browser Operations Console</em></p>
+These are 19 separate 1280×800 viewport captures from the packaged, localhost-only TDS Browser. Each capture was made after selecting the corresponding navigation control against a real release-qualification observer snapshot. Page 07 is the actual CSV Interpole Monitor in its `Monitor Ready` state. The images are shown vertically in Browser navigation order; they are not a stitched Dashboard image or a UI mock.
+
+<p align="center"><strong>01 — Dashboard</strong><br>
+  <img src="docs/screenshots/browser_pages/01-dashboard-1280x800.png" alt="Staqtapp-TDS Browser page 01, Dashboard, selected in the navigation" width="100%">
+</p>
+<p align="center"><strong>02 — Engine Health</strong><br>
+  <img src="docs/screenshots/browser_pages/02-engine-health-1280x800.png" alt="Staqtapp-TDS Browser page 02, Engine Health, selected in the navigation" width="100%">
+</p>
+<p align="center"><strong>03 — Real-time Metrics</strong><br>
+  <img src="docs/screenshots/browser_pages/03-real-time-metrics-1280x800.png" alt="Staqtapp-TDS Browser page 03, Real-time Metrics, selected in the navigation" width="100%">
+</p>
+<p align="center"><strong>04 — Transition Timeline</strong><br>
+  <img src="docs/screenshots/browser_pages/04-transition-timeline-1280x800.png" alt="Staqtapp-TDS Browser page 04, Transition Timeline, selected in the navigation" width="100%">
+</p>
+<p align="center"><strong>05 — Event Ring Monitor</strong><br>
+  <img src="docs/screenshots/browser_pages/05-event-ring-monitor-1280x800.png" alt="Staqtapp-TDS Browser page 05, Event Ring Monitor, selected in the navigation" width="100%">
+</p>
+<p align="center"><strong>06 — Pressure Diagnostics</strong><br>
+  <img src="docs/screenshots/browser_pages/06-pressure-diagnostics-1280x800.png" alt="Staqtapp-TDS Browser page 06, Pressure Diagnostics, selected in the navigation" width="100%">
+</p>
+<p align="center"><strong>07 — CSV Interpole</strong><br>
+  <img src="docs/screenshots/browser_pages/07-csv-interpole-1280x800.png" alt="Staqtapp-TDS Browser page 07, the real CSV Interpole Monitor in Monitor Ready state, selected in the navigation" width="100%">
+</p>
+<p align="center"><strong>08 — Snapshot Explorer</strong><br>
+  <img src="docs/screenshots/browser_pages/08-snapshot-explorer-1280x800.png" alt="Staqtapp-TDS Browser page 08, Snapshot Explorer, selected in the navigation" width="100%">
+</p>
+<p align="center"><strong>09 — Lock Contention</strong><br>
+  <img src="docs/screenshots/browser_pages/09-lock-contention-1280x800.png" alt="Staqtapp-TDS Browser page 09, Lock Contention, selected in the navigation" width="100%">
+</p>
+<p align="center"><strong>10 — Workload Analytics</strong><br>
+  <img src="docs/screenshots/browser_pages/10-workload-analytics-1280x800.png" alt="Staqtapp-TDS Browser page 10, Workload Analytics, selected in the navigation" width="100%">
+</p>
+<p align="center"><strong>11 — Spiral Rank</strong><br>
+  <img src="docs/screenshots/browser_pages/11-spiral-rank-1280x800.png" alt="Staqtapp-TDS Browser page 11, Spiral Rank, selected in the navigation" width="100%">
+</p>
+<p align="center"><strong>12 — Index Analytics</strong><br>
+  <img src="docs/screenshots/browser_pages/12-index-analytics-1280x800.png" alt="Staqtapp-TDS Browser page 12, Index Analytics, selected in the navigation" width="100%">
+</p>
+<p align="center"><strong>13 — Storage Analytics</strong><br>
+  <img src="docs/screenshots/browser_pages/13-storage-analytics-1280x800.png" alt="Staqtapp-TDS Browser page 13, Storage Analytics, selected in the navigation" width="100%">
+</p>
+<p align="center"><strong>14 — Comparative Views</strong><br>
+  <img src="docs/screenshots/browser_pages/14-comparative-views-1280x800.png" alt="Staqtapp-TDS Browser page 14, Comparative Views, selected in the navigation" width="100%">
+</p>
+<p align="center"><strong>15 — Recovery Planner</strong><br>
+  <img src="docs/screenshots/browser_pages/15-recovery-planner-1280x800.png" alt="Staqtapp-TDS Browser page 15, Recovery Planner, selected in the navigation" width="100%">
+</p>
+<p align="center"><strong>16 — Policy Proposals</strong><br>
+  <img src="docs/screenshots/browser_pages/16-policy-proposals-1280x800.png" alt="Staqtapp-TDS Browser page 16, Policy Proposals, selected in the navigation" width="100%">
+</p>
+<p align="center"><strong>17 — Alerts &amp; Events</strong><br>
+  <img src="docs/screenshots/browser_pages/17-alerts-events-1280x800.png" alt="Staqtapp-TDS Browser page 17, Alerts and Events, selected in the navigation" width="100%">
+</p>
+<p align="center"><strong>18 — Security</strong><br>
+  <img src="docs/screenshots/browser_pages/18-security-1280x800.png" alt="Staqtapp-TDS Browser page 18, Security, selected in the navigation" width="100%">
+</p>
+<p align="center"><strong>19 — Settings</strong><br>
+  <img src="docs/screenshots/browser_pages/19-settings-1280x800.png" alt="Staqtapp-TDS Browser page 19, Settings, selected in the navigation" width="100%">
+</p>
 
 [日本語 README](README_ja.md) | [Complete API Surface Reference PDF](tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf) | [Changelog](CHANGELOG.md)
 
@@ -169,7 +225,7 @@ Native storage is responsible for narrow mechanical work. Diagnostics, Semantic 
 
 ## Programmer documentation
 
-The new [Programmer Core API Guide](tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf) is the recommended starting point. It organizes direct calls by task and includes implementation snippets for:
+The [Programmer Core API Guide](tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf) is the recommended starting point. Its first three pages are the authoritative v3.5.3 supplement for controlled activation, segment GC, and release qualification. The broad guide then organizes direct calls by task and includes implementation snippets for:
 
 - directory and entry operations;
 - `.tds` writing, reading, mounting, and integrity behavior;
@@ -181,7 +237,7 @@ The new [Programmer Core API Guide](tds_api_docs/Staqtapp_TDS_Programmer_Core_AP
 - Semantic IR candidates, lifecycle transitions, and atomic batches;
 - Driver Foundry, VM, Runtime Manager, regression, review, evidence, Browser, and Driver Studio calls.
 
-The [API Surface Reference](tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf) remains available for broad class-by-class inspection.
+Use the current [v3.5.3 Guaranteed Storage API reference](docs/reference/Programmers_API_Reference.md) for the new storage calls. The separate [API Surface Reference PDF](tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf) is retained as a historical v3.1.23 Driver/Studio reference; it is not an exhaustive v3.5.3 inventory.
 
 ## Safety and authority boundaries
 
@@ -195,13 +251,15 @@ TDS intentionally distinguishes preparation, evidence, review, and authority:
 
 ## Validation status
 
-The v3.5.2 delivery baseline was validated with:
+Local v3.5.3 release qualification is complete:
 
-- 683 fallback/source tests passed and 11 native-only tests skipped;
-- 694 tests passed with both C extensions built;
-- 61 packaged Semantic IR tests passed;
-- fresh-archive release checking and packaged native builds passed;
-- no compiled objects or cache directories included in the source archive.
+- Phase 10 controlled activation, exact migration proof, and lossless rollback tests;
+- Phase 11 GC corruption, publication-window, replacement, interruption, concurrency, and accounting tests;
+- a 129-generation incremental/recovery/GC soak;
+- Python 3.10–3.14, Windows, macOS, Linux, and native-extension CI gates;
+- PEP 517 wheel/sdist, metadata, isolated-install, and source-hygiene gates.
+
+Evidence: 832 passed and 11 skipped in the pure monolithic suite; 843 passed in the native-active monolithic suite; and 157 passed in the overlapping v3.5.3/workflow/Browser/CSV qualification group. Both distribution artifacts passed `twine check`, archive-content inspection, and an isolated wheel activation/rollback/GC smoke test. Exact local and review-branch details are recorded in `DEV11_RELEASE_QUALIFICATION_STATUS.txt`. Draft PR review and CI runs carry no release authority; a v3.5.3 tag remains prohibited until every gate on the candidate head is green.
 
 ## Repository map
 
@@ -213,7 +271,7 @@ src/staqtapp_tds/studio_pyqt5/ optional Driver Studio cockpit
 src/staqtapp_tds/admin/    centralized Browser and local admin control
 examples/                  runnable examples
 docs/                      architecture and release contract documents
-tds_api_docs/              programmer and full API PDFs
+tds_api_docs/              programmer guide and historical API-surface PDF
 ```
 
 ## License
