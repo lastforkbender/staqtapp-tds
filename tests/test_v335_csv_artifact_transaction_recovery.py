@@ -19,7 +19,7 @@ from staqtapp_tds.csv_layer import (
 
 
 def test_version_335_csv_artifact_transaction_recovery_envelope():
-    assert __version__ == "3.5.2"
+    assert __version__ == "3.5.3"
 
 
 def test_csv_transaction_id_validation_rejects_path_and_control_values():

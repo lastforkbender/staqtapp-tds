@@ -18,13 +18,13 @@ The hardening focuses on:
 
 ## README visual preview
 
-The 1280×800 Browser telemetry overview screenshot is included at:
+The former telemetry overview image was retired during v3.5.3 release qualification because a single Dashboard capture could not truthfully demonstrate every Browser page. The current evidence is a set of 19 distinct 1280×800 captures under:
 
 ```text
-docs/screenshots/tds_browser_telemetry_overview_1280x800.png
+docs/screenshots/browser_pages/
 ```
 
-The root README embeds this image near the top so GitHub renders the Browser telemetry overview without requiring the long full-page screenshot to be opened separately.
+The root README embeds every image vertically in navigation order. The reproducible capture driver selects and validates each page before taking its screenshot, including the real CSV Interpole Monitor as page 07.
 
 ## Studio hardening
 

@@ -1,3 +1,38 @@
+# v3.5.3 — Guaranteed Storage controlled activation and release qualification
+
+Implemented the complete opt-in path from legacy `.tds` mounts to incremental
+immutable segment generations, with verified round-trip migration, explicit
+controlled activation, visible operating mode, and lossless rollback into a new
+verified legacy mount.
+
+Phase 11 release qualification found and corrected destructive segment-GC
+defects: corrupt generations could be omitted from reference accounting, one
+reachability proof could be reused across a deletion batch, and a replaced
+candidate was not revalidated immediately before unlink. Destructive GC now
+fails closed on incomplete generation evidence, repeats reachability for every
+candidate and after the final fault boundary, and validates candidate identity
+and change metadata before exact unlink accounting.
+
+Release preparation also:
+
+- added explicit root completion records for Phase 10 and Phase 11;
+- included the immediate-root Phase 6 through Phase 11 records in source
+  distributions so Phase 10 cannot disappear between Phase 9 and Phase 11;
+- added corruption, salvage, publication-race, replacement, symlink,
+  interruption, concurrency, accounting, and 129-generation soak tests;
+- removed the misleading single Dashboard image and false CSV claim;
+- added 19 reproducible 1280×800 Browser captures, one for each selected page,
+  with the real CSV Interpole Monitor as page 07;
+- prepended a rendered, visually verified v3.5.3 release supplement to the
+  Programmer Core API Guide and labeled the older v3.1.23 API Surface PDF as
+  historical rather than exhaustive for v3.5.3;
+- corrected the top spacing of all 634 light-blue API signature strips and
+  verified that none intersects the method or class heading above it;
+- replaced the independent token-based PyPI workflow with one gated trusted-
+  publishing job after Python, platform, native, test, and package validation;
+- set the release identity to v3.5.3 while retaining legacy persistence as the
+  default when no explicit storage-mode record exists.
+
 # Documentation refresh - v3.5.2 programmer integration guide
 
 - Added `tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf`.

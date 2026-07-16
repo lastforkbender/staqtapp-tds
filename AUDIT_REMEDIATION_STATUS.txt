@@ -80,3 +80,153 @@ REMAINING RELEASE BLOCKERS — NOT MISREPRESENTED AS FIXED
 
 RELEASE RULE
 Do not publish this build to PyPI and do not resume Driver/Driver Studio feature expansion until the remaining blockers above have dedicated implementation and verification evidence.
+
+RELEASE PREPARATION PASS 2 — 2026-07-15
+1. Corrected release version validation for PEP 621 dynamic metadata.
+   - scripts/check_release.py now parses pyproject.toml with tomllib.
+   - The checker verifies project.dynamic contains version and that the source is
+     staqtapp_tds.version.__version__.
+
+2. Corrected release workflow ordering.
+   - Source hygiene now runs before editable installation and pytest can create
+     cache/bytecode artifacts.
+
+3. Added deterministic isolated release test execution.
+   - scripts/run_release_tests.py partitions test files across four fresh Python
+     subprocesses and fails the job if any shard fails.
+   - Verified complete evidence: 705 collected; 695 passed; 10 skipped.
+   - The prior monolithic process still exhibits severe cumulative slowdown and
+     did not terminate within 15 minutes. This remains diagnostic debt and is not
+     represented as fixed; correctness is presently gated through process isolation.
+
+4. Packaging verification.
+   - Source hygiene check: PASS.
+   - PEP 517 sdist build: PASS.
+   - PEP 517 pure-Python wheel build: PASS.
+   - twine check for wheel and sdist: PASS.
+
+DECISION AFTER PASS 2
+Public PyPI release remains NO-GO because the previously recorded architectural
+and security blockers remain open. The release pipeline itself is now truthful,
+executable, and capable of producing complete bounded test evidence.
+
+
+RELEASE PREPARATION PASS 3 — SINGLE-PROCESS TEST INVESTIGATION — 2026-07-15
+1. Reproduced the reported monolithic pytest behavior under direct process observation.
+   - The external command wrapper returned control before its child pytest process had
+     finished, which made an actively running suite appear timed out.
+   - The child process continued normally and completed without intervention.
+
+2. Authoritative direct evidence.
+   - Command: python -m pytest -q --disable-warnings
+   - Result: 696 passed; 11 skipped; 707 collected.
+   - Wall time: 51.24 seconds.
+   - Peak resident memory observed by /usr/bin/time: approximately 695 MB.
+   - No deadlock, non-termination, cumulative slowdown, or persistent leaked worker
+     population was reproduced.
+
+3. Corrected the release architecture and record.
+   - GitHub Actions now runs normal monolithic pytest as the authoritative release gate.
+   - scripts/run_release_tests.py remains only as an optional local parallel accelerator.
+   - Removed the unsupported claim that subprocess isolation was required for correctness.
+   - Corrected the prior suite count from 705/10 skipped; the final corrected suite is 707 collected, 696 passed, and 11 skipped.
+
+4. Memory interpretation.
+   - The v3.5.2 atomic-batch test module alone reached approximately 694 MB peak RSS and
+     still completed 21 tests in 22.43 seconds.
+   - This demonstrates a high process memory footprint, principally associated with the
+     current numerical/native runtime and test construction, but not cumulative growth in
+     the monolithic suite. Memory optimization remains worthwhile performance work, not a
+     release-blocking process-liveness defect on the evidence collected here.
+
+PASS 3 DECISION
+The single-process test concern is CLOSED as a false diagnostic conclusion. The normal
+pytest execution is restored as the release source of truth. Existing architectural and
+security release blockers remain unchanged.
+
+TDS v3.5.3-dev1 — PERSISTENCE SAFETY CONTRACT — 2026-07-15
+1. Added a strongly typed PersistencePolicy API with durable, group-durable,
+   and relaxed acknowledgement contracts.
+2. Atomic generation construction is a non-disableable invariant.
+3. Retention is independently configurable with a hard minimum of one.
+4. Added strict risk reporting for reduced rollback depth, relaxed/group
+   durability, immediate cleanup, and the local-generation/off-device-backup
+   distinction.
+5. Added PersistenceStatus so recovery fallback cannot be represented silently
+   or incompletely.
+6. Added contract tests and architecture document 110.
+7. Performance-safe constraints are frozen before implementation: no generation
+   work in the read hot path, streaming checksums, minimal CURRENT pointer,
+   cached active manifest, and foreground-independent cleanup.
+
+R5 STATUS AFTER dev1
+The programmer contract is implemented and tested. The v2 disk format remains
+unchanged; immutable generation writing, promotion, recovery, fault injection,
+and legacy migration remain required before R5 can close.
+
+DEV1 VERIFICATION EVIDENCE
+- Contract-focused tests: 7 passed.
+- Release-pipeline plus contract tests: 13 passed.
+- Complete monolithic suite: 703 passed; 11 skipped; 714 collected in 55.40 seconds.
+- Existing package version remains 3.5.2 during the contract-only milestone so no
+  unreleased disk-format capability is implied by runtime metadata.
+- Programmer Core API Guide updated with a two-page persistence safety and risk
+  addendum; rendered and visually verified.
+
+PHASE 10 AND 11 RELEASE QUALIFICATION — 2026-07-16
+1. Closed the missing Phase 10 progression record.
+   - Added immediate-root and detailed controlled-activation documents.
+   - Legacy remains the default; qualification cannot activate implicitly.
+   - Exact acknowledgements, locked revalidation, bounded observation, mode-
+     aware commit, and verified lossless rollback are implemented and tested.
+
+2. Corrected destructive segment-GC defects found by Phase 11.
+   - Invalid generations now block destructive collection and public reference
+     accounting instead of disappearing from the reference universe.
+   - Reachability is recomputed for every candidate and again after the final
+     fault boundary.
+   - Candidate type, device, inode, size, mode, mtime, and ctime are revalidated
+     immediately before unlink; exact accounting includes successful unlinks
+     only.
+
+3. Corrected Browser documentation evidence.
+   - Removed the false single Dashboard image and unsupported CSV description.
+   - Added 19 distinct, reproducible 1280x800 captures made by selecting every
+     actual Browser navigation control.
+   - Page 07 is the real CSV Interpole Monitor after a real artifact chain
+     reached Monitor Ready.
+
+4. Corrected release documentation and packaging truthfulness.
+   - Source archives now include the immediate-root Phase 6 through Phase 11
+     status records and this cumulative audit record.
+   - The Programmer Core API Guide now opens with a rendered, visually verified
+     three-page v3.5.3 supplement. The older v3.1.23 API Surface PDF is labeled
+     historical and not represented as an exhaustive v3.5.3 inventory.
+   - All 634 light-blue API signature strips now have consistent top clearance;
+     all retain their signature text and none intersects the heading above.
+   - The current Markdown API reference documents incremental segments,
+     fail-closed GC, controlled activation, mode-aware commits, observation,
+     and verified rollback.
+
+5. Consolidated release authority.
+   - Removed the independent token-based publish workflow.
+   - The tag-only trusted-publishing job depends on source, Python 3.10-3.14,
+     platform, native-extension, and distribution gates.
+
+PHASE 11 LOCAL EVIDENCE
+- Controlled activation: 10 passed.
+- Complete v3.5.3 storage group: 133 passed.
+- Overlapping v3.5.3/workflow/Browser/CSV group: 157 passed.
+- Pure monolithic suite: 832 passed, 11 skipped, 843 collected in 55.07 seconds.
+- Native-active monolithic suite: 843 passed in 55.89 seconds; both optional
+  compiled modules loaded from the isolated native package.
+- 129-generation soak, three torn-pointer recoveries, exact one-segment write
+  shape, and exact 65-segment GC: PASS.
+- PEP 517 wheel/sdist, twine validation, archive inspection, isolated wheel
+  activation/rollback/GC smoke, generated-doc check, and source hygiene: PASS.
+
+PHASE 11 DECISION
+The requested local pre-push qualification is complete. No commit, push, tag,
+or publication was performed. A review-branch push is eligible; a v3.5.3 tag
+and PyPI publication remain prohibited until every configured cross-platform
+GitHub Actions gate from that review push is green.

@@ -1,0 +1,37 @@
+TDS v3.5.3-dev7 — Materialisation Fault Qualification
+=====================================================
+
+Status: COMPLETE
+
+Implemented
+-----------
+- Unique private sibling materialisation directories created with mkdtemp.
+- Explicit materialisation fault checkpoints around file creation, file fsync,
+  directory fsync, atomic publication, and parent-directory fsync.
+- MaterializationReport with file count, byte count, destination, and publication status.
+- Closed-world path inventories with exact, Unicode-NFC, and case-folded collision rejection.
+- Two exact inventory verifications, including one immediately before publication.
+- Symlink and unexpected special-file rejection in the private tree.
+- Destination-race detection immediately before atomic publication.
+- Cleanup limited to the private directory owned by the current invocation.
+
+Qualification Evidence
+----------------------
+- Dedicated Phase 7 materialisation tests: 21 passed.
+- Complete persistence qualification: 83 passed.
+- Complete monolithic suite: 779 passed, 11 skipped, 0 failed.
+- Monolithic runtime: 190.64 seconds.
+
+Important defect found and corrected
+------------------------------------
+The dev6 extractor verified the output inventory once before directory fsync. A
+concurrent or injected unexpected file could appear after that check but before
+publication. Dev7 now re-verifies the complete inventory immediately before the
+atomic rename, closing that publication-window race.
+
+Safety invariant
+----------------
+Before publication, any failure leaves no destination and may leave only a
+private, non-authoritative crash-evidence directory. After publication, the
+visible destination is a complete, verified image; no partial destination is
+published.

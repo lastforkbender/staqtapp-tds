@@ -1,0 +1,56 @@
+TDS GUARANTEED STORAGE — PHASE 10 STATUS
+Version line: v3.5.3-dev10
+Feature: Controlled Activation
+
+STATUS: COMPLETE
+
+IMPLEMENTED
+
+- Legacy TDSPersistence remains the default when no mode record exists.
+- StorageMode makes legacy and guaranteed-segmented operation explicit.
+- Legacy-to-segment qualification preserves exact paths, lengths, SHA-256
+  digests, structured metadata, logical reopen semantics, and source bytes.
+- Qualification writes a canonical immutable evidence receipt but does not
+  activate Guaranteed Storage.
+- Activation requires the exact explicit acknowledgement and repeats every
+  equivalence gate immediately before atomic mode publication.
+- Corrupt, non-canonical, incomplete, stale, or mismatched mode/qualification
+  evidence fails closed.
+- Mode-aware commits cannot switch storage paths implicitly.
+- Browser/admin status exposes the active mode and qualification state through
+  a bounded observer read; it does not hash segment payloads during polling.
+- Guaranteed-to-legacy rollback materialises the current segment generation
+  into a new verified legacy mount before atomically changing authority.
+- The original legacy mount and all immutable segment generations remain
+  untouched by rollback.
+
+PUBLIC API
+
+- StorageMode
+- ControlledActivationError
+- ActivationQualification
+- StorageActivationStatus
+- ControlledCommitReport
+- ControlledStorage
+
+QUALIFICATION EVIDENCE IN THIS ENVIRONMENT
+
+- Dedicated controlled-activation tests: 10 passed / 0 failed.
+- Complete v3.5.3 Guaranteed Storage tests through Phase 11 GC additions:
+  133 passed / 0 failed.
+
+PHASE 10 INVARIANT
+
+No mode transition is authoritative until exact migration evidence, current
+generation integrity, unchanged source evidence, and explicit operator intent
+have all been verified immediately before atomic mode publication.
+
+ROLLBACK INVARIANT
+
+Rollback never points at stale pre-activation bytes. The current guaranteed
+generation is first reconstructed and logically reopened as a new legacy mount;
+only that verified mount can become the legacy authority.
+
+NEXT PHASE
+
+Phase 11 — Release Qualification

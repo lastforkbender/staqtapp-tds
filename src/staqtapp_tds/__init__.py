@@ -59,6 +59,7 @@ from staqtapp_tds.provenance import ProvenanceTag, ProvenanceClass, PROVENANCE_D
 from staqtapp_tds.cluster import TDSClusterIdentity, CLUSTER_DTYPE, query_requires_selector
 from staqtapp_tds.radix import RadixDirectoryRouter
 from staqtapp_tds.config import RuntimeConfig, AdminConfig, ConfigRegistry
+from staqtapp_tds.persistence_policy import Durability, CleanupMode, PersistencePolicy, PersistenceStatus
 from staqtapp_tds.secure import SecureParams
 from staqtapp_tds.crypto import CryptoProvider, NoopCryptoProvider, XorCryptoProvider
 from staqtapp_tds.spiral import TraceRecord, TraceSetManifest, AggregationRecord, SpiralRun, SpiralRunMetadata, create_spiral_run
@@ -94,6 +95,40 @@ __all__ = [
     "InvariantEngine", "InvariantReport", "InvariantViolation", "InvariantCode", "INVARIANT_DTYPE",
     "ProvenanceTag", "ProvenanceClass", "PROVENANCE_DTYPE",
     "TDSClusterIdentity", "CLUSTER_DTYPE", "query_requires_selector", "RadixDirectoryRouter",
-    "RuntimeConfig", "AdminConfig", "ConfigRegistry", "SecureParams", "CryptoProvider", "NoopCryptoProvider", "XorCryptoProvider",
+    "RuntimeConfig", "AdminConfig", "ConfigRegistry", "Durability", "CleanupMode", "PersistencePolicy", "PersistenceStatus", "SecureParams", "CryptoProvider", "NoopCryptoProvider", "XorCryptoProvider",
     "TraceRecord", "TraceSetManifest", "AggregationRecord", "SpiralRun", "SpiralRunMetadata", "create_spiral_run", "HealthCheck", "HealthReport", "HealthVerifier", "verify", "VERSION", "PressureMode", "VFSState", "ChunkState", "PressureSnapshot", "estimate_pressure", "DiagnosticEvent", "NativeDiagnosticSnapshot", "native_diagnostics_available", "native_diag_snapshot", "native_diag_reset", "native_diag_set_enabled", "native_diag_mark_degraded", "native_diag_emit", "calculate_pressure_snapshot", "PressureComponent", "PressureCalculationSnapshot", "RecoveryAction", "RecoveryPlan", "build_recovery_plan", "NativeEngineManager", "NativeLoadReport", "NativeRuntimePlatform", "TDS_NATIVE_ABI_VERSION", "get_native_manager", "native_status_result", "native_capabilities_result",
 ]
+
+from .generation_store import (
+    GenerationError, GenerationIntegrityError, BufferContractError, BufferPolicy,
+    CleanupError, CleanupReport, GenerationInfo, ImmutableGenerationStore,
+    RecoveryCondition, RejectedGeneration, RecoveryReport,
+)
+from .guaranteed_storage import (
+    GuaranteedStorageError, TransitionFitAnalysis, GuaranteedCommitReport,
+    SegmentedGuaranteedCommitReport, MaterializationReport, MigrationFileRecord,
+    VerifiedMigrationReport, GuaranteedStorageBridge,
+)
+from .segment_store import (
+    SegmentStoreError, SegmentIntegrityError, SegmentReference,
+    SegmentGenerationInfo, SegmentCommitReport, SegmentGCReport,
+    ImmutableSegmentStore,
+)
+from .storage_activation import (
+    StorageMode, ControlledActivationError, ActivationQualification,
+    StorageActivationStatus, ControlledCommitReport, ControlledStorage,
+)
+
+__all__.extend([
+    "GenerationError", "GenerationIntegrityError", "BufferContractError",
+    "BufferPolicy", "CleanupError", "CleanupReport", "GenerationInfo",
+    "ImmutableGenerationStore", "RecoveryCondition", "RejectedGeneration",
+    "RecoveryReport", "GuaranteedStorageError", "TransitionFitAnalysis",
+    "GuaranteedCommitReport", "SegmentedGuaranteedCommitReport",
+    "MaterializationReport", "MigrationFileRecord", "VerifiedMigrationReport",
+    "GuaranteedStorageBridge", "SegmentStoreError", "SegmentIntegrityError",
+    "SegmentReference", "SegmentGenerationInfo", "SegmentCommitReport",
+    "SegmentGCReport", "ImmutableSegmentStore", "StorageMode",
+    "ControlledActivationError", "ActivationQualification",
+    "StorageActivationStatus", "ControlledCommitReport", "ControlledStorage",
+])

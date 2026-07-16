@@ -18,12 +18,24 @@ class AdminControl:
         snap["audit_count"] = len(self.audit.entries())
         if self.observation_source is not None:
             source = self.observation_source
+            if hasattr(source, "storage_status"):
+                snap["storage_mode"] = source.storage_status()
             if hasattr(source, "observation_snapshot"):
                 snap["observation"] = source.observation_snapshot()
             elif hasattr(source, "snapshot"):
                 snap["observation"] = source.snapshot()
             elif callable(source):
                 snap["observation"] = source()
+            if hasattr(source, "csv_interpole_monitor_snapshot"):
+                csv_snapshot = source.csv_interpole_monitor_snapshot()
+                snap["csv_interpole_monitor"] = (
+                    csv_snapshot.to_dict() if hasattr(csv_snapshot, "to_dict") else csv_snapshot
+                )
+            elif hasattr(source, "csv_interpole_monitor"):
+                csv_snapshot = source.csv_interpole_monitor
+                snap["csv_interpole_monitor"] = (
+                    csv_snapshot.to_dict() if hasattr(csv_snapshot, "to_dict") else csv_snapshot
+                )
             snap["spiral_rank"] = spiral_rank_snapshot_from(source)
         else:
             snap["spiral_rank"] = self.spiral_rank_telemetry.snapshot()

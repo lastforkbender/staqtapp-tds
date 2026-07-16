@@ -12,7 +12,7 @@ from staqtapp_tds.csv_layer import (
 
 
 def test_version_336_csv_storage_bridge_preflight():
-    assert __version__ == "3.5.2"
+    assert __version__ == "3.5.3"
 
 
 def test_csv_storage_bridge_plan_is_six_core_artifacts_by_default():

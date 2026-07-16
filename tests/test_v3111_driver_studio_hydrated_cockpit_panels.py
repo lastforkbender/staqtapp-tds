@@ -97,7 +97,7 @@ def _bundle():
 
 
 def test_v3111_version():
-    assert __version__ == "3.5.2"
+    assert __version__ == "3.5.3"
 
 
 def test_hydration_capability_matrix_is_gui_power_not_trust_authority():

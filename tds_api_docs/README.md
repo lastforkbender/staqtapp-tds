@@ -1,15 +1,36 @@
-# TDS API Docs
+# TDS API Documentation
 
-This folder intentionally contains one canonical Staqtapp-TDS API surface reference PDF for repository consumers, AI integration planning, stress testing, and authority-boundary review.
+Start with the programmer-oriented guide:
 
-Current PDF:
+```text
+Staqtapp_TDS_Programmer_Core_API_Guide.pdf
+```
+
+Its first three pages are the authoritative v3.5.3 release supplement covering
+Phase 10 controlled activation, Phase 11 GC hardening, the new public storage
+types, and exact local qualification evidence. The broad guide that follows
+organizes the earlier direct operational calls for `.tds` storage, directories,
+entries, variables, serialization, telemetry, trace ranking, CSV operations,
+Semantic IR review, Driver Foundry/VM/Runtime Manager, the centralized Browser,
+and Driver Studio.
+
+The historical guide pages were also layout-corrected: all 634 light-blue API
+signature strips now have clear separation from the method or class heading
+above while retaining the signature text.
+
+The current v3.5.3 Guaranteed Storage lookup is:
+
+```text
+../docs/reference/Programmers_API_Reference.md
+```
+
+The older class-and-function PDF remains available as:
 
 ```text
 Staqtapp_TDS_API_Surface_Reference.pdf
 ```
 
-The PDF filename and first cover page omit a release version so README-only or storage-hardening version bumps do not create duplicate API PDFs. Regenerate this document only when the public API surface itself changes.
-
-The v3.1.26 storage-engine hardening release does not regenerate the API surface content because it promotes the hardened storage baseline through version metadata and README documentation only.
-
-The PDF separates AI-safe public proposal/testing calls, Runtime Manager evidence calls, controlled Driver VM runtime calls, Browser/Admin telemetry calls, Driver Studio cockpit calls, storage/.tds calls, and stress-harness calls.
+`Staqtapp_TDS_API_Surface_Reference.pdf` is a historical v3.1.23
+Driver/Studio reference. It is not an exhaustive v3.5.3 inventory and does not
+contain the new Guaranteed Storage APIs. The Programmer Core API Guide plus the
+current Markdown reference above are the supported v3.5.3 entry points.

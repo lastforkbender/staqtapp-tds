@@ -1,0 +1,19 @@
+TDS v3.5.3-dev6 — Guaranteed Storage Transition Fit
+
+STATUS
+- Opt-in bridge implemented; stable TDSPersistence default remains unchanged.
+- Complete legacy-compatible mount images commit through one immutable generation.
+- Bounded streaming image format with per-file SHA-256 validation.
+- Atomic materialisation into a previously absent destination.
+- Traversal, symlink, truncation, trailing-data, mutable-stream, and existing-target failures fail closed.
+
+TEST EVIDENCE
+- Transition + persistence focused qualification: 62 passed.
+- Final critical transition/recovery recheck: 34 passed.
+- Complete monolithic suite: 758 passed, 11 skipped, 0 failed in 81.67 seconds.
+- Source hygiene: PASS.
+
+RELEASE POSITION
+- Development transition API only.
+- No default persistence-path switch.
+- Next work should qualify compound materialisation faults and then design incremental immutable segments to remove the bridge's duplicate-write cost without changing recovery semantics.

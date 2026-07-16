@@ -1,0 +1,76 @@
+TDS GUARANTEED STORAGE — PHASE 11 STATUS
+Version: v3.5.3
+Feature: Release Qualification
+
+STATUS: LOCAL QUALIFICATION COMPLETE — REVIEW-BRANCH PUSH ELIGIBLE
+
+COMPLETED IMPLEMENTATION
+
+- Phase 10 controlled activation and lossless rollback are explicit and tested.
+- Segment GC fails closed when any generation is invalid or unreadable.
+- GC recomputes closed-world reachability before every candidate deletion and
+  repeats the proof after the final fault-injection boundary.
+- Candidate file type, device, inode, size, mode, modification time, and change
+  time are revalidated before unlinking.
+- Interrupted collection is idempotently resumable and exact byte accounting
+  includes only files actually unlinked.
+- Browser documentation uses 19 genuine, distinct page captures produced by
+  selecting every real navigation control; the false overview was removed.
+- The independent token-based PyPI workflow was removed. Publication now
+  depends on Python, platform, native-extension, and distribution gates and
+  uses PyPI trusted publishing.
+- The source archive contains the immediate-root Phase 6, 7, 8, 9, 10, and 11
+  status records plus the cumulative audit record; Phase 10 is no longer absent
+  between the Phase 9 and Phase 11 evidence.
+- The Programmer Core API Guide opens with a rendered and visually verified
+  three-page v3.5.3 supplement covering controlled activation, GC, the new
+  public APIs, and the local/remote release boundary. The v3.1.23 API Surface
+  PDF is now labeled historical rather than exhaustive for v3.5.3. All 634
+  light-blue signature strips have corrected top clearance; every strip retains
+  its signature text and none intersects the heading above.
+
+EXACT LOCAL QUALIFICATION EVIDENCE
+
+- Controlled activation tests: 10 passed / 0 failed.
+- Complete `tests/test_v353_*.py` Guaranteed Storage group: 133 passed / 0 failed.
+- Overlapping v3.5.3, release-workflow, Browser visual, and CSV monitor group:
+  157 passed / 0 failed.
+- Pure monolithic suite: 843 collected; 832 passed; 11 skipped; 0 failed in
+  55.07 seconds.
+- Opt-in native extensions built with GCC on local Linux x86_64 / Python 3.12;
+  `_native_index` and `_csv_scan_kernel` both loaded from compiled modules.
+- Native-active monolithic suite: 843 passed / 0 failed in 55.89 seconds.
+- The 129-generation incremental soak completed three torn-pointer recoveries,
+  proved one 64-byte physical segment write per 4096-byte logical change,
+  collected exactly 65 unreachable segments, and reverified current bytes.
+- PEP 517 produced `staqtapp_tds-3.5.3-py3-none-any.whl` and
+  `staqtapp_tds-3.5.3.tar.gz`; both passed `twine check`.
+- Archive audit confirmed version 3.5.3, `Requires-Python: >=3.10`, corrected
+  GitHub project URLs, pure `py3-none-any` wheel tagging, all 19 Browser images,
+  all Phase status records, and no cache, bytecode, compiled binary, old false
+  screenshot, or retired token-publish workflow.
+- An isolated wheel install imported from the isolated target and exercised
+  version identity, legacy qualification, explicit activation, current-
+  generation verification, lossless rollback, destructive segment GC, and
+  current-byte reconstruction successfully.
+- The generated result-code documentation, source hygiene checker, workflow
+  YAML parse, PDF text extraction, all-page PDF rendering, and PDF visual review
+  passed. The structural PDF audit found 406 corrected 12-point strips and 228
+  corrected 15-point strips, with 634/634 containing text and zero heading
+  intersections.
+
+REMOTE GATES THAT CANNOT PRECEDE THE FIRST REVIEW PUSH
+
+- The workflow is configured for Linux Python 3.10 through 3.14, Windows and
+  macOS pure suites, Linux and macOS native-active suites, source hygiene,
+  package validation, and tag-only trusted publication.
+- Those remote jobs have not run for this local branch because no push has been
+  made. Local completion is not represented as remote platform evidence.
+
+RELEASE RULE
+
+The repository now meets the requested pre-push local gates, so a review-branch
+push is eligible. This work performed no commit, push, tag, or publication. A
+v3.5.3 tag and PyPI publication remain prohibited until every cross-platform
+GitHub Actions gate from the eventual review push is green and the resulting
+diff is reviewed.

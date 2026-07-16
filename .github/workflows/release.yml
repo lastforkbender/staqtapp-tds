@@ -1,0 +1,133 @@
+name: Staqtapp-TDS release gates
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-release-checks:
+    name: Source release checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Check source release hygiene
+        run: python scripts/check_release.py
+      - name: Verify generated documentation is current
+        run: git diff --exit-code
+
+  python-compatibility:
+    name: Python ${{ matrix.python-version }} compatibility
+    needs: source-release-checks
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install package for tests
+        run: python -m pip install ".[test]"
+      - name: Run authoritative monolithic test suite
+        run: python -m pytest -q --disable-warnings
+
+  platform-compatibility:
+    name: ${{ matrix.os }} pure-Python compatibility
+    needs: source-release-checks
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+        python-version: ['3.13']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install package for tests
+        run: python -m pip install ".[test]"
+      - name: Run authoritative monolithic test suite
+        run: python -m pytest -q --disable-warnings
+
+  native-extension-qualification:
+    name: ${{ matrix.os }} native extensions
+    needs: source-release-checks
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ['3.13']
+    env:
+      STAQTAPP_TDS_BUILD_NATIVE: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Build and install native extensions
+        run: python -m pip install ".[test]"
+      - name: Require both native modules
+        run: python -c "from staqtapp_tds import _native_index, _csv_scan_kernel; assert _native_index and _csv_scan_kernel"
+      - name: Run suite with native extensions active
+        run: python -m pytest -q --disable-warnings -c /dev/null tests
+
+  build-distributions:
+    name: Build and inspect distributions
+    needs:
+      - python-compatibility
+      - platform-compatibility
+      - native-extension-qualification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Build source and universal wheel
+        run: |
+          python -m pip install build twine
+          python -m build
+      - name: Validate distribution metadata and contents
+        run: |
+          python -m twine check dist/*
+          python -m pip install --force-reinstall --no-deps dist/*.whl
+          python -c "import staqtapp_tds; assert staqtapp_tds.__version__ == '3.5.3'"
+      - name: Archive validated distributions
+        uses: actions/upload-artifact@v7
+        with:
+          name: staqtapp-tds-3.5.3-distributions
+          path: dist/*
+          if-no-files-found: error
+
+  publish-pypi:
+    name: Publish validated distributions to PyPI
+    if: github.ref_type == 'tag' && github.ref_name == 'v3.5.3'
+    needs: build-distributions
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/staqtapp-tds
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: staqtapp-tds-3.5.3-distributions
+          path: dist
+      - name: Publish with PyPI trusted publishing
+        uses: pypa/gh-action-pypi-publish@v1.14.0

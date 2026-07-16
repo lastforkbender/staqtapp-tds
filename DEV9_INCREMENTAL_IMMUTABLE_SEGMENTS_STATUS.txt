@@ -1,0 +1,35 @@
+TDS GUARANTEED STORAGE — PHASE 9 STATUS
+Version: v3.5.3-dev9
+
+COMPLETED
+
+- Content-addressed immutable SHA-256 segments.
+- Ordered immutable generation manifests.
+- Atomic SEGMENT_CURRENT publication after complete verification.
+- Fixed-size incremental segment reuse.
+- Explicit physical-write and reuse accounting.
+- Streaming reconstruction through the proven materialisation engine.
+- Full logical size and SHA-256 verification.
+- Manifest canonical-form and identity verification.
+- Corrupt, missing, or size-mismatched segment rejection.
+- Deterministic newest-valid-generation recovery and pointer repair.
+- Proven reference accounting across valid generations.
+- Explicit dry-run-first segment garbage collection.
+- Cross-process fail-closed mutation exclusion for commit, deletion, and GC.
+- Full-image dev8 path retained unchanged and independently addressable.
+- No activation or silent behavior change.
+
+PHASE 9 INVARIANT
+
+A segment is authoritative only through a fully valid immutable manifest that is
+reachable from a valid generation. A generation becomes current only after every
+segment and the complete logical reconstruction verify.
+
+GC INVARIANT
+
+A segment may be deleted only while mutation exclusion is held and only after a
+fresh scan proves that no valid generation manifest references it.
+
+NEXT PHASE
+
+Phase 10 — Controlled Activation

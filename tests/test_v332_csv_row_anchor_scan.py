@@ -15,7 +15,7 @@ from staqtapp_tds.csv_layer.dialect import detect_csv_dialect
 
 
 def test_version_332_csv_row_anchor_scan_pass():
-    assert __version__ == "3.5.2"
+    assert __version__ == "3.5.3"
 
 
 def test_csv_row_anchor_profile_hashes_exact_logical_record_bytes():

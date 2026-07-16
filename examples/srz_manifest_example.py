@@ -7,7 +7,7 @@ from staqtapp_tds import (
 
 reserved = ReservedNamespaces(directory_names=("future_zone",))
 policy = ManifestPolicy.from_dict({
-    "schema_version": "1.7.1",
+    "schema_version": "1.7.3",
     "telemetry": {"mode": "light", "flush_policy": "snapshot", "trace_window": 1024},
     "capabilities": ["srz", "latency", "telemetry", "reserved_namespaces"],
     "reserved_namespaces": reserved.to_dict(),

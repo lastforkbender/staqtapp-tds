@@ -1,0 +1,60 @@
+TDS GUARANTEED STORAGE — PHASE 8 STATUS
+Version: staqtapp TDS v3.5.3-dev8
+Feature: Verified Round-Trip Migration
+
+IMPLEMENTED
+
+Legacy Mount
+    -> isolated exact snapshot
+    -> immutable guaranteed generation
+    -> private materialised mount
+    -> equivalence qualification
+    -> atomic destination publication
+
+PROVEN GATES
+
+- identical path inventory
+- no missing files
+- no unexpected files
+- identical byte lengths
+- identical SHA-256 digests
+- structured metadata equivalence for manifest and .tds.meta documents
+- logical reopen equivalence for every .tds file
+- legacy source unchanged before, during, and after migration
+- activation eligibility false unless every gate passes
+- requested destination remains absent on qualification failure
+- prior CURRENT generation restored if post-commit equivalence fails
+
+NEW PUBLIC TYPES
+
+- MigrationFileRecord
+- VerifiedMigrationReport
+
+NEW API
+
+GuaranteedStorageBridge.verify_round_trip(legacy_mount, destination)
+
+QUALIFICATION COMPLETED IN THIS ENVIRONMENT
+
+66 passed / 0 failed across:
+- Phase 8 dedicated migration suite
+- Guaranteed Storage transition suite
+- Materialisation Fault Qualification suite
+- Buffer streaming hardening suite
+- Immutable generation suite
+- Persistence policy contract suite
+- Recovery state-machine suite
+- Retention and cleanup suite
+
+The separate exhaustive fault-injection recovery file exceeded the execution
+window after continued passing progress. No failure was observed, but it is not
+counted as completed qualification in this status.
+
+ENGINEERING INVARIANT
+
+Before equivalence proof:
+No requested destination is published and activation remains prohibited.
+
+After equivalence proof:
+The destination is an exact, reopenable, metadata-equivalent reconstruction of
+an unchanged legacy source, and the structured report records every gate.

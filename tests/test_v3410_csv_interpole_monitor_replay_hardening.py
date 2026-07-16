@@ -66,7 +66,7 @@ def _monitor_ready_csv(
 
 
 def test_version_3410_csv_interpole_monitor_replay_hardening():
-    assert __version__ == "3.5.2"
+    assert __version__ == "3.5.3"
     assert CSV_INTERPOLE_MONITOR_REPLAY_VERSION == "1.0"
     assert CSV_INTERPOLE_MONITOR_PAYLOAD_BYTE_LIMIT >= 65536
     assert "status" in CSV_INTERPOLE_MONITOR_DISPLAY_CONTRACT_KEYS
