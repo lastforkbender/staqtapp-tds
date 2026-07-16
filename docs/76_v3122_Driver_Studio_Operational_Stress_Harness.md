@@ -34,6 +34,11 @@ The harness currently covers four non-authoritative pressure paths:
 3. Manual Builder form payload normalization with unusual Qt-style values.
 4. `.tds` atomic persistence reader/writer checks with existing reader stability and fresh-reader visibility.
 
+POSIX readers retain the file-backed mmap path. Windows readers use an
+immutable detached snapshot and close the source file before validation; this
+preserves existing-reader stability without allowing an open mapping to block
+the writer's atomic path replacement.
+
 Event overflow is not treated as a failure when it is explicitly reported. The pass condition is that `dropped_event_count`, `retained_cursor_floor`, and `event_retention_gap` make event loss visible while the current immutable snapshot remains usable.
 
 ## Result shape

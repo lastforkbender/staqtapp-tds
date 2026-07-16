@@ -35,6 +35,8 @@ Release preparation also:
   cannot alter headers, offsets, lengths, checksums, or GC evidence;
 - aligned native Spiral score operation boundaries with Python evaluation so
   Apple Clang cannot introduce a one-ULP fused-arithmetic parity difference;
+- detached Windows reader snapshots from their source handles so an existing
+  reader remains stable without blocking atomic `.tds` replacement;
 - set the release identity to v3.5.3 while retaining legacy persistence as the
   default when no explicit storage-mode record exists.
 

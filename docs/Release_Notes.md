@@ -27,6 +27,8 @@
   persistence, generation, segmentation, migration, and materialization.
 - Preserved exact native/Python Spiral score parity on macOS by preventing
   compiler contraction across Python-equivalent arithmetic boundaries.
+- Added immutable detached Windows reader snapshots so open readers remain
+  usable while a writer atomically promotes the next `.tds` image.
 
 ## v3.5.3-dev10 — Controlled Activation
 

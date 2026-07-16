@@ -55,7 +55,8 @@ def test_csv_import_persists_through_tds_storage_without_native_engine_changes(t
 
     loaded_manifest = load_csv_manifest(loaded, manifest.csv_id)
     assert loaded_manifest.raw_sha256 == manifest.raw_sha256
-    assert export_original_csv(loaded, manifest.csv_id) == source.read_text(encoding="utf-8")
+    exported = export_original_csv(loaded, manifest.csv_id)
+    assert exported.encode(loaded_manifest.encoding) == source.read_bytes()
     proof = prove_original_roundtrip(loaded, manifest.csv_id)
     assert proof.byte_equivalent is True
     assert loaded.read_value(manifest.artifact_keys["roundtrip_report"])["byte_equivalent"] is True

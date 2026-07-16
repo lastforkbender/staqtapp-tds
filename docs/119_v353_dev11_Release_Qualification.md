@@ -85,12 +85,14 @@ The release workflow now requires:
 - a single tag-only publication job that depends on all earlier gates and uses
   PyPI trusted publishing rather than a repository token.
 
-The first draft-PR runs added three release findings. The generated result-code
+The first draft-PR runs added four release findings. The generated result-code
 check originally imported the complete package before dependencies were
 installed; it now loads `result.py` directly. Windows raw descriptors were
 opened without `O_BINARY`, allowing CRT newline translation to corrupt TDS
 indexes, generation lengths, segment hashes, migration copies, and downstream
 GC evidence. Every byte-exact descriptor writer now uses one binary-open helper.
+Windows readers also detach an immutable snapshot and release the source handle
+before validation, so an existing reader cannot block atomic path replacement.
 Apple Clang also contracted the native Spiral weighted terms and produced a
 one-ULP difference from Python; the native operation boundaries now mirror the
 Python expression while the strict equality test remains in place.
