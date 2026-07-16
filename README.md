@@ -259,7 +259,7 @@ Local v3.5.3 release qualification is complete:
 - Python 3.10–3.14, Windows, macOS, Linux, and native-extension CI gates;
 - PEP 517 wheel/sdist, metadata, isolated-install, and source-hygiene gates.
 
-Evidence: 832 passed and 11 skipped in the pure monolithic suite; 843 passed in the native-active monolithic suite; and 157 passed in the overlapping v3.5.3/workflow/Browser/CSV qualification group. Both distribution artifacts passed `twine check`, archive-content inspection, and an isolated wheel activation/rollback/GC smoke test. Exact details are recorded in `DEV11_RELEASE_QUALIFICATION_STATUS.txt`. No push or tag has been made. A v3.5.3 tag remains prohibited until the eventual cross-platform GitHub Actions run is green.
+Evidence: 832 passed and 11 skipped in the pure monolithic suite; 843 passed in the native-active monolithic suite; and 157 passed in the overlapping v3.5.3/workflow/Browser/CSV qualification group. Both distribution artifacts passed `twine check`, archive-content inspection, and an isolated wheel activation/rollback/GC smoke test. Exact local and review-branch details are recorded in `DEV11_RELEASE_QUALIFICATION_STATUS.txt`. Draft PR review and CI runs carry no release authority; a v3.5.3 tag remains prohibited until every gate on the candidate head is green.
 
 ## Repository map
 

@@ -85,9 +85,18 @@ The release workflow now requires:
 - a single tag-only publication job that depends on all earlier gates and uses
   PyPI trusted publishing rather than a repository token.
 
-Local qualification can make a review-branch push acceptable, but it cannot
-claim that remote platform jobs have passed before that push exists. A v3.5.3
-tag remains prohibited until the eventual GitHub Actions run is green.
+The first draft-PR runs added three release findings. The generated result-code
+check originally imported the complete package before dependencies were
+installed; it now loads `result.py` directly. Windows raw descriptors were
+opened without `O_BINARY`, allowing CRT newline translation to corrupt TDS
+indexes, generation lengths, segment hashes, migration copies, and downstream
+GC evidence. Every byte-exact descriptor writer now uses one binary-open helper.
+Apple Clang also contracted the native Spiral weighted terms and produced a
+one-ULP difference from Python; the native operation boundaries now mirror the
+Python expression while the strict equality test remains in place.
+
+Draft-PR qualification does not grant release authority. A v3.5.3 tag remains
+prohibited until every GitHub Actions gate on the candidate head is green.
 
 ## Evidence status
 
@@ -106,6 +115,7 @@ Local Phase 11 qualification is complete. Exact evidence is recorded in
   historical;
 - source hygiene and generated-result documentation checks passed.
 
-No commit, push, tag, or publication was performed. The configured remote
-platform matrix cannot produce evidence until a review branch is pushed. A
-v3.5.3 tag remains prohibited until that complete GitHub Actions run is green.
+The local pre-push qualification was completed before draft PR #1 opened.
+Review-branch commits and CI runs are qualification evidence only; no tag or
+publication has been performed. A v3.5.3 tag remains prohibited until the
+complete GitHub Actions matrix on the candidate head is green.

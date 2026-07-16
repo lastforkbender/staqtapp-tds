@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 from pathlib import Path
 
 import pytest
@@ -144,7 +145,26 @@ def test_bridge_unchanged_filesystem_reuses_segments(tmp_path: Path) -> None:
     assert first.generation.generation_id != second.generation.generation_id
 
 
-def test_full_image_path_remains_independent_and_compatible(tmp_path: Path) -> None:
+def test_full_image_path_remains_independent_and_compatible(tmp_path: Path, monkeypatch) -> None:
+    # Simulate the Windows CRT contract even on POSIX: every raw descriptor
+    # write must request O_BINARY before byte-exact storage content is emitted.
+    platform_binary_flag = getattr(os, "O_BINARY", 0)
+    sentinel = 1 << 29
+    real_open = os.open
+    binary_write_paths: list[str] = []
+
+    def tracked_open(path, flags, mode=0o777, *, dir_fd=None):
+        if flags & os.O_WRONLY:
+            assert flags & sentinel, f"raw descriptor write omitted O_BINARY: {path}"
+            binary_write_paths.append(str(path))
+        clean_flags = (flags & ~sentinel) | platform_binary_flag
+        if dir_fd is None:
+            return real_open(path, clean_flags, mode)
+        return real_open(path, clean_flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(os, "O_BINARY", sentinel, raising=False)
+    monkeypatch.setattr(os, "open", tracked_open)
+
     bridge = GuaranteedStorageBridge(tmp_path / "guaranteed")
     full = bridge.commit_filesystem(_fs(), parallel_nodes=False)
     segmented = bridge.commit_filesystem_segmented(_fs(b"beta"), parallel_nodes=False)
@@ -152,6 +172,10 @@ def test_full_image_path_remains_independent_and_compatible(tmp_path: Path) -> N
     assert bridge.segment_store.current_generation() == segmented.generation.generation_id
     assert bridge.materialize_current(tmp_path / "full").is_dir()
     assert bridge.materialize_segmented_current(tmp_path / "segmented").is_dir()
+    assert any(path.endswith(".tds~") for path in binary_write_paths)
+    assert any(path.endswith("data.tds") for path in binary_write_paths)
+    assert any("segments" in path for path in binary_write_paths)
+    assert any(".materializing-" in path for path in binary_write_paths)
 
 
 def test_segment_names_are_content_addresses(tmp_path: Path) -> None:

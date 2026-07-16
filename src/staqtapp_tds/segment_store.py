@@ -18,6 +18,7 @@ import time
 import uuid
 from typing import Any, Callable, Iterable, Iterator
 
+from ._binary_io import open_binary_fd
 from .generation_store import BufferContractError, GenerationError, GenerationIntegrityError, ImmutableGenerationStore
 from .persistence_policy import PersistencePolicy
 from .tds_json import dumps_canonical, loads_strict
@@ -146,7 +147,7 @@ class ImmutableSegmentStore:
 
     @staticmethod
     def _write_all_exclusive(path: Path, data: bytes, *, durable: bool) -> None:
-        fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        fd = open_binary_fd(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         try:
             view = memoryview(data)
             try:

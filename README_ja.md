@@ -253,7 +253,7 @@ Local v3.5.3 release qualification は完了しています。
 - Python 3.10–3.14、Windows、macOS、Linux、native-extension CI gate;
 - PEP 517 wheel/sdist、metadata、isolated install、source-hygiene gate。
 
-Evidence: pure monolithic suite は 832 passed / 11 skipped、native-active monolithic suite は 843 passed、重複する v3.5.3/workflow/Browser/CSV qualification group は 157 passed です。両 distribution artifact は `twine check`、archive content inspection、isolated wheel activation/rollback/GC smoke test に合格しました。正確な詳細は `DEV11_RELEASE_QUALIFICATION_STATUS.txt` に記録しています。Push も tag もまだ行っていません。Cross-platform GitHub Actions が green になるまでは v3.5.3 tag を作成できません。
+Evidence: pure monolithic suite は 832 passed / 11 skipped、native-active monolithic suite は 843 passed、重複する v3.5.3/workflow/Browser/CSV qualification group は 157 passed です。両 distribution artifact は `twine check`、archive content inspection、isolated wheel activation/rollback/GC smoke test に合格しました。Local と review branch の正確な詳細は `DEV11_RELEASE_QUALIFICATION_STATUS.txt` に記録しています。Draft PR review と CI run は release authority を持ちません。Candidate head の全 gate が green になるまでは v3.5.3 tag を作成できません。
 
 ## Repository map
 

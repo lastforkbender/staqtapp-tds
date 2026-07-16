@@ -30,6 +30,11 @@ Release preparation also:
   verified that none intersects the method or class heading above it;
 - replaced the independent token-based PyPI workflow with one gated trusted-
   publishing job after Python, platform, native, test, and package validation;
+- forced every raw-descriptor TDS, generation, segment, migration-copy, and
+  materialization write into Windows binary mode so CRT newline translation
+  cannot alter headers, offsets, lengths, checksums, or GC evidence;
+- aligned native Spiral score operation boundaries with Python evaluation so
+  Apple Clang cannot introduce a one-ULP fused-arithmetic parity difference;
 - set the release identity to v3.5.3 while retaining legacy persistence as the
   default when no explicit storage-mode record exists.
 

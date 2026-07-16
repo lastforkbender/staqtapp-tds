@@ -16,6 +16,7 @@ import time
 import uuid
 from typing import Any, Callable, Iterable
 
+from ._binary_io import open_binary_fd
 from .persistence_policy import CleanupMode, PersistencePolicy, PersistenceStatus
 from .tds_json import dumps_canonical, loads_strict
 
@@ -156,7 +157,7 @@ class ImmutableGenerationStore:
 
     def _write_file(self, path: Path, chunks: Iterable[bytes | bytearray | memoryview], *, durable: bool,
                     hasher: Any | None = None, checkpoint_prefix: str | None = None) -> int:
-        fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        fd = open_binary_fd(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         total = 0
         try:
             for chunk in chunks:

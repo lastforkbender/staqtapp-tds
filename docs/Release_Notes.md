@@ -23,6 +23,10 @@
   visible directly after extraction.
 - Consolidated publication behind all release gates with PyPI trusted
   publishing. A tag is forbidden until cross-platform CI is green.
+- Corrected Windows raw-descriptor writes to require binary mode throughout
+  persistence, generation, segmentation, migration, and materialization.
+- Preserved exact native/Python Spiral score parity on macOS by preventing
+  compiler contraction across Python-equivalent arithmetic boundaries.
 
 ## v3.5.3-dev10 — Controlled Activation
 

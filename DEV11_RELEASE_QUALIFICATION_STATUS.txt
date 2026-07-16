@@ -2,7 +2,7 @@ TDS GUARANTEED STORAGE — PHASE 11 STATUS
 Version: v3.5.3
 Feature: Release Qualification
 
-STATUS: LOCAL QUALIFICATION COMPLETE — REVIEW-BRANCH PUSH ELIGIBLE
+STATUS: LOCAL QUALIFICATION COMPLETE — REMOTE REVIEW GATES REQUIRED
 
 COMPLETED IMPLEMENTATION
 
@@ -19,6 +19,11 @@ COMPLETED IMPLEMENTATION
 - The independent token-based PyPI workflow was removed. Publication now
   depends on Python, platform, native-extension, and distribution gates and
   uses PyPI trusted publishing.
+- Every raw-descriptor TDS, generation, segment, migration-copy, and
+  materialization writer now requests Windows binary mode. CRT newline
+  translation can no longer change byte offsets, sizes, hashes, or GC evidence.
+- Native Spiral scoring now preserves Python's arithmetic operation boundaries,
+  preventing Apple Clang fused arithmetic from producing a one-ULP parity drift.
 - The source archive contains the immediate-root Phase 6, 7, 8, 9, 10, and 11
   status records plus the cumulative audit record; Phase 10 is no longer absent
   between the Phase 9 and Phase 11 evidence.
@@ -36,10 +41,11 @@ EXACT LOCAL QUALIFICATION EVIDENCE
 - Overlapping v3.5.3, release-workflow, Browser visual, and CSV monitor group:
   157 passed / 0 failed.
 - Pure monolithic suite: 843 collected; 832 passed; 11 skipped; 0 failed in
-  55.07 seconds.
+  51.04 seconds after the cross-platform repairs.
 - Opt-in native extensions built with GCC on local Linux x86_64 / Python 3.12;
   `_native_index` and `_csv_scan_kernel` both loaded from compiled modules.
-- Native-active monolithic suite: 843 passed / 0 failed in 55.89 seconds.
+- Native-active monolithic suite: 843 passed / 0 failed in 53.02 seconds after
+  a fresh GCC rebuild; strict native/Python score equality also passed.
 - The 129-generation incremental soak completed three torn-pointer recoveries,
   proved one 64-byte physical segment write per 4096-byte logical change,
   collected exactly 65 unreachable segments, and reverified current bytes.
@@ -59,18 +65,24 @@ EXACT LOCAL QUALIFICATION EVIDENCE
   corrected 15-point strips, with 634/634 containing text and zero heading
   intersections.
 
-REMOTE GATES THAT CANNOT PRECEDE THE FIRST REVIEW PUSH
+REMOTE REVIEW QUALIFICATION
 
 - The workflow is configured for Linux Python 3.10 through 3.14, Windows and
   macOS pure suites, Linux and macOS native-active suites, source hygiene,
   package validation, and tag-only trusted publication.
-- Those remote jobs have not run for this local branch because no push has been
-  made. Local completion is not represented as remote platform evidence.
+- Draft PR #1 exposed and fixed a source-gate bootstrap defect: generated result
+  documentation now loads `result.py` without importing the uninstalled package.
+- The next review run passed source hygiene, Linux Python 3.10 through 3.14,
+  Linux native, and macOS pure qualification. It also located the Windows
+  raw-descriptor text-mode corruption and macOS native one-ULP score drift now
+  corrected and locally requalified in this candidate.
+- Every candidate head must still complete the entire remote matrix before it
+  can become a tag or publication candidate.
 
 RELEASE RULE
 
-The repository now meets the requested pre-push local gates, so a review-branch
-push is eligible. This work performed no commit, push, tag, or publication. A
-v3.5.3 tag and PyPI publication remain prohibited until every cross-platform
-GitHub Actions gate from the eventual review push is green and the resulting
-diff is reviewed.
+The repository met the requested pre-push local gates before draft PR #1 was
+opened. Review-branch commits, pushes, and CI runs are qualification activity
+only and grant no publication authority. A v3.5.3 tag and PyPI publication
+remain prohibited until every cross-platform GitHub Actions gate on the
+candidate head is green and the resulting diff is reviewed.

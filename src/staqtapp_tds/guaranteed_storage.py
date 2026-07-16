@@ -18,6 +18,7 @@ import tempfile
 import uuid
 from typing import Any, Callable, Iterable, Iterator
 
+from ._binary_io import open_binary_fd
 from .generation_store import GenerationInfo, GenerationIntegrityError, ImmutableGenerationStore
 from .segment_store import ImmutableSegmentStore
 from .persistence_policy import PersistencePolicy
@@ -391,7 +392,7 @@ class GuaranteedStorageBridge:
             src = source / Path(*PurePosixPath(relative).parts)
             dst = destination / Path(*PurePosixPath(relative).parts)
             dst.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-            fd = os.open(str(dst), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            fd = open_binary_fd(dst, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             try:
                 with src.open("rb", buffering=0) as handle:
                     while True:
@@ -638,7 +639,9 @@ class GuaranteedStorageBridge:
                     target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
                     digest = hashlib.sha256()
                     remaining = size
-                    fd = os.open(str(target), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                    fd = open_binary_fd(
+                        target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600
+                    )
                     try:
                         while remaining:
                             chunk = source.read(min(self.ARCHIVE_CHUNK_BYTES, remaining))

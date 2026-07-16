@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
+from staqtapp_tds._binary_io import open_binary_fd
 from staqtapp_tds.tds_filesystem import (
     TDSDirectory, TDSEntry, TDSFileSystem, FmtID, DirFlags, ConcurrencyPool,
     decode_header, encode_header, _compute_subdir_offsets,
@@ -759,8 +760,9 @@ class TDSWriter:
         mv[pos: pos + len(index_block)] = index_block
 
         try:
-            fd = os.open(str(self._shadow),
-                         os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            fd = open_binary_fd(
+                self._shadow, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600
+            )
             try:
                 _write_all(fd, buf)
                 os.fsync(fd)
@@ -810,7 +812,9 @@ class TDSWriter:
         meta_tmp = self._meta.with_suffix(self._meta.suffix + '.tmp')
         meta_bytes = dumps_canonical(meta)[0]
         try:
-            fd = os.open(str(meta_tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            fd = open_binary_fd(
+                meta_tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600
+            )
             try:
                 _write_all(fd, meta_bytes)
                 os.fsync(fd)

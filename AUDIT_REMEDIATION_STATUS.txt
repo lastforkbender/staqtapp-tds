@@ -226,7 +226,8 @@ PHASE 11 LOCAL EVIDENCE
   activation/rollback/GC smoke, generated-doc check, and source hygiene: PASS.
 
 PHASE 11 DECISION
-The requested local pre-push qualification is complete. No commit, push, tag,
-or publication was performed. A review-branch push is eligible; a v3.5.3 tag
-and PyPI publication remain prohibited until every configured cross-platform
-GitHub Actions gate from that review push is green.
+The requested local pre-push qualification was completed before the review
+branch was published. Draft PR #1 and its CI runs are validation evidence only;
+they grant no tag or publication authority. A v3.5.3 tag and PyPI publication
+remain prohibited until every configured cross-platform GitHub Actions gate on
+the candidate head is green.
