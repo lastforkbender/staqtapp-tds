@@ -1,3 +1,6 @@
+*****ATTENTION*****
+- If you are here to get the TDS zip directly so you can have native c gil release, click the star above because you are downloading extreme well written gil release performance intelligent storage engine.
+
 > **v3.5.3.post1 PyPI presentation correction**
 >
 > This corrective post-release keeps the qualified v3.5.3 storage behavior and
