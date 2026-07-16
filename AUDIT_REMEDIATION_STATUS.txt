@@ -1,9 +1,18 @@
-STAQTAPP-TDS v3.5.2 — PYPI READINESS AUDIT REMEDIATION STATUS
-Date: 2026-07-14
+STAQTAPP-TDS v3.5.2 -> v3.5.3 — PYPI READINESS AUDIT REMEDIATION STATUS
+Initial audit date: 2026-07-14
+Post-release closure date: 2026-07-16
 
-DECISION
-Public PyPI release remains NO-GO. Driver and Driver Studio feature improvements must remain frozen.
-This archive is a bounded remediation build, not a public release candidate.
+INITIAL v3.5.2 DECISION (HISTORICAL)
+Public PyPI release was NO-GO. Driver and Driver Studio feature improvements
+were frozen while the bounded remediation and Phase 11 qualification ran.
+
+FINAL v3.5.3 DECISION
+GO — RELEASED. Pull request #1, merged-main, and annotated-tag matrices passed;
+tag `v3.5.3` resolves to merge commit
+`84c253f2a7d68a20ddcab96e94cc107439ccdd32`; and PyPI trusted publishing
+accepted the universal wheel and source distribution with attestations on
+2026-07-16. The immutable production release is
+https://pypi.org/project/staqtapp-tds/3.5.3/.
 
 VERIFIED FIXES IMPLEMENTED
 1. R1 license and metadata
@@ -225,9 +234,11 @@ PHASE 11 LOCAL EVIDENCE
 - PEP 517 wheel/sdist, twine validation, archive inspection, isolated wheel
   activation/rollback/GC smoke, generated-doc check, and source hygiene: PASS.
 
-PHASE 11 DECISION
+PHASE 11 FINAL DECISION
 The requested local pre-push qualification was completed before the review
-branch was published. Draft PR #1 and its CI runs are validation evidence only;
-they grant no tag or publication authority. A v3.5.3 tag and PyPI publication
-remain prohibited until every configured cross-platform GitHub Actions gate on
-the candidate head is green.
+branch was published. That evidence granted no tag or publication authority by
+itself. The required condition was subsequently satisfied: the complete
+cross-platform matrix passed on the final PR candidate, the merge commit passed
+on `main`, and the exact annotated tag passed again before its trusted-publisher
+job uploaded version 3.5.3. Exact run IDs, artifact hashes, and publication
+responses are recorded in `DEV11_RELEASE_QUALIFICATION_STATUS.txt`.

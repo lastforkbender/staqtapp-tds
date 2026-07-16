@@ -5,6 +5,11 @@ immutable segment generations, with verified round-trip migration, explicit
 controlled activation, visible operating mode, and lossless rollback into a new
 verified legacy mount.
 
+Published to production PyPI on 2026-07-16 from annotated tag `v3.5.3` at
+commit `84c253f2a7d68a20ddcab96e94cc107439ccdd32`. PyPI trusted publishing accepted
+the universal wheel and source distribution with attestations after the
+pull-request, merged-main, and tag release matrices passed.
+
 Phase 11 release qualification found and corrected destructive segment-GC
 defects: corrupt generations could be omitted from reference accounting, one
 reachability proof could be reused across a deletion batch, and a replaced
