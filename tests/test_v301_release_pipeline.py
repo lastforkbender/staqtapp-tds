@@ -14,7 +14,7 @@ def test_release_pipeline_files_exist():
 
 
 def test_release_checker_enforces_clean_source_artifacts():
-    checker = (ROOT / "scripts" / "check_release.py").read_text()
+    checker = (ROOT / "scripts" / "check_release.py").read_text(encoding="utf-8")
     assert ".so" in checker
     assert ".pyd" in checker
     assert "__pycache__" in checker
@@ -22,7 +22,7 @@ def test_release_checker_enforces_clean_source_artifacts():
 
 
 def test_release_checker_supports_dynamic_version_metadata():
-    checker = (ROOT / "scripts" / "check_release.py").read_text()
+    checker = (ROOT / "scripts" / "check_release.py").read_text(encoding="utf-8")
     assert "tomllib.loads" in checker
     assert '"version" not in dynamic' in checker
     assert 'staqtapp_tds.version.__version__' in checker
