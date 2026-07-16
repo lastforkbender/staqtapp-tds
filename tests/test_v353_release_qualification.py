@@ -97,9 +97,27 @@ def test_release_workflow_makes_publication_depend_on_every_gate() -> None:
     assert "platform-compatibility:" in workflow
     assert "native-extension-qualification:" in workflow
     assert "build-distributions:" in workflow
+    assert "release-gates-complete:" in workflow
     assert "publish-pypi:" in workflow
     assert workflow.index("build-distributions:") < workflow.index("publish-pypi:")
-    assert "needs: build-distributions" in workflow
+    assert "needs: release-gates-complete" in workflow
+    assert "name: Release gates complete" in workflow
     assert "github.ref_name == 'v3.5.3'" in workflow
     assert "id-token: write" in workflow
     assert not (ROOT / ".github" / "workflows" / "publish.yml").exists()
+
+
+def test_production_pypi_smoke_covers_every_supported_os() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "pypi-smoke.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "release:" in workflow
+    assert "workflow_dispatch:" in workflow
+    assert "https://pypi.org/simple" in workflow
+    assert "--no-cache-dir" in workflow
+    assert "staqtapp-tds=={version}" in workflow
+    assert "ubuntu-latest" in workflow
+    assert "macos-latest" in workflow
+    assert "windows-latest" in workflow
+    assert "python -I" in workflow
+    assert "name: Production PyPI smoke complete" in workflow

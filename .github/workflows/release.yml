@@ -114,10 +114,45 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
+  release-gates-complete:
+    name: Release gates complete
+    if: always()
+    needs:
+      - source-release-checks
+      - python-compatibility
+      - platform-compatibility
+      - native-extension-qualification
+      - build-distributions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every release gate
+        env:
+          SOURCE_RESULT: ${{ needs.source-release-checks.result }}
+          PYTHON_RESULT: ${{ needs.python-compatibility.result }}
+          PLATFORM_RESULT: ${{ needs.platform-compatibility.result }}
+          NATIVE_RESULT: ${{ needs.native-extension-qualification.result }}
+          DISTRIBUTION_RESULT: ${{ needs.build-distributions.result }}
+        run: |
+          python - <<'PY'
+          import os
+
+          results = {
+              "source": os.environ["SOURCE_RESULT"],
+              "python": os.environ["PYTHON_RESULT"],
+              "platform": os.environ["PLATFORM_RESULT"],
+              "native": os.environ["NATIVE_RESULT"],
+              "distribution": os.environ["DISTRIBUTION_RESULT"],
+          }
+          failed = {name: result for name, result in results.items() if result != "success"}
+          if failed:
+              raise SystemExit(f"release gates did not all succeed: {failed}")
+          print("all release gates succeeded")
+          PY
+
   publish-pypi:
     name: Publish validated distributions to PyPI
     if: github.ref_type == 'tag' && github.ref_name == 'v3.5.3'
-    needs: build-distributions
+    needs: release-gates-complete
     runs-on: ubuntu-latest
     environment:
       name: pypi

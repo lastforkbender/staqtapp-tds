@@ -96,10 +96,14 @@ TDS is designed around a narrow storage hot path. Native indexing, lookup, persi
 ## Install
 
 ```bash
+# Published release from production PyPI
+python -m pip install staqtapp-tds==3.5.3
+
+# Source checkout
 python -m pip install .
 
 # Optional PyQt5 Driver Studio
-python -m pip install ".[gui]"
+python -m pip install "staqtapp-tds[gui]==3.5.3"
 ```
 
 Python 3.10 or newer and NumPy are required. The C extensions are optional; supported operations retain deterministic Python fallback paths unless a caller explicitly forces native-only execution.
@@ -259,7 +263,9 @@ Local v3.5.3 release qualification is complete:
 - Python 3.10–3.14, Windows, macOS, Linux, and native-extension CI gates;
 - PEP 517 wheel/sdist, metadata, isolated-install, and source-hygiene gates.
 
-Evidence: 832 passed and 11 skipped in the pure monolithic suite; 843 passed in the native-active monolithic suite; and 157 passed in the overlapping v3.5.3/workflow/Browser/CSV qualification group. Both distribution artifacts passed `twine check`, archive-content inspection, and an isolated wheel activation/rollback/GC smoke test. Exact local and review-branch details are recorded in `DEV11_RELEASE_QUALIFICATION_STATUS.txt`. Draft PR review and CI runs carry no release authority; a v3.5.3 tag remains prohibited until every gate on the candidate head is green.
+Evidence: 832 passed and 11 skipped in the pure monolithic suite; 843 passed in the native-active monolithic suite; and 157 passed in the overlapping v3.5.3/workflow/Browser/CSV qualification group. Both distribution artifacts passed `twine check`, archive-content inspection, and an isolated wheel activation/rollback/GC smoke test. Exact local, review-branch, tag, and publication details are recorded in `DEV11_RELEASE_QUALIFICATION_STATUS.txt`.
+
+Release `v3.5.3` was published from immutable tag [`v3.5.3`](https://github.com/lastforkbender/staqtapp-tds/tree/v3.5.3) at commit `84c253f2a7d68a20ddcab96e94cc107439ccdd32` after the complete pull-request, merged-`main`, and tag matrices passed. PyPI trusted publishing accepted both the universal wheel and source distribution with attestations. See [PyPI](https://pypi.org/project/staqtapp-tds/3.5.3/), the [publication workflow](https://github.com/lastforkbender/staqtapp-tds/actions/runs/29500270923), and the [GitHub Release](https://github.com/lastforkbender/staqtapp-tds/releases/tag/v3.5.3).
 
 ## Repository map
 

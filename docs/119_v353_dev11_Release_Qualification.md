@@ -97,8 +97,9 @@ Apple Clang also contracted the native Spiral weighted terms and produced a
 one-ULP difference from Python; the native operation boundaries now mirror the
 Python expression while the strict equality test remains in place.
 
-Draft-PR qualification does not grant release authority. A v3.5.3 tag remains
-prohibited until every GitHub Actions gate on the candidate head is green.
+Draft-PR qualification did not grant release authority. The final candidate
+subsequently passed every pull-request gate, merged as commit `84c253f`, passed
+the entire `main` matrix, and passed the tag matrix before publication.
 
 ## Evidence status
 
@@ -117,7 +118,16 @@ Local Phase 11 qualification is complete. Exact evidence is recorded in
   historical;
 - source hygiene and generated-result documentation checks passed.
 
-The local pre-push qualification was completed before draft PR #1 opened.
-Review-branch commits and CI runs are qualification evidence only; no tag or
-publication has been performed. A v3.5.3 tag remains prohibited until the
-complete GitHub Actions matrix on the candidate head is green.
+The local pre-push qualification was completed before draft PR #1 opened. The
+final release sequence then completed without bypassing the boundary:
+
+- PR run [29499339585](https://github.com/lastforkbender/staqtapp-tds/actions/runs/29499339585) passed every gate;
+- PR #1 merged to `main` as `84c253f2a7d68a20ddcab96e94cc107439ccdd32`;
+- merged-main run [29499946976](https://github.com/lastforkbender/staqtapp-tds/actions/runs/29499946976) passed every gate;
+- annotated tag `v3.5.3` was created on that exact commit;
+- tag run [29500270923](https://github.com/lastforkbender/staqtapp-tds/actions/runs/29500270923) passed the matrix and published through PyPI trusted publishing.
+
+PyPI accepted `staqtapp_tds-3.5.3-py3-none-any.whl` and
+`staqtapp_tds-3.5.3.tar.gz` with HTTP 200 responses and publish attestations at
+13:38:22 UTC on 2026-07-16. The immutable release is available at
+https://pypi.org/project/staqtapp-tds/3.5.3/.

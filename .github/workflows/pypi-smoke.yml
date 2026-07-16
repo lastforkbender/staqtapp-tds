@@ -1,0 +1,52 @@
+name: Production PyPI smoke
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact Staqtapp-TDS version already published to production PyPI
+        required: true
+        default: '3.5.3'
+
+permissions:
+  contents: read
+
+jobs:
+  install-from-pypi:
+    name: ${{ matrix.os }} production PyPI install
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+        python-version:
+          - '3.13'
+    env:
+      RELEASE_VERSION: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.version }}
+    steps:
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install exact release from production PyPI
+        run: >-
+          python -c "import os, subprocess, sys; version = os.environ['RELEASE_VERSION'].removeprefix('v'); subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--disable-pip-version-check', '--no-cache-dir', '--only-binary=:all:', '--index-url', 'https://pypi.org/simple', f'staqtapp-tds=={version}'])"
+      - name: Verify installed version and core round trip
+        run: >-
+          python -I -c "import importlib.metadata as metadata, os; from staqtapp_tds import TDSFileSystem, __version__; expected = os.environ['RELEASE_VERSION'].removeprefix('v'); assert metadata.version('staqtapp-tds') == expected; assert __version__ == expected; fs = TDSFileSystem('pypi_smoke'); node = fs.makedirs('/release'); node.write_text('status', 'published'); assert node.read_value('status') == 'published'; print(f'staqtapp-tds {expected} production smoke passed')"
+
+  smoke-complete:
+    name: Production PyPI smoke complete
+    if: always()
+    needs: install-from-pypi
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all platform installs
+        env:
+          INSTALL_RESULT: ${{ needs.install-from-pypi.result }}
+        run: test "$INSTALL_RESULT" = success

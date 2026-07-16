@@ -2,7 +2,25 @@ TDS GUARANTEED STORAGE — PHASE 11 STATUS
 Version: v3.5.3
 Feature: Release Qualification
 
-STATUS: LOCAL QUALIFICATION COMPLETE — REMOTE REVIEW GATES REQUIRED
+STATUS: LOCAL QUALIFICATION COMPLETE — RELEASED; REMOTE GATES AND PYPI PUBLICATION COMPLETE
+
+FINAL RELEASE OUTCOME
+
+- Pull request #1 merged to `main` as commit
+  `84c253f2a7d68a20ddcab96e94cc107439ccdd32` on 2026-07-16.
+- Immutable annotated tag `v3.5.3` resolves to that exact merge commit.
+- Pull-request run 29499339585, merged-main run 29499946976, and tag run
+  29500270923 completed the source, Python 3.10-3.14, Windows, macOS,
+  Linux, native-extension, and distribution gates successfully.
+- PyPI trusted publishing completed in tag-run attempt 2 at 2026-07-16
+  13:38:22 UTC after the pending publisher was registered.
+- Production project: https://pypi.org/project/staqtapp-tds/3.5.3/
+- Published wheel: `staqtapp_tds-3.5.3-py3-none-any.whl`, SHA256
+  `7c557c26247a6411705cf728e3bfa74793601bfd77a03c592c732d0403f9a9ac`.
+- Published source: `staqtapp_tds-3.5.3.tar.gz`, SHA256
+  `daf21ced4e88ae47f5f8145d9db01b22f9636645e33074dcea0a23a26611b554`.
+- PyPI returned HTTP 200 for both uploads and accepted their trusted-publisher
+  attestations.
 
 COMPLETED IMPLEMENTATION
 
@@ -83,13 +101,16 @@ REMOTE REVIEW QUALIFICATION
   50 failures to 5. The residual evidence isolated an open-mmap replacement
   conflict plus a test comparison that normalized physical CSV line endings;
   both are corrected and locally requalified in this candidate.
-- Every candidate head must still complete the entire remote matrix before it
-  can become a tag or publication candidate.
+- Final candidate `7042ed5` completed the entire pull-request matrix. The
+  resulting merge commit completed the entire `main` matrix, and the exact tag
+  completed the matrix again before trusted publication.
 
-RELEASE RULE
+RELEASE OUTCOME
 
-The repository met the requested pre-push local gates before draft PR #1 was
-opened. Review-branch commits, pushes, and CI runs are qualification activity
-only and grant no publication authority. A v3.5.3 tag and PyPI publication
-remain prohibited until every cross-platform GitHub Actions gate on the
-candidate head is green and the resulting diff is reviewed.
+The original rule prohibited a tag or publication until every cross-platform
+GitHub Actions gate was green and the resulting diff was reviewed. That rule
+was satisfied: PR #1 was reviewed through its complete green matrix, merged,
+requalified on `main`, tagged exactly once, requalified on the tag, and
+published through the tag-only trusted-publisher job. Version 3.5.3 is now an
+immutable released artifact; subsequent repository documentation changes do
+not alter its tag or published files.

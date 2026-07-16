@@ -2,6 +2,11 @@
 
 ## v3.5.3 — Controlled Activation and Release Qualification
 
+Published to production PyPI on 2026-07-16 from annotated tag `v3.5.3` at
+commit `84c253f2a7d68a20ddcab96e94cc107439ccdd32`. The universal wheel and source
+distribution were uploaded through trusted publishing with attestations after
+the pull-request, merged-main, and tag matrices all passed.
+
 - Completed verified legacy-to-segment qualification and explicit controlled
   activation without changing the default legacy persistence path.
 - Added mode-aware commits, bounded Browser/admin mode status, and lossless
@@ -22,7 +27,8 @@
   source distribution so the Phase 9 -> Phase 10 -> Phase 11 progression is
   visible directly after extraction.
 - Consolidated publication behind all release gates with PyPI trusted
-  publishing. A tag is forbidden until cross-platform CI is green.
+  publishing. The tag was created only after cross-platform CI was green, then
+  the tag matrix passed again before the upload job ran.
 - Corrected Windows raw-descriptor writes to require binary mode throughout
   persistence, generation, segmentation, migration, and materialization.
 - Preserved exact native/Python Spiral score parity on macOS by preventing
