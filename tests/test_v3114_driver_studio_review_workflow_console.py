@@ -99,7 +99,7 @@ def _bundle():
 
 
 def test_v3114_version():
-    assert __version__ == "3.5.3"
+    assert __version__ == "3.5.3.post1"
 
 
 def test_review_workflow_capability_matrix_is_decision_support_not_authority():

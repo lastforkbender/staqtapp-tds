@@ -60,7 +60,7 @@ def _row_anchor_ready_csv(
 
 
 def test_version_347_csv_native_row_anchor_kernel():
-    assert __version__ == "3.5.3"
+    assert __version__ == "3.5.3.post1"
     assert CSV_NATIVE_ROW_ANCHOR_KERNEL_VERSION == "1.0"
 
 

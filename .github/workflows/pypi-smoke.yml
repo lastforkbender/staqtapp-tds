@@ -9,7 +9,7 @@ on:
       version:
         description: Exact Staqtapp-TDS version already published to production PyPI
         required: true
-        default: '3.5.3'
+        default: '3.5.3.post1'
 
 permissions:
   contents: read
@@ -40,13 +40,29 @@ jobs:
         run: >-
           python -I -c "import importlib.metadata as metadata, os; from staqtapp_tds import TDSFileSystem, __version__; expected = os.environ['RELEASE_VERSION'].removeprefix('v'); assert metadata.version('staqtapp-tds') == expected; assert __version__ == expected; fs = TDSFileSystem('pypi_smoke'); node = fs.makedirs('/release'); node.write_text('status', 'published'); assert node.read_value('status') == 'published'; print(f'staqtapp-tds {expected} production smoke passed')"
 
+  verify-pypi-presentation:
+    name: Live PyPI description and links
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_VERSION: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Verify live description, screenshots, PDFs, and documentation links
+        run: python scripts/verify_pypi_presentation.py --version "$RELEASE_VERSION"
+
   smoke-complete:
     name: Production PyPI smoke complete
     if: always()
-    needs: install-from-pypi
+    needs:
+      - install-from-pypi
+      - verify-pypi-presentation
     runs-on: ubuntu-latest
     steps:
-      - name: Require all platform installs
+      - name: Require all platform installs and presentation checks
         env:
           INSTALL_RESULT: ${{ needs.install-from-pypi.result }}
-        run: test "$INSTALL_RESULT" = success
+          PRESENTATION_RESULT: ${{ needs.verify-pypi-presentation.result }}
+        run: test "$INSTALL_RESULT" = success && test "$PRESENTATION_RESULT" = success

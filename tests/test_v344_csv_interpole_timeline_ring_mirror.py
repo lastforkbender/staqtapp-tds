@@ -43,7 +43,7 @@ def _interpole_ring_ready_csv(
 
 
 def test_version_344_csv_interpole_timeline_ring_mirror():
-    assert __version__ == "3.5.3"
+    assert __version__ == "3.5.3.post1"
 
 
 def test_csv_interpole_timeline_ring_prepare_builds_no_write_mirror_feedback():

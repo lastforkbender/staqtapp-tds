@@ -5,7 +5,7 @@ from staqtapp_tds.csv_layer import import_csv_bytes, load_csv_artifact, validate
 
 
 def test_version_322_csv_artifact_validation_pass():
-    assert __version__ == "3.5.3"
+    assert __version__ == "3.5.3.post1"
 
 
 def test_csv_artifact_validation_accepts_clean_import():

@@ -1,76 +1,84 @@
-> **v3.5.3 release security contract**
+> **v3.5.3.post1 PyPI presentation correction**
+>
+> This corrective post-release keeps the qualified v3.5.3 storage behavior and
+> replaces every PyPI-facing repository-relative image and document target with
+> an absolute HTTPS URL. Binary evidence is pinned to the immutable v3.5.3
+> source tag, while corrected text records resolve from protected `main`. It also
+> removes the obsolete pre-publication status wording carried by v3.5.3.
+
+> **v3.5.3.post1 release security contract**
 >
 > At-rest encryption is not implemented. Requests using `DirFlags.ENCRYPTED` fail closed instead of storing plaintext. New v2 persistence files require their integrity sidecar. `.tds` input should be treated as trusted until explicit resource-budget hardening is complete. Native extensions are optional and are built only when `STAQTAPP_TDS_BUILD_NATIVE=1` is set.
 
-# Staqtapp-TDS v3.5.3
+# Staqtapp-TDS v3.5.3.post1
 
 **Temporal Directory System - native-indexed `.tds` storage, controlled variables, trace ranking, CSV evidence operations, semantic review, and centralized observability for AI systems.**
 
-**Programmer start here:** [Staqtapp-TDS Programmer Core API Guide (PDF)](tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf)
+**Programmer start here:** [Staqtapp-TDS Programmer Core API Guide (PDF)](https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf)
 
 ## Browser Operations Console — all 19 pages
 
 These are 19 separate 1280×800 viewport captures from the packaged, localhost-only TDS Browser. Each capture was made after selecting the corresponding navigation control against a real release-qualification observer snapshot. Page 07 is the actual CSV Interpole Monitor in its `Monitor Ready` state. The images are shown vertically in Browser navigation order; they are not a stitched Dashboard image or a UI mock.
 
 <p align="center"><strong>01 — Dashboard</strong><br>
-  <img src="docs/screenshots/browser_pages/01-dashboard-1280x800.png" alt="Staqtapp-TDS Browser page 01, Dashboard, selected in the navigation" width="100%">
+  <img src="https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/01-dashboard-1280x800.png" alt="Staqtapp-TDS Browser page 01, Dashboard, selected in the navigation" width="100%">
 </p>
 <p align="center"><strong>02 — Engine Health</strong><br>
-  <img src="docs/screenshots/browser_pages/02-engine-health-1280x800.png" alt="Staqtapp-TDS Browser page 02, Engine Health, selected in the navigation" width="100%">
+  <img src="https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/02-engine-health-1280x800.png" alt="Staqtapp-TDS Browser page 02, Engine Health, selected in the navigation" width="100%">
 </p>
 <p align="center"><strong>03 — Real-time Metrics</strong><br>
-  <img src="docs/screenshots/browser_pages/03-real-time-metrics-1280x800.png" alt="Staqtapp-TDS Browser page 03, Real-time Metrics, selected in the navigation" width="100%">
+  <img src="https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/03-real-time-metrics-1280x800.png" alt="Staqtapp-TDS Browser page 03, Real-time Metrics, selected in the navigation" width="100%">
 </p>
 <p align="center"><strong>04 — Transition Timeline</strong><br>
-  <img src="docs/screenshots/browser_pages/04-transition-timeline-1280x800.png" alt="Staqtapp-TDS Browser page 04, Transition Timeline, selected in the navigation" width="100%">
+  <img src="https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/04-transition-timeline-1280x800.png" alt="Staqtapp-TDS Browser page 04, Transition Timeline, selected in the navigation" width="100%">
 </p>
 <p align="center"><strong>05 — Event Ring Monitor</strong><br>
-  <img src="docs/screenshots/browser_pages/05-event-ring-monitor-1280x800.png" alt="Staqtapp-TDS Browser page 05, Event Ring Monitor, selected in the navigation" width="100%">
+  <img src="https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/05-event-ring-monitor-1280x800.png" alt="Staqtapp-TDS Browser page 05, Event Ring Monitor, selected in the navigation" width="100%">
 </p>
 <p align="center"><strong>06 — Pressure Diagnostics</strong><br>
-  <img src="docs/screenshots/browser_pages/06-pressure-diagnostics-1280x800.png" alt="Staqtapp-TDS Browser page 06, Pressure Diagnostics, selected in the navigation" width="100%">
+  <img src="https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/06-pressure-diagnostics-1280x800.png" alt="Staqtapp-TDS Browser page 06, Pressure Diagnostics, selected in the navigation" width="100%">
 </p>
 <p align="center"><strong>07 — CSV Interpole</strong><br>
-  <img src="docs/screenshots/browser_pages/07-csv-interpole-1280x800.png" alt="Staqtapp-TDS Browser page 07, the real CSV Interpole Monitor in Monitor Ready state, selected in the navigation" width="100%">
+  <img src="https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/07-csv-interpole-1280x800.png" alt="Staqtapp-TDS Browser page 07, the real CSV Interpole Monitor in Monitor Ready state, selected in the navigation" width="100%">
 </p>
 <p align="center"><strong>08 — Snapshot Explorer</strong><br>
-  <img src="docs/screenshots/browser_pages/08-snapshot-explorer-1280x800.png" alt="Staqtapp-TDS Browser page 08, Snapshot Explorer, selected in the navigation" width="100%">
+  <img src="https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/08-snapshot-explorer-1280x800.png" alt="Staqtapp-TDS Browser page 08, Snapshot Explorer, selected in the navigation" width="100%">
 </p>
 <p align="center"><strong>09 — Lock Contention</strong><br>
-  <img src="docs/screenshots/browser_pages/09-lock-contention-1280x800.png" alt="Staqtapp-TDS Browser page 09, Lock Contention, selected in the navigation" width="100%">
+  <img src="https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/09-lock-contention-1280x800.png" alt="Staqtapp-TDS Browser page 09, Lock Contention, selected in the navigation" width="100%">
 </p>
 <p align="center"><strong>10 — Workload Analytics</strong><br>
-  <img src="docs/screenshots/browser_pages/10-workload-analytics-1280x800.png" alt="Staqtapp-TDS Browser page 10, Workload Analytics, selected in the navigation" width="100%">
+  <img src="https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/10-workload-analytics-1280x800.png" alt="Staqtapp-TDS Browser page 10, Workload Analytics, selected in the navigation" width="100%">
 </p>
 <p align="center"><strong>11 — Spiral Rank</strong><br>
-  <img src="docs/screenshots/browser_pages/11-spiral-rank-1280x800.png" alt="Staqtapp-TDS Browser page 11, Spiral Rank, selected in the navigation" width="100%">
+  <img src="https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/11-spiral-rank-1280x800.png" alt="Staqtapp-TDS Browser page 11, Spiral Rank, selected in the navigation" width="100%">
 </p>
 <p align="center"><strong>12 — Index Analytics</strong><br>
-  <img src="docs/screenshots/browser_pages/12-index-analytics-1280x800.png" alt="Staqtapp-TDS Browser page 12, Index Analytics, selected in the navigation" width="100%">
+  <img src="https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/12-index-analytics-1280x800.png" alt="Staqtapp-TDS Browser page 12, Index Analytics, selected in the navigation" width="100%">
 </p>
 <p align="center"><strong>13 — Storage Analytics</strong><br>
-  <img src="docs/screenshots/browser_pages/13-storage-analytics-1280x800.png" alt="Staqtapp-TDS Browser page 13, Storage Analytics, selected in the navigation" width="100%">
+  <img src="https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/13-storage-analytics-1280x800.png" alt="Staqtapp-TDS Browser page 13, Storage Analytics, selected in the navigation" width="100%">
 </p>
 <p align="center"><strong>14 — Comparative Views</strong><br>
-  <img src="docs/screenshots/browser_pages/14-comparative-views-1280x800.png" alt="Staqtapp-TDS Browser page 14, Comparative Views, selected in the navigation" width="100%">
+  <img src="https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/14-comparative-views-1280x800.png" alt="Staqtapp-TDS Browser page 14, Comparative Views, selected in the navigation" width="100%">
 </p>
 <p align="center"><strong>15 — Recovery Planner</strong><br>
-  <img src="docs/screenshots/browser_pages/15-recovery-planner-1280x800.png" alt="Staqtapp-TDS Browser page 15, Recovery Planner, selected in the navigation" width="100%">
+  <img src="https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/15-recovery-planner-1280x800.png" alt="Staqtapp-TDS Browser page 15, Recovery Planner, selected in the navigation" width="100%">
 </p>
 <p align="center"><strong>16 — Policy Proposals</strong><br>
-  <img src="docs/screenshots/browser_pages/16-policy-proposals-1280x800.png" alt="Staqtapp-TDS Browser page 16, Policy Proposals, selected in the navigation" width="100%">
+  <img src="https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/16-policy-proposals-1280x800.png" alt="Staqtapp-TDS Browser page 16, Policy Proposals, selected in the navigation" width="100%">
 </p>
 <p align="center"><strong>17 — Alerts &amp; Events</strong><br>
-  <img src="docs/screenshots/browser_pages/17-alerts-events-1280x800.png" alt="Staqtapp-TDS Browser page 17, Alerts and Events, selected in the navigation" width="100%">
+  <img src="https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/17-alerts-events-1280x800.png" alt="Staqtapp-TDS Browser page 17, Alerts and Events, selected in the navigation" width="100%">
 </p>
 <p align="center"><strong>18 — Security</strong><br>
-  <img src="docs/screenshots/browser_pages/18-security-1280x800.png" alt="Staqtapp-TDS Browser page 18, Security, selected in the navigation" width="100%">
+  <img src="https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/18-security-1280x800.png" alt="Staqtapp-TDS Browser page 18, Security, selected in the navigation" width="100%">
 </p>
 <p align="center"><strong>19 — Settings</strong><br>
-  <img src="docs/screenshots/browser_pages/19-settings-1280x800.png" alt="Staqtapp-TDS Browser page 19, Settings, selected in the navigation" width="100%">
+  <img src="https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/19-settings-1280x800.png" alt="Staqtapp-TDS Browser page 19, Settings, selected in the navigation" width="100%">
 </p>
 
-[日本語 README](README_ja.md) | [Complete API Surface Reference PDF](tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf) | [Changelog](CHANGELOG.md)
+[日本語 README](https://github.com/lastforkbender/staqtapp-tds/blob/main/README_ja.md) | [Complete API Surface Reference PDF](https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf) | [Changelog](https://github.com/lastforkbender/staqtapp-tds/blob/main/CHANGELOG.md)
 
 ## What TDS provides
 
@@ -97,13 +105,13 @@ TDS is designed around a narrow storage hot path. Native indexing, lookup, persi
 
 ```bash
 # Published release from production PyPI
-python -m pip install staqtapp-tds==3.5.3
+python -m pip install staqtapp-tds==3.5.3.post1
 
 # Source checkout
 python -m pip install .
 
 # Optional PyQt5 Driver Studio
-python -m pip install "staqtapp-tds[gui]==3.5.3"
+python -m pip install "staqtapp-tds[gui]==3.5.3.post1"
 ```
 
 Python 3.10 or newer and NumPy are required. The C extensions are optional; supported operations retain deterministic Python fallback paths unless a caller explicitly forces native-only execution.
@@ -229,7 +237,7 @@ Native storage is responsible for narrow mechanical work. Diagnostics, Semantic 
 
 ## Programmer documentation
 
-The [Programmer Core API Guide](tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf) is the recommended starting point. Its first three pages are the authoritative v3.5.3 supplement for controlled activation, segment GC, and release qualification. The broad guide then organizes direct calls by task and includes implementation snippets for:
+The [Programmer Core API Guide](https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf) is the recommended starting point. Its first three pages are the authoritative v3.5.3 supplement for controlled activation, segment GC, and release qualification. The broad guide then organizes direct calls by task and includes implementation snippets for:
 
 - directory and entry operations;
 - `.tds` writing, reading, mounting, and integrity behavior;
@@ -241,7 +249,7 @@ The [Programmer Core API Guide](tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Gu
 - Semantic IR candidates, lifecycle transitions, and atomic batches;
 - Driver Foundry, VM, Runtime Manager, regression, review, evidence, Browser, and Driver Studio calls.
 
-Use the current [v3.5.3 Guaranteed Storage API reference](docs/reference/Programmers_API_Reference.md) for the new storage calls. The separate [API Surface Reference PDF](tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf) is retained as a historical v3.1.23 Driver/Studio reference; it is not an exhaustive v3.5.3 inventory.
+Use the current [v3.5.3 Guaranteed Storage API reference](https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/docs/reference/Programmers_API_Reference.md) for the new storage calls. The separate [API Surface Reference PDF](https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf) is retained as a historical v3.1.23 Driver/Studio reference; it is not an exhaustive v3.5.3 inventory.
 
 ## Safety and authority boundaries
 
@@ -255,7 +263,7 @@ TDS intentionally distinguishes preparation, evidence, review, and authority:
 
 ## Validation status
 
-Local v3.5.3 release qualification is complete:
+The v3.5.3 runtime release qualification is complete:
 
 - Phase 10 controlled activation, exact migration proof, and lossless rollback tests;
 - Phase 11 GC corruption, publication-window, replacement, interruption, concurrency, and accounting tests;
@@ -266,6 +274,14 @@ Local v3.5.3 release qualification is complete:
 Evidence: 832 passed and 11 skipped in the pure monolithic suite; 843 passed in the native-active monolithic suite; and 157 passed in the overlapping v3.5.3/workflow/Browser/CSV qualification group. Both distribution artifacts passed `twine check`, archive-content inspection, and an isolated wheel activation/rollback/GC smoke test. Exact local, review-branch, tag, and publication details are recorded in `DEV11_RELEASE_QUALIFICATION_STATUS.txt`.
 
 Release `v3.5.3` was published from immutable tag [`v3.5.3`](https://github.com/lastforkbender/staqtapp-tds/tree/v3.5.3) at commit `84c253f2a7d68a20ddcab96e94cc107439ccdd32` after the complete pull-request, merged-`main`, and tag matrices passed. PyPI trusted publishing accepted both the universal wheel and source distribution with attestations. See [PyPI](https://pypi.org/project/staqtapp-tds/3.5.3/), the [publication workflow](https://github.com/lastforkbender/staqtapp-tds/actions/runs/29500270923), and the [GitHub Release](https://github.com/lastforkbender/staqtapp-tds/releases/tag/v3.5.3).
+
+Version `3.5.3.post1` is the corrective package presentation release. It keeps
+the qualified storage implementation, assigns the post-release package
+identity, admits that identity in existing Semantic IR compatibility records,
+and corrects the PyPI long description and source-archive status. Release
+hygiene now rejects repository-relative image or document targets before any
+distribution can be built. Publication remains restricted to the exact
+annotated `v3.5.3.post1` tag after the complete aggregate release gate succeeds.
 
 ## Repository map
 
@@ -282,4 +298,4 @@ tds_api_docs/              programmer guide and historical API-surface PDF
 
 ## License
 
-See [LICENSE](LICENSE).
+See [LICENSE](https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/LICENSE).

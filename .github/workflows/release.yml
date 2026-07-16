@@ -106,11 +106,11 @@ jobs:
         run: |
           python -m twine check dist/*
           python -m pip install --force-reinstall dist/*.whl
-          python -c "import staqtapp_tds; assert staqtapp_tds.__version__ == '3.5.3'"
+          python -c "import staqtapp_tds; assert staqtapp_tds.__version__ == '3.5.3.post1'"
       - name: Archive validated distributions
         uses: actions/upload-artifact@v7
         with:
-          name: staqtapp-tds-3.5.3-distributions
+          name: staqtapp-tds-3.5.3.post1-distributions
           path: dist/*
           if-no-files-found: error
 
@@ -151,7 +151,7 @@ jobs:
 
   publish-pypi:
     name: Publish validated distributions to PyPI
-    if: github.ref_type == 'tag' && github.ref_name == 'v3.5.3'
+    if: github.ref_type == 'tag' && github.ref_name == 'v3.5.3.post1'
     needs: release-gates-complete
     runs-on: ubuntu-latest
     environment:
@@ -162,7 +162,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v8
         with:
-          name: staqtapp-tds-3.5.3-distributions
+          name: staqtapp-tds-3.5.3.post1-distributions
           path: dist
       - name: Publish with PyPI trusted publishing
         uses: pypa/gh-action-pypi-publish@v1.14.0

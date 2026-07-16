@@ -147,7 +147,7 @@ def _active_registry_for(package: BytecodePackage) -> DriverRegistry:
 
 
 def test_v313_version():
-    assert __version__ == "3.5.3"
+    assert __version__ == "3.5.3.post1"
 
 
 def test_runtime_manager_capability_matrix_denies_trust_authority_and_storage_writes():

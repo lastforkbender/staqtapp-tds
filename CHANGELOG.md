@@ -1,3 +1,20 @@
+# v3.5.3.post1 — PyPI presentation correction
+
+Corrective post-release with the qualified v3.5.3 storage implementation.
+
+- Replaced all 19 repository-relative Browser image sources in the PyPI long
+  description with absolute HTTPS raw-image URLs pinned to tag `v3.5.3`.
+- Replaced relative Japanese README, PDF, API reference, changelog, and license
+  targets with absolute GitHub URLs.
+- Removed obsolete active tag-prohibition and pending-remote-gate wording from
+  the English and Japanese package documentation.
+- Added release hygiene and test contracts that reject relative image or
+  Markdown link targets in the PyPI-facing README.
+- Preserved v3.5.3 runtime behavior while assigning the PEP 440 post-release
+  identity and admitting it to the existing Semantic IR compatibility sets.
+- Restricted trusted publication to annotated tag `v3.5.3.post1` after the
+  complete aggregate release gate.
+
 # v3.5.3 — Guaranteed Storage controlled activation and release qualification
 
 Implemented the complete opt-in path from legacy `.tds` mounts to incremental

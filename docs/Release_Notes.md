@@ -1,5 +1,23 @@
 # TDS Release Notes
 
+## v3.5.3.post1 — PyPI Presentation Correction
+
+This corrective post-release retains the qualified v3.5.3 storage behavior and
+repairs the package presentation exposed by PyPI:
+
+- all 19 genuine Browser captures use absolute HTTPS raw-image targets pinned
+  to immutable tag `v3.5.3`;
+- the Japanese README, both PDFs, Guaranteed Storage API reference, changelog,
+  and license use absolute GitHub targets;
+- English and Japanese status text records completed v3.5.3 publication rather
+  than carrying an active pre-publication restriction;
+- release hygiene rejects every relative image or Markdown document target in
+  the PyPI-facing README;
+- package identity and compatible Semantic IR release declarations admit PEP
+  440 version `3.5.3.post1`; and
+- tag-only trusted publishing remains behind the complete aggregate source,
+  Python, platform, native-extension, and distribution gate.
+
 ## v3.5.3 — Controlled Activation and Release Qualification
 
 Published to production PyPI on 2026-07-16 from annotated tag `v3.5.3` at

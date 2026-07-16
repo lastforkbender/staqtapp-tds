@@ -61,7 +61,7 @@ def _monitor_ready_csv(
 
 
 def test_version_349_csv_interpole_browser_monitor():
-    assert __version__ == "3.5.3"
+    assert __version__ == "3.5.3.post1"
     assert CSV_INTERPOLE_BROWSER_MONITOR_VERSION == "1.0"
     assert "csv-interpole" in CSV_INTERPOLE_MONITOR_ICON_NAMES
     assert "csv-performance-gate" in CSV_INTERPOLE_MONITOR_ICON_NAMES

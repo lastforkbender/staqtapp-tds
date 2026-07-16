@@ -13,7 +13,7 @@ from staqtapp_tds.csv_layer.dialect import detect_csv_dialect
 
 
 def test_version_330_csv_scan_reference_foundation():
-    assert __version__ == "3.5.3"
+    assert __version__ == "3.5.3.post1"
 
 
 def test_csv_scan_profile_matches_row_offset_reference_across_chunk_boundaries():

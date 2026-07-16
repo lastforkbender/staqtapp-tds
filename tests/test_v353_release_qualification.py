@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 from staqtapp_tds import (
     ControlledStorage,
@@ -8,13 +9,15 @@ from staqtapp_tds import (
     StorageMode,
     __version__,
 )
+from staqtapp_tds.version import VERSION_INFO
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_v353_release_identity_and_phase_evidence_are_explicit() -> None:
-    assert __version__ == "3.5.3"
+def test_v353_post1_release_identity_and_phase_evidence_are_explicit() -> None:
+    assert __version__ == "3.5.3.post1"
+    assert VERSION_INFO == (3, 5, 3)
     assert StorageMode.LEGACY.value == "legacy"
     assert StorageMode.GUARANTEED_SEGMENTED.value == "guaranteed-segmented"
     assert ControlledStorage.ACTIVATE_ACKNOWLEDGEMENT == "activate-guaranteed-segmented"
@@ -26,6 +29,7 @@ def test_v353_release_identity_and_phase_evidence_are_explicit() -> None:
         "DEV9_INCREMENTAL_IMMUTABLE_SEGMENTS_STATUS.txt",
         "DEV10_CONTROLLED_ACTIVATION_STATUS.txt",
         "DEV11_RELEASE_QUALIFICATION_STATUS.txt",
+        "V353_POST1_PYPI_PRESENTATION_STATUS.txt",
         "docs/118_v353_dev10_Controlled_Activation.md",
         "docs/119_v353_dev11_Release_Qualification.md",
     ):
@@ -34,6 +38,7 @@ def test_v353_release_identity_and_phase_evidence_are_explicit() -> None:
     assert "STATUS: LOCAL QUALIFICATION COMPLETE" in phase11
     manifest = (ROOT / "MANIFEST.in").read_text(encoding="utf-8")
     assert "include AUDIT_REMEDIATION_STATUS.txt DEV*_STATUS.txt" in manifest
+    assert "include V353_POST1_PYPI_PRESENTATION_STATUS.txt" in manifest
 
     guide = ROOT / "tds_api_docs" / "Staqtapp_TDS_Programmer_Core_API_Guide.pdf"
     guide_bytes = guide.read_bytes()
@@ -102,7 +107,8 @@ def test_release_workflow_makes_publication_depend_on_every_gate() -> None:
     assert workflow.index("build-distributions:") < workflow.index("publish-pypi:")
     assert "needs: release-gates-complete" in workflow
     assert "name: Release gates complete" in workflow
-    assert "github.ref_name == 'v3.5.3'" in workflow
+    assert "github.ref_name == 'v3.5.3.post1'" in workflow
+    assert "staqtapp-tds-3.5.3.post1-distributions" in workflow
     assert "id-token: write" in workflow
     assert not (ROOT / ".github" / "workflows" / "publish.yml").exists()
 
@@ -120,4 +126,48 @@ def test_production_pypi_smoke_covers_every_supported_os() -> None:
     assert "macos-latest" in workflow
     assert "windows-latest" in workflow
     assert "python -I" in workflow
+    assert "verify-pypi-presentation:" in workflow
+    assert "python scripts/verify_pypi_presentation.py" in workflow
+    assert "PRESENTATION_RESULT" in workflow
     assert "name: Production PyPI smoke complete" in workflow
+    assert "default: '3.5.3.post1'" in workflow
+
+    verifier = (ROOT / "scripts" / "verify_pypi_presentation.py").read_text(
+        encoding="utf-8"
+    )
+    assert "EXPECTED_IMAGE_COUNT = 19" in verifier
+    assert "07-csv-interpole-1280x800.png" in verifier
+    assert "README_ja.md" in verifier
+    assert "Staqtapp_TDS_API_Surface_Reference.pdf" in verifier
+    assert "Staqtapp_TDS_Programmer_Core_API_Guide.pdf" in verifier
+
+
+def test_pypi_readme_uses_only_working_absolute_targets() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    image_targets = re.findall(
+        r'<img\b[^>]*?\bsrc="([^"]+)"', readme, flags=re.IGNORECASE
+    )
+    markdown_targets = re.findall(r"(?<!!)\[[^]]+\]\(([^)\s]+)", readme)
+    assert len(image_targets) == 19
+    assert all(target.startswith("https://") for target in image_targets)
+    assert all(target.startswith(("https://", "#", "mailto:")) for target in markdown_targets)
+    assert all(
+        target.startswith(
+            "https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/"
+            "v3.5.3/docs/screenshots/browser_pages/"
+        )
+        for target in image_targets
+    )
+    for required in (
+        "https://github.com/lastforkbender/staqtapp-tds/blob/main/README_ja.md",
+        "https://github.com/lastforkbender/staqtapp-tds/blob/main/CHANGELOG.md",
+        "https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/LICENSE",
+        "https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/docs/reference/Programmers_API_Reference.md",
+        "https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf",
+        "https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf",
+    ):
+        assert required in readme
+    assert "tag remains prohibited" not in readme
+    assert "REMOTE REVIEW GATES REQUIRED" not in readme
+    japanese_readme = (ROOT / "README_ja.md").read_text(encoding="utf-8")
+    assert "tag を作成できません" not in japanese_readme

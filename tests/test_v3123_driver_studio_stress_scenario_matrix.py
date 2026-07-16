@@ -13,7 +13,7 @@ from staqtapp_tds.studio_pyqt5 import (
 
 
 def test_v3123_version():
-    assert __version__ == "3.5.3"
+    assert __version__ == "3.5.3.post1"
 
 
 def test_default_operational_stress_scenarios_cover_combined_and_authority_boundaries():

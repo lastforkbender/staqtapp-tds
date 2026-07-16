@@ -7,7 +7,7 @@ from staqtapp_tds.tds_json import dumps_canonical, dumps_pretty, loads_fast, loa
 
 
 def test_v261_version():
-    assert __version__ == "3.5.3"
+    assert __version__ == "3.5.3.post1"
 
 
 def test_central_json_round_trip_and_strict_loaders():
