@@ -1,4 +1,7 @@
+import os
 from pathlib import Path
+import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -31,6 +34,21 @@ def test_release_hygiene_runs_before_install_and_tests():
     install = workflow.index("Install package for tests", hygiene)
     tests = workflow.index("Run authoritative monolithic test suite", install)
     assert hygiene < install < tests
+
+    generated = (
+        ROOT / "docs" / "TDS_RESULT_CODES.json",
+        ROOT / "docs" / "TDS_RESULT_CODES.md",
+    )
+    before = tuple(path.read_bytes() for path in generated)
+    env = dict(os.environ)
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    subprocess.run(
+        [sys.executable, "-S", "tools/generate_result_code_docs.py"],
+        cwd=ROOT,
+        check=True,
+        env=env,
+    )
+    assert tuple(path.read_bytes() for path in generated) == before
 
 
 def test_release_pipeline_uses_authoritative_monolithic_pytest():

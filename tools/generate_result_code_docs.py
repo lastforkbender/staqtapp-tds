@@ -6,13 +6,12 @@ machine-readable JSON and human-readable Markdown references from that registry.
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
+from runpy import run_path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src"))
-
-from staqtapp_tds.result import TDS_RESULT_CODES  # noqa: E402
+RESULT_MODULE = ROOT / "src" / "staqtapp_tds" / "result.py"
+TDS_RESULT_CODES = run_path(str(RESULT_MODULE))["TDS_RESULT_CODES"]
 
 JSON_PATH = ROOT / "docs" / "TDS_RESULT_CODES.json"
 MD_PATH = ROOT / "docs" / "TDS_RESULT_CODES.md"
