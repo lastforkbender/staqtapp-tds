@@ -12,7 +12,7 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "3.5.3.post1"
+EXPECTED_VERSION = "3.5.3.post2"
 BANNED_SUFFIXES = {".so", ".pyd", ".dll", ".dylib", ".pyc"}
 BANNED_DIRS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "build", "dist"}
 BROWSER_CAPTURES = (

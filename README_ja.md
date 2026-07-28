@@ -1,8 +1,11 @@
-# Staqtapp-TDS v3.5.3.post1
+# Staqtapp-TDS v3.5.3.post2
 
-> **PyPI presentation correction:** v3.5.3.post1 は qualified v3.5.3 storage
-> behavior を保持し、PyPI page の image/document link と obsolete
-> pre-publication status を修正する corrective post-release です。
+> **Mandatory UI install correction:** v3.5.3.post2 は qualified v3.5.3
+> storage behavior と検証済み PyPI presentation を保持し、通常の
+> installation に main telemetry Browser と PyQt5 Driver Studio を
+> 含めます。`staqtapp-tds` は telemetry Browser を起動します。
+> Native C extension は引き続き
+> `STAQTAPP_TDS_BUILD_NATIVE=1` による明示的な opt-in です。
 
 **Temporal Directory System - AI システム向けの native-indexed `.tds` ストレージ、変数制御、トレース順位付け、CSV evidence 操作、semantic review、集中型 observability。**
 
@@ -96,17 +99,17 @@ TDS は storage hot path を狭く保つ設計です。Native index、lookup、p
 ## インストール
 
 ```bash
-# Production PyPI corrective release
-python -m pip install staqtapp-tds==3.5.3.post1
+# Production PyPI corrective release（両方の UI を含む）
+python -m pip install staqtapp-tds==3.5.3.post2
 
-# Source checkout
+# main TDS telemetry UI を起動
+staqtapp-tds
+
+# Source checkout（両方の UI を含む）
 python -m pip install .
-
-# Optional PyQt5 Driver Studio
-python -m pip install "staqtapp-tds[gui]==3.5.3.post1"
 ```
 
-Python 3.10 以上と NumPy が必要です。C extension は optional です。Caller が native-only を明示的に強制しない限り、対応する operation には deterministic Python fallback があります。
+Python 3.10 以上、NumPy、PyQt5 が standard installation に必要です。Driver Studio は自動的に install され、`staqtapp-tds` は main HTML/CSS/JS telemetry Browser を起動します。C extension は optional です。Caller が native-only を明示的に強制しない限り、対応する operation には deterministic Python fallback があります。
 
 ## Core storage quick start
 
@@ -263,7 +266,9 @@ v3.5.3 runtime release qualification は完了しています。
 
 Evidence: pure monolithic suite は 832 passed / 11 skipped、native-active monolithic suite は 843 passed、重複する v3.5.3/workflow/Browser/CSV qualification group は 157 passed です。両 distribution artifact は `twine check`、archive content inspection、isolated wheel activation/rollback/GC smoke test に合格しました。Pull request、merged `main`、annotated `v3.5.3` tag の matrix はすべて green となり、v3.5.3 は 2026-07-16 に PyPI trusted publishing で公開されました。正確な run、artifact hash、publication response は `DEV11_RELEASE_QUALIFICATION_STATUS.txt` に記録しています。
 
-v3.5.3.post1 は PyPI long description と source archive の presentation を修正します。すべての PyPI-facing target は absolute HTTPS URL であり、release hygiene は relative image/document target を distribution build 前に拒否します。Publication は complete aggregate release gate 通過後の exact annotated `v3.5.3.post1` tag に限定されます。
+v3.5.3.post1 は PyPI long description と source archive の presentation を修正しました。すべての PyPI-facing target は absolute HTTPS URL であり、release hygiene は relative image/document target を distribution build 前に拒否します。
+
+v3.5.3.post2 は standard installation に main telemetry Browser と PyQt5 Driver Studio を含めます。`staqtapp-tds` は telemetry Browser を起動し、native C extension は opt-in のままです。Publication は complete aggregate release gate 通過後の exact annotated `v3.5.3.post2` tag に限定されます。
 
 ## Repository map
 
@@ -271,7 +276,7 @@ v3.5.3.post1 は PyPI long description と source archive の presentation を�
 src/staqtapp_tds/          core storage, persistence, telemetry, native management
 src/staqtapp_tds/csv_layer CSV evidence, transactions, Interpole, Semantic IR
 src/staqtapp_tds/drivers/  TDDL, bytecode, VM, Foundry, review and evidence
-src/staqtapp_tds/studio_pyqt5/ optional Driver Studio cockpit
+src/staqtapp_tds/studio_pyqt5/ Driver Studio cockpit
 src/staqtapp_tds/admin/    centralized Browser and local admin control
 examples/                  runnable examples
 docs/                      architecture and release contract documents

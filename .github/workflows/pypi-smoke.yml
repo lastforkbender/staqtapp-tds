@@ -9,7 +9,7 @@ on:
       version:
         description: Exact Staqtapp-TDS version already published to production PyPI
         required: true
-        default: '3.5.3.post1'
+        default: '3.5.3.post2'
 
 permissions:
   contents: read
