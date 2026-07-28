@@ -37,7 +37,10 @@ Issues = "https://github.com/lastforkbender/staqtapp-tds/issues"
 fast = ["numba>=0.58"]
 # Backward-compatible alias: Driver Studio is included by every standard install.
 gui = []
-test = ["pytest>=7"]
+test = [
+  "pytest>=7",
+  "tomli>=2; python_version < '3.11'",
+]
 native = []
 
 [tool.setuptools.packages.find]
