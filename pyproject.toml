@@ -23,7 +23,10 @@ classifiers = [
 
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["numpy>=1.23"]
+dependencies = [
+  "numpy>=1.23",
+  "PyQt5>=5.15",
+]
 
 [project.urls]
 Homepage = "https://github.com/lastforkbender/staqtapp-tds"
@@ -32,7 +35,8 @@ Issues = "https://github.com/lastforkbender/staqtapp-tds/issues"
 
 [project.optional-dependencies]
 fast = ["numba>=0.58"]
-gui = ["PyQt5>=5.15"]
+# Backward-compatible alias: the UI is included by every standard install.
+gui = []
 test = ["pytest>=7"]
 native = []
 
