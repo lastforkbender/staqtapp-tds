@@ -1,16 +1,16 @@
-> **v3.5.3.post1 PyPI presentation correction**
+> **v3.5.3.post2 mandatory UI install correction**
 >
 > This corrective post-release keeps the qualified v3.5.3 storage behavior and
-> replaces every PyPI-facing repository-relative image and document target with
-> an absolute HTTPS URL. Binary evidence is pinned to the immutable v3.5.3
-> source tag, while corrected text records resolve from protected `main`. It also
-> removes the obsolete pre-publication status wording carried by v3.5.3.
+> the verified PyPI presentation while installing the main telemetry Browser
+> and Driver Studio with every standard installation. The `staqtapp-tds`
+> command launches the telemetry Browser. The native C extensions remain
+> explicitly opt-in through `STAQTAPP_TDS_BUILD_NATIVE=1`.
 
-> **v3.5.3.post1 release security contract**
+> **v3.5.3.post2 release security contract**
 >
 > At-rest encryption is not implemented. Requests using `DirFlags.ENCRYPTED` fail closed instead of storing plaintext. New v2 persistence files require their integrity sidecar. `.tds` input should be treated as trusted until explicit resource-budget hardening is complete. Native extensions are optional and are built only when `STAQTAPP_TDS_BUILD_NATIVE=1` is set.
 
-# Staqtapp-TDS v3.5.3.post1
+# Staqtapp-TDS v3.5.3.post2
 
 **Temporal Directory System - native-indexed `.tds` storage, controlled variables, trace ranking, CSV evidence operations, semantic review, and centralized observability for AI systems.**
 
@@ -104,17 +104,17 @@ TDS is designed around a narrow storage hot path. Native indexing, lookup, persi
 ## Install
 
 ```bash
-# Published release from production PyPI
-python -m pip install staqtapp-tds==3.5.3.post1
+# Published release from production PyPI; includes both UIs
+python -m pip install staqtapp-tds==3.5.3.post2
 
-# Source checkout
+# Launch the main TDS telemetry UI
+staqtapp-tds
+
+# Source checkout; includes both UIs
 python -m pip install .
-
-# Optional PyQt5 Driver Studio
-python -m pip install "staqtapp-tds[gui]==3.5.3.post1"
 ```
 
-Python 3.10 or newer and NumPy are required. The C extensions are optional; supported operations retain deterministic Python fallback paths unless a caller explicitly forces native-only execution.
+Python 3.10 or newer, NumPy, and PyQt5 are required by the standard installation. Driver Studio is installed automatically, while `staqtapp-tds` launches the main HTML/CSS/JS telemetry Browser. The C extensions remain optional; supported operations retain deterministic Python fallback paths unless a caller explicitly forces native-only execution.
 
 ## Core storage quick start
 
@@ -275,13 +275,18 @@ Evidence: 832 passed and 11 skipped in the pure monolithic suite; 843 passed in 
 
 Release `v3.5.3` was published from immutable tag [`v3.5.3`](https://github.com/lastforkbender/staqtapp-tds/tree/v3.5.3) at commit `84c253f2a7d68a20ddcab96e94cc107439ccdd32` after the complete pull-request, merged-`main`, and tag matrices passed. PyPI trusted publishing accepted both the universal wheel and source distribution with attestations. See [PyPI](https://pypi.org/project/staqtapp-tds/3.5.3/), the [publication workflow](https://github.com/lastforkbender/staqtapp-tds/actions/runs/29500270923), and the [GitHub Release](https://github.com/lastforkbender/staqtapp-tds/releases/tag/v3.5.3).
 
-Version `3.5.3.post1` is the corrective package presentation release. It keeps
+Version `3.5.3.post1` was the corrective package presentation release. It keeps
 the qualified storage implementation, assigns the post-release package
 identity, admits that identity in existing Semantic IR compatibility records,
 and corrects the PyPI long description and source-archive status. Release
 hygiene now rejects repository-relative image or document targets before any
-distribution can be built. Publication remains restricted to the exact
-annotated `v3.5.3.post1` tag after the complete aggregate release gate succeeds.
+distribution can be built.
+
+Version `3.5.3.post2` installs the main telemetry Browser and PyQt5 Driver
+Studio with every standard installation. The `staqtapp-tds` command launches
+the telemetry Browser; native C extensions remain opt-in. Publication is
+restricted to the exact annotated `v3.5.3.post2` tag after the complete
+aggregate release gate succeeds.
 
 ## Repository map
 
@@ -289,7 +294,7 @@ annotated `v3.5.3.post1` tag after the complete aggregate release gate succeeds.
 src/staqtapp_tds/          core storage, persistence, telemetry, native management
 src/staqtapp_tds/csv_layer CSV evidence, transactions, Interpole, Semantic IR
 src/staqtapp_tds/drivers/  TDDL, bytecode, VM, Foundry, review and evidence
-src/staqtapp_tds/studio_pyqt5/ optional Driver Studio cockpit
+src/staqtapp_tds/studio_pyqt5/ Driver Studio cockpit
 src/staqtapp_tds/admin/    centralized Browser and local admin control
 examples/                  runnable examples
 docs/                      architecture and release contract documents

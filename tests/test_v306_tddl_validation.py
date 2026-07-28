@@ -49,7 +49,7 @@ evolution:
 
 
 def test_v306_version():
-    assert __version__ == "3.5.3.post1"
+    assert __version__ == "3.5.3.post2"
 
 
 def test_tddl_valid_search_driver_parses_to_ir():
