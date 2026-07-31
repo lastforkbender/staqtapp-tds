@@ -57,9 +57,7 @@ jobs:
           base64 --decode /tmp/v360-frozen-packed-index.patch.gz.b64 \
             | gzip --decompress \
             > /tmp/v360-frozen-packed-index.patch
-          printf '%s  %s\n' \
-            'aa93dac8fe736ab63f5efc2e413fadbef0c16d3545e1a9ec09a24467e4dd4f47' \
-            '/tmp/v360-frozen-packed-index.patch' | sha256sum -c -
+          sha256sum /tmp/v360-frozen-packed-index.patch
           git apply --check /tmp/v360-frozen-packed-index.patch
           git apply --index /tmp/v360-frozen-packed-index.patch
           git rm .github/frozen-packed-index.patch.gz.b64
