@@ -86,12 +86,59 @@ jobs:
       - name: Run suite with native extensions active
         run: python -m pytest -q --disable-warnings -c /dev/null tests
 
+  native-sanitizer-qualification:
+    name: Native ${{ matrix.sanitizer }} sanitizer
+    needs: source-release-checks
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer: [address, undefined]
+    env:
+      STAQTAPP_TDS_BUILD_NATIVE: '1'
+      STAQTAPP_TDS_SANITIZE: ${{ matrix.sanitizer }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Require strict CSV C compilation
+        if: matrix.sanitizer == 'undefined'
+        shell: bash
+        run: |
+          cc -std=c11 -fsyntax-only $(python3-config --includes) \
+            -Wall -Wextra -Werror -Wconversion -Wshadow -Wpedantic \
+            -Wno-cast-function-type src/staqtapp_tds/_csv_scan_kernel.c
+      - name: Build and install sanitized native extensions
+        run: python -m pip install ".[test]"
+      - name: Run bounded native CSV sanitizer qualification
+        shell: bash
+        run: |
+          set -euo pipefail
+          tests=(
+            tests/test_v360_native_csv_input_safety.py
+            tests/test_v346_csv_native_scan_kernel_prototype.py
+            tests/test_v347_csv_native_row_anchor_kernel.py
+            tests/test_v348_csv_kernel_performance_gates.py
+          )
+          if [[ "$STAQTAPP_TDS_SANITIZE" == "address" ]]; then
+            asan_runtime="$(gcc -print-file-name=libasan.so)"
+            test -n "$asan_runtime"
+            LD_PRELOAD="$asan_runtime" \
+              ASAN_OPTIONS="detect_leaks=0:halt_on_error=1:abort_on_error=1" \
+              python -m pytest -q --disable-warnings -c /dev/null "${tests[@]}"
+          else
+            UBSAN_OPTIONS="halt_on_error=1:print_stacktrace=1" \
+              python -m pytest -q --disable-warnings -c /dev/null "${tests[@]}"
+          fi
+
   build-distributions:
     name: Build and inspect distributions
     needs:
       - python-compatibility
       - platform-compatibility
       - native-extension-qualification
+      - native-sanitizer-qualification
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -122,6 +169,7 @@ jobs:
       - python-compatibility
       - platform-compatibility
       - native-extension-qualification
+      - native-sanitizer-qualification
       - build-distributions
     runs-on: ubuntu-latest
     steps:
@@ -131,6 +179,7 @@ jobs:
           PYTHON_RESULT: ${{ needs.python-compatibility.result }}
           PLATFORM_RESULT: ${{ needs.platform-compatibility.result }}
           NATIVE_RESULT: ${{ needs.native-extension-qualification.result }}
+          SANITIZER_RESULT: ${{ needs.native-sanitizer-qualification.result }}
           DISTRIBUTION_RESULT: ${{ needs.build-distributions.result }}
         run: |
           python - <<'PY'
@@ -141,6 +190,7 @@ jobs:
               "python": os.environ["PYTHON_RESULT"],
               "platform": os.environ["PLATFORM_RESULT"],
               "native": os.environ["NATIVE_RESULT"],
+              "sanitizer": os.environ["SANITIZER_RESULT"],
               "distribution": os.environ["DISTRIBUTION_RESULT"],
           }
           failed = {name: result for name, result in results.items() if result != "success"}
