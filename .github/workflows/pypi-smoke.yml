@@ -9,7 +9,6 @@ on:
       version:
         description: Exact Staqtapp-TDS version already published to production PyPI
         required: true
-        default: '3.5.3.post2'
 
 permissions:
   contents: read
@@ -30,9 +29,12 @@ jobs:
     env:
       RELEASE_VERSION: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.version }}
     steps:
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Validate public release identity
+        run: python scripts/release_version.py --check-env RELEASE_VERSION
       - name: Install exact release from production PyPI
         run: >-
           python -c "import os, subprocess, sys; version = os.environ['RELEASE_VERSION'].removeprefix('v'); subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--disable-pip-version-check', '--no-cache-dir', '--only-binary=:all:', '--index-url', 'https://pypi.org/simple', f'staqtapp-tds=={version}'])"
@@ -50,6 +52,8 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
+      - name: Validate public release identity
+        run: python scripts/release_version.py --check-env RELEASE_VERSION
       - name: Verify live description, screenshots, PDFs, and documentation links
         run: python scripts/verify_pypi_presentation.py --version "$RELEASE_VERSION"
 
