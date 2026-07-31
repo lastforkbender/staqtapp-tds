@@ -72,8 +72,19 @@ typedef struct {
 #define TDS_PACKED_LOOKUP_CONTRACT "keys-bytes;offsets-le64;handles-le-i64;caller-owned-output-v1"
 
 static PyTypeObject NativeFrozenHandleIndexType;
+
+typedef struct {
+    int owns_process_instance;
+} NativeModuleState;
+
+#define TDS_NATIVE_MODULE_INIT_CONTRACT "multiphase-pep489-v1"
+#define TDS_NATIVE_MULTI_INTERPRETER_POLICY "reject-subinterpreters-v1"
+#define TDS_NATIVE_GIL_POLICY "compatibility-gil-required-v1"
+#define TDS_NATIVE_REINITIALIZATION_POLICY "process-restart-required-v1"
+
 static _Atomic uint64_t g_index_namespace_sequence = 0;
 static _Atomic uint64_t g_frozen_snapshot_sequence = 0;
+static _Atomic uint64_t g_native_module_instance_active = 0;
 
 static int allocate_positive_identity(_Atomic uint64_t *counter, uint64_t *out) {
     uint64_t current = atomic_load_explicit(counter, memory_order_relaxed);
@@ -2794,86 +2805,213 @@ static PyMethodDef module_methods[] = {
     {NULL, NULL, 0, NULL}
 };
 
+static int native_module_add_constants(PyObject *module) {
+    if (PyModule_AddIntConstant(module, "TDS_NATIVE_ABI_VERSION", 1) < 0) {
+        return -1;
+    }
+    if (PyModule_AddStringConstant(module, "TDS_NATIVE_ENGINE", "index") < 0) {
+        return -1;
+    }
+    if (PyModule_AddStringConstant(
+            module,
+            "TDS_NATIVE_CAPABILITIES",
+            "index,checksum32,checksum_registry,spiral_rank,utf8_chunks,"
+            "utf8_strict,diagnostics,diagnostics_c11_ring,diagnostics_sampling,"
+            "handle_refs_v1,frozen_index_v1,packed_lookup_v1,"
+            "lifecycle_fail_closed") < 0) {
+        return -1;
+    }
+    if (PyModule_AddStringConstant(
+            module,
+            "TDS_NATIVE_CHECKSUM_ALGORITHMS",
+            "crc32-ieee-v1,fnv1a32-legacy-v1") < 0) {
+        return -1;
+    }
+    if (PyModule_AddStringConstant(
+            module,
+            "TDS_NATIVE_UTF8_CHUNK_CONTRACT",
+            "strict-rfc3629-complete-codepoints-v1") < 0) {
+        return -1;
+    }
+    if (PyModule_AddStringConstant(
+            module,
+            "TDS_NATIVE_HANDLE_REF_CONTRACT",
+            "namespace-epoch-slot-generation-handle-v1") < 0) {
+        return -1;
+    }
+    if (PyModule_AddStringConstant(
+            module,
+            "TDS_NATIVE_FROZEN_INDEX_CONTRACT",
+            TDS_FROZEN_INDEX_CONTRACT) < 0) {
+        return -1;
+    }
+    if (PyModule_AddStringConstant(
+            module,
+            "TDS_NATIVE_PACKED_LOOKUP_CONTRACT",
+            TDS_PACKED_LOOKUP_CONTRACT) < 0) {
+        return -1;
+    }
+    if (PyModule_AddIntConstant(
+            module,
+            "TDS_NATIVE_PACKED_LOOKUP_MAX_KEYS",
+            (int)TDS_PACKED_LOOKUP_MAX_KEYS) < 0) {
+        return -1;
+    }
+    if (PyModule_AddStringConstant(
+            module,
+            "TDS_NATIVE_DIAG_PROTOCOL",
+            "c11-atomic-slot-seqlock-mpsc-v1") < 0) {
+        return -1;
+    }
+    if (PyModule_AddStringConstant(
+            module,
+            "TDS_NATIVE_DIAG_SAMPLING",
+            "burst=64;period=1024;manual=all") < 0) {
+        return -1;
+    }
+    if (PyModule_AddStringConstant(
+            module,
+            "TDS_NATIVE_MODULE_INIT",
+            TDS_NATIVE_MODULE_INIT_CONTRACT) < 0) {
+        return -1;
+    }
+    if (PyModule_AddStringConstant(
+            module,
+            "TDS_NATIVE_MULTI_INTERPRETER_POLICY",
+            TDS_NATIVE_MULTI_INTERPRETER_POLICY) < 0) {
+        return -1;
+    }
+    if (PyModule_AddStringConstant(
+            module,
+            "TDS_NATIVE_GIL_POLICY",
+            TDS_NATIVE_GIL_POLICY) < 0) {
+        return -1;
+    }
+    if (PyModule_AddStringConstant(
+            module,
+            "TDS_NATIVE_REINITIALIZATION_POLICY",
+            TDS_NATIVE_REINITIALIZATION_POLICY) < 0) {
+        return -1;
+    }
+    return 0;
+}
+
+static int native_module_exec(PyObject *module) {
+    NativeModuleState *state = (NativeModuleState *)PyModule_GetState(module);
+    uint64_t expected = 0ULL;
+
+    if (state == NULL) {
+        PyErr_SetString(PyExc_RuntimeError, "native module state is unavailable");
+        return -1;
+    }
+    if (!atomic_compare_exchange_strong_explicit(
+            &g_native_module_instance_active,
+            &expected,
+            1ULL,
+            memory_order_acq_rel,
+            memory_order_acquire)) {
+        PyErr_SetString(
+            PyExc_ImportError,
+            "staqtapp_tds._native_index permits one process-lifetime module "
+            "admission; subinterpreters and repeat initialization are fail-closed"
+        );
+        return -1;
+    }
+    state->owns_process_instance = 1;
+
+    if (PyType_Ready(&NativeHandleIndexType) < 0
+            || PyType_Ready(&NativeFrozenHandleIndexType) < 0) {
+        goto fail;
+    }
+    if (!diag_atomics_lock_free()) {
+        PyErr_SetString(
+            PyExc_RuntimeError,
+            "native diagnostics requires lock-free C11 atomics"
+        );
+        goto fail;
+    }
+    diag_initialize();
+    if (native_module_add_constants(module) < 0) {
+        goto fail;
+    }
+
+    Py_INCREF(&NativeHandleIndexType);
+    if (PyModule_AddObject(
+            module,
+            "NativeHandleIndex",
+            (PyObject *)&NativeHandleIndexType) < 0) {
+        Py_DECREF(&NativeHandleIndexType);
+        goto fail;
+    }
+    Py_INCREF(&NativeFrozenHandleIndexType);
+    if (PyModule_AddObject(
+            module,
+            "NativeFrozenHandleIndex",
+            (PyObject *)&NativeFrozenHandleIndexType) < 0) {
+        Py_DECREF(&NativeFrozenHandleIndexType);
+        goto fail;
+    }
+    return 0;
+
+fail:
+    state->owns_process_instance = 0;
+    atomic_store_explicit(
+        &g_native_module_instance_active,
+        0ULL,
+        memory_order_release
+    );
+    return -1;
+}
+
+static void native_module_free(void *module_pointer) {
+    PyObject *module = (PyObject *)module_pointer;
+    NativeModuleState *state;
+
+    if (module == NULL) {
+        return;
+    }
+    state = (NativeModuleState *)PyModule_GetState(module);
+    if (state != NULL && state->owns_process_instance) {
+        /* Static extension types and observer globals remain process-scoped.
+         * Do not reopen admission after module deallocation: a process restart
+         * is required before another module instance may initialize. */
+        state->owns_process_instance = 0;
+    }
+}
+
+/* PyModuleDef_Slot stores the Py_mod_exec function pointer in void *. Keep the
+ * standards exception localized to this CPython API boundary. */
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+static PyModuleDef_Slot native_module_slots[] = {
+    {Py_mod_exec, (void *)native_module_exec},
+#if PY_VERSION_HEX >= 0x030C0000
+    {
+        Py_mod_multiple_interpreters,
+        Py_MOD_MULTIPLE_INTERPRETERS_NOT_SUPPORTED
+    },
+#endif
+#if PY_VERSION_HEX >= 0x030D0000
+    {Py_mod_gil, Py_MOD_GIL_USED},
+#endif
+    {0, NULL}
+};
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
+
 static PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
     .m_name = "_native_index",
     .m_doc = "Staqtapp-TDS native execution primitives.",
-    .m_size = -1,
+    .m_size = sizeof(NativeModuleState),
     .m_methods = module_methods,
+    .m_slots = native_module_slots,
+    .m_free = native_module_free,
 };
 
 PyMODINIT_FUNC PyInit__native_index(void) {
-    PyObject *m;
-    if (PyType_Ready(&NativeHandleIndexType) < 0) return NULL;
-    if (PyType_Ready(&NativeFrozenHandleIndexType) < 0) return NULL;
-    if (!diag_atomics_lock_free()) {
-        PyErr_SetString(PyExc_RuntimeError, "native diagnostics requires lock-free C11 atomics");
-        return NULL;
-    }
-    diag_initialize();
-    m = PyModule_Create(&moduledef);
-    if (!m) return NULL;
-    if (PyModule_AddIntConstant(m, "TDS_NATIVE_ABI_VERSION", 1) < 0) {
-        Py_DECREF(m);
-        return NULL;
-    }
-    if (PyModule_AddStringConstant(m, "TDS_NATIVE_ENGINE", "index") < 0) {
-        Py_DECREF(m);
-        return NULL;
-    }
-    if (PyModule_AddStringConstant(m, "TDS_NATIVE_CAPABILITIES", "index,checksum32,checksum_registry,spiral_rank,utf8_chunks,utf8_strict,diagnostics,diagnostics_c11_ring,diagnostics_sampling,handle_refs_v1,frozen_index_v1,packed_lookup_v1") < 0) {
-        Py_DECREF(m);
-        return NULL;
-    }
-    if (PyModule_AddStringConstant(m, "TDS_NATIVE_CHECKSUM_ALGORITHMS", "crc32-ieee-v1,fnv1a32-legacy-v1") < 0) {
-        Py_DECREF(m);
-        return NULL;
-    }
-    if (PyModule_AddStringConstant(m, "TDS_NATIVE_UTF8_CHUNK_CONTRACT", "strict-rfc3629-complete-codepoints-v1") < 0) {
-        Py_DECREF(m);
-        return NULL;
-    }
-    if (PyModule_AddStringConstant(m, "TDS_NATIVE_HANDLE_REF_CONTRACT", "namespace-epoch-slot-generation-handle-v1") < 0) {
-        Py_DECREF(m);
-        return NULL;
-    }
-    if (PyModule_AddStringConstant(m, "TDS_NATIVE_FROZEN_INDEX_CONTRACT", TDS_FROZEN_INDEX_CONTRACT) < 0) {
-        Py_DECREF(m);
-        return NULL;
-    }
-    if (PyModule_AddStringConstant(m, "TDS_NATIVE_PACKED_LOOKUP_CONTRACT", TDS_PACKED_LOOKUP_CONTRACT) < 0) {
-        Py_DECREF(m);
-        return NULL;
-    }
-    if (PyModule_AddIntConstant(
-            m,
-            "TDS_NATIVE_PACKED_LOOKUP_MAX_KEYS",
-            (int)TDS_PACKED_LOOKUP_MAX_KEYS) < 0) {
-        Py_DECREF(m);
-        return NULL;
-    }
-    if (PyModule_AddStringConstant(m, "TDS_NATIVE_DIAG_PROTOCOL", "c11-atomic-slot-seqlock-mpsc-v1") < 0) {
-        Py_DECREF(m);
-        return NULL;
-    }
-    if (PyModule_AddStringConstant(m, "TDS_NATIVE_DIAG_SAMPLING", "burst=64;period=1024;manual=all") < 0) {
-        Py_DECREF(m);
-        return NULL;
-    }
-    Py_INCREF(&NativeHandleIndexType);
-    if (PyModule_AddObject(m, "NativeHandleIndex", (PyObject*)&NativeHandleIndexType) < 0) {
-        Py_DECREF(&NativeHandleIndexType);
-        Py_DECREF(m);
-        return NULL;
-    }
-    Py_INCREF(&NativeFrozenHandleIndexType);
-    if (PyModule_AddObject(
-            m,
-            "NativeFrozenHandleIndex",
-            (PyObject *)&NativeFrozenHandleIndexType) < 0) {
-        Py_DECREF(&NativeFrozenHandleIndexType);
-        Py_DECREF(m);
-        return NULL;
-    }
-    return m;
+    return PyModuleDef_Init(&moduledef);
 }
