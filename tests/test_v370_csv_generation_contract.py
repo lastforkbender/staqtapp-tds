@@ -176,7 +176,7 @@ def test_chunk_sequence_root_is_bound_into_generation_identity() -> None:
 
 
 def test_qualified_limits_are_rooted_and_fail_one_over() -> None:
-    limits = _limits(max_source_bytes=8)
+    limits = _limits(max_source_bytes=8, max_chunk_bytes=8)
     manifest = _manifest(limits=limits)
     with pytest.raises(CSVGenerationContractError) as oversized:
         validate_manifest(manifest, limits)
@@ -307,7 +307,8 @@ def test_phase_contract_blocks_learned_serving_and_requires_exact_round_trip() -
         encoding="utf-8"
     )
     assert "Original bytes are authoritative" in contract
-    assert "old complete generation or" in contract
+    assert "old complete generation" in contract
+    assert "new complete generation" in contract
     assert "learned Trace Ranking layer is still disabled" in contract
     assert "Only after this gate" in contract
     assert "3.7.0" in contract
