@@ -1,6 +1,12 @@
 name: Hydrate native checksum and UTF-8 truth sources
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/native-truth/**'
+      - '.github/workflows/hydrate-native-truth.yml'
   push:
     branches:
       - agent/v360-checksum-utf8-truth
@@ -14,6 +20,7 @@ permissions:
 jobs:
   hydrate:
     name: Materialize verified source blobs
+    if: github.event_name == 'push' || github.head_ref == 'agent/v360-checksum-utf8-truth'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
