@@ -57,7 +57,9 @@ jobs:
           base64 --decode /tmp/v360-frozen-packed-index.patch.gz.b64 \
             | gzip --decompress \
             > /tmp/v360-frozen-packed-index.patch
-          sha256sum /tmp/v360-frozen-packed-index.patch
+          printf '%s  %s\n' \
+            'fde9043698a816c145d84843729bae244018bcb10d4da3a515f3cddf79ee82cc' \
+            '/tmp/v360-frozen-packed-index.patch' | sha256sum -c -
           git apply --check /tmp/v360-frozen-packed-index.patch
           git apply --index /tmp/v360-frozen-packed-index.patch
           git rm .github/frozen-packed-index.patch.gz.b64
@@ -68,12 +70,13 @@ jobs:
               '.github/frozen-packed-index.patch.gz.b64',
               'DEV15_NATIVE_FROZEN_PACKED_INDEX_STATUS.txt',
               'docs/125_v360_Frozen_Packed_Index.md',
-              'scripts/benchmark_v360_frozen_index.py',
-              'scripts/qualify_v360_frozen_tsan.py',
               'src/staqtapp_tds/_native_index.c',
               'src/staqtapp_tds/backends/native_index.py',
               'src/staqtapp_tds/native/manager.py',
               'tests/test_v360_frozen_packed_index.py',
+              'tools/benchmark_v360_frozen_index.py',
+              'tools/fuzz_v360_frozen_index.py',
+              'tools/tsan_v360_frozen_index.py',
           }
           staged = set(
               subprocess.check_output(
@@ -107,28 +110,35 @@ jobs:
             tests/test_v360_native_csv_input_safety.py \
             tests/test_v346_csv_native_scan_kernel_prototype.py \
             tests/test_v347_csv_native_row_anchor_kernel.py
-          PYTHONPATH=src python scripts/benchmark_v360_frozen_index.py \
-            --keys 1024 --iterations 20 --samples 1 --workers 2 \
-            > /tmp/v360-frozen-packed-index-smoke.json
+          PYTHONPATH=src python tools/fuzz_v360_frozen_index.py \
+            --seed 36015 --cases 500 \
+            > /tmp/v360-frozen-packed-index-fuzz.json
+          PYTHONPATH=src python tools/benchmark_v360_frozen_index.py \
+            --keys 1024 --iterations 20 --samples 1 \
+            --min-two-worker-factor 0 \
+            --output /tmp/v360-frozen-packed-index-smoke.json
           python - <<'PY'
           import json
           from pathlib import Path
 
-          report = json.loads(
+          fuzz = json.loads(
+              Path('/tmp/v360-frozen-packed-index-fuzz.json').read_text(
+                  encoding='utf-8'
+              )
+          )
+          performance = json.loads(
               Path('/tmp/v360-frozen-packed-index-smoke.json').read_text(
                   encoding='utf-8'
               )
           )
-          if report['functional_authority'] is not False:
+          if fuzz['passed'] is not True or fuzz['functional_authority'] is not False:
+              raise SystemExit('frozen packed-format fuzz qualification failed')
+          if performance['functional_authority'] is not False:
               raise SystemExit('candidate benchmark must remain non-authoritative')
-          if report['contracts']['frozen_index'] != (
-              'immutable-rehash-copy;lock-free-read-v1'
-          ):
-              raise SystemExit('unexpected frozen index contract')
-          if report['contracts']['packed_lookup'] != (
-              'keys-bytes;offsets-le64;handles-le-i64;caller-owned-output-v1'
-          ):
-              raise SystemExit('unexpected packed lookup contract')
+          if performance['activation_authority'] is not False:
+              raise SystemExit('candidate benchmark gained activation authority')
+          if performance['gate_passed'] is not True:
+              raise SystemExit('frozen packed benchmark smoke failed')
           PY
           rm -rf build
           find src -maxdepth 3 -type f \
