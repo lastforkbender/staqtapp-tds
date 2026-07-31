@@ -32,14 +32,21 @@ jobs:
         run: |
           set -euo pipefail
 
-          cat .github/native-truth/chunks/native.part-* \
-            | tr -d '\r\n' \
-            | base64 --decode \
+          test "$(find .github/native-truth/chunks -name 'native.part-*' -type f | wc -l)" -eq 4
+          test "$(find .github/native-truth/chunks -name 'filesystem.part-*' -type f | wc -l)" -eq 6
+          cat .github/native-truth/chunks/native.part-* | tr -d '\r\n' > /tmp/native.b64
+          cat .github/native-truth/chunks/filesystem.part-* | tr -d '\r\n' > /tmp/filesystem.b64
+          test "$(wc -c < /tmp/native.b64)" -eq 15660
+          test "$(wc -c < /tmp/filesystem.b64)" -eq 22908
+          echo 'b23654b4718fbe92bc32d69669719f1bb5f73554f8fedf8f2a1b19392e03a8d1  /tmp/native.b64' \
+            | sha256sum --check --strict
+          echo '2c10f55f2bdc6818785abe04ad73865f31dbea65443bb9d2551541282be3138b  /tmp/filesystem.b64' \
+            | sha256sum --check --strict
+
+          base64 --decode /tmp/native.b64 \
             | xz --decompress \
             > src/staqtapp_tds/_native_index.c
-          cat .github/native-truth/chunks/filesystem.part-* \
-            | tr -d '\r\n' \
-            | base64 --decode \
+          base64 --decode /tmp/filesystem.b64 \
             | xz --decompress \
             > src/staqtapp_tds/tds_filesystem.py
 
