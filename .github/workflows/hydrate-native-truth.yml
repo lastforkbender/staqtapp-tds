@@ -33,9 +33,33 @@ jobs:
           set -euo pipefail
 
           test "$(find .github/native-truth/chunks -name 'native.part-*' -type f | wc -l)" -eq 4
-          test "$(find .github/native-truth/chunks -name 'filesystem.part-*' -type f | wc -l)" -eq 6
+          for source in \
+            .github/native-truth/chunks/filesystem.part-000 \
+            .github/native-truth/chunks/filesystem.part-001.000 \
+            .github/native-truth/chunks/filesystem.part-001.001 \
+            .github/native-truth/chunks/filesystem.part-001.002 \
+            .github/native-truth/chunks/filesystem.part-001.003 \
+            .github/native-truth/chunks/filesystem.part-002 \
+            .github/native-truth/chunks/filesystem.part-003 \
+            .github/native-truth/chunks/filesystem.part-004 \
+            .github/native-truth/chunks/filesystem.part-005
+          do
+            test -f "$source"
+          done
+
           cat .github/native-truth/chunks/native.part-* | tr -d '\r\n' > /tmp/native.b64
-          cat .github/native-truth/chunks/filesystem.part-* | tr -d '\r\n' > /tmp/filesystem.b64
+          cat \
+            .github/native-truth/chunks/filesystem.part-000 \
+            .github/native-truth/chunks/filesystem.part-001.000 \
+            .github/native-truth/chunks/filesystem.part-001.001 \
+            .github/native-truth/chunks/filesystem.part-001.002 \
+            .github/native-truth/chunks/filesystem.part-001.003 \
+            .github/native-truth/chunks/filesystem.part-002 \
+            .github/native-truth/chunks/filesystem.part-003 \
+            .github/native-truth/chunks/filesystem.part-004 \
+            .github/native-truth/chunks/filesystem.part-005 \
+            | tr -d '\r\n' > /tmp/filesystem.b64
+
           test "$(wc -c < /tmp/native.b64)" -eq 15660
           test "$(wc -c < /tmp/filesystem.b64)" -eq 22908
           echo 'b23654b4718fbe92bc32d69669719f1bb5f73554f8fedf8f2a1b19392e03a8d1  /tmp/native.b64' \
