@@ -1,0 +1,49 @@
+name: Correct v3.6 AArch64 soak semantic comparison
+
+on:
+  push:
+    branches:
+      - agent/v360-aarch64-hardening
+    paths:
+      - '.github/workflows/fix-v360-aarch64-hardening-script.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  correct:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/v360-aarch64-hardening
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Replace chunk-shape comparison with semantic CSV comparison
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('tools/aarch64_hardening_v360.py')
+          source = path.read_text(encoding='utf-8')
+          old = '''        stable = {"scan": scan, "rows": rows}\n        if baseline is None:\n            baseline = stable\n        elif stable != baseline:\n            raise RuntimeError(f"CSV result changed at chunk size {chunk_size}")\n        variants[str(chunk_size)] = stable\n'''
+          new = '''        semantic = {\n            "scan": {key: value for key, value in scan.items() if key != "chunk_count"},\n            "rows": {key: value for key, value in rows.items() if key != "chunk_count"},\n        }\n        if baseline is None:\n            baseline = semantic\n        elif semantic != baseline:\n            raise RuntimeError(f"CSV semantics changed at chunk size {chunk_size}")\n        variants[str(chunk_size)] = {"scan": scan, "rows": rows}\n'''
+          if old not in source:
+              raise SystemExit('expected CSV comparison block not found')
+          path.write_text(source.replace(old, new, 1), encoding='utf-8', newline='\n')
+          PY
+          python -m py_compile tools/aarch64_hardening_v360.py
+          git diff --check
+      - name: Commit corrected soak tool
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'staqtapp-release-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add tools/aarch64_hardening_v360.py
+          git commit -m 'Compare CSV semantics independently of chunk metadata'
+          git push origin HEAD:agent/v360-aarch64-hardening
