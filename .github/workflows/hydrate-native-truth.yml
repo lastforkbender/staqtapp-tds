@@ -1,0 +1,51 @@
+name: Hydrate native checksum and UTF-8 truth sources
+
+on:
+  push:
+    branches:
+      - agent/v360-checksum-utf8-truth
+    paths:
+      - '.github/native-truth/**'
+      - '.github/workflows/hydrate-native-truth.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  hydrate:
+    name: Materialize verified source blobs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/v360-checksum-utf8-truth
+          fetch-depth: 0
+      - name: Decode, verify, and commit exact sources
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          base64 --decode .github/native-truth/_native_index.c.xz.b64 \
+            | xz --decompress \
+            > src/staqtapp_tds/_native_index.c
+          base64 --decode .github/native-truth/tds_filesystem.py.xz.b64 \
+            | xz --decompress \
+            > src/staqtapp_tds/tds_filesystem.py
+
+          echo 'bc142a57bfaf5d5be44f75d062c373e877780ea7f2f16d4610bdee75f3137f38  src/staqtapp_tds/_native_index.c' \
+            | sha256sum --check --strict
+          echo '68b2bb31e0953b63e8e05fa83f6009515f1c3425a41362fb8da729912b6bad0d  src/staqtapp_tds/tds_filesystem.py' \
+            | sha256sum --check --strict
+          test "$(git hash-object src/staqtapp_tds/_native_index.c)" \
+            = d087c07f9e20760d2f85982b68566afbdb1af913
+          test "$(git hash-object src/staqtapp_tds/tds_filesystem.py)" \
+            = d438e132b058ce9511af3acb7cc46bcf50b96c09
+
+          rm -rf .github/native-truth
+          rm -f .github/workflows/hydrate-native-truth.yml
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Implement checksum identity and strict UTF-8 truth paths'
+          git push origin HEAD:agent/v360-checksum-utf8-truth
