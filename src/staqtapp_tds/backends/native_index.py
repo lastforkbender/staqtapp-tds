@@ -11,6 +11,62 @@ from staqtapp_tds.backends.python_index import EntryIndexStats
 NativeHandleRef = Tuple[int, int, int, int, int]
 
 
+class NativeFrozenHandleView:
+    """Handle-only immutable native snapshot for bounded request-time reads.
+
+    The view intentionally contains no Python entry objects.  It exposes scalar
+    compatibility lookups and a packed caller-owned output path whose C loop
+    does not acquire the mutable index lock or allocate one object per result.
+    """
+
+    backend_name = "native-c-frozen-handle-index"
+
+    def __init__(self, native_index: Any) -> None:
+        self._index = native_index
+
+    def identity(self) -> Dict[str, int | str]:
+        return {str(key): value for key, value in self._index.identity().items()}
+
+    @staticmethod
+    def _encode_key(key: str | bytes) -> bytes:
+        if isinstance(key, bytes):
+            return key if type(key) is bytes else bytes(key)
+        if isinstance(key, str):
+            return key.encode("utf-8")
+        raise TypeError("frozen native keys must be str or bytes")
+
+    def get_handle(self, key: str | bytes) -> int:
+        return int(self._index.get_handle(self._encode_key(key)))
+
+    def contains(self, key: str | bytes) -> bool:
+        return bool(self._index.contains(self._encode_key(key)))
+
+    def lookup_packed(
+        self,
+        keys_blob: bytes,
+        offsets_le64: bytes,
+        output_le_i64: bytearray | memoryview,
+    ) -> int:
+        """Write canonical little-endian signed-64 handles into output.
+
+        Missing keys are encoded as ``-1``.  The method returns only the number
+        of processed keys; it never constructs a Python result list.
+        """
+        return int(
+            self._index.lookup_packed(
+                keys_blob,
+                offsets_le64,
+                output_le_i64,
+            )
+        )
+
+    def stats(self) -> Dict[str, int | str]:
+        return {str(key): value for key, value in self._index.stats().items()}
+
+    def __len__(self) -> int:
+        return int(self._index.size())
+
+
 class NativeEntryIndexBackend:
     """EntryIndex backend using a C Swiss-table-inspired bytes->int64 handle map.
 
@@ -59,6 +115,10 @@ class NativeEntryIndexBackend:
     def identity(self) -> Tuple[int, int]:
         namespace_id, index_epoch = self._index.identity()
         return int(namespace_id), int(index_epoch)
+
+    def freeze_handles(self) -> NativeFrozenHandleView:
+        """Build an off-request immutable handle-only native snapshot."""
+        return NativeFrozenHandleView(self._index.freeze())
 
     def get_handle_ref(self, key: str) -> Optional[NativeHandleRef]:
         ref = self._index.get_handle_ref(key.encode("utf-8"))

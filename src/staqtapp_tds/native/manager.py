@@ -155,6 +155,24 @@ class NativeEngineManager:
             "handle_ref_contract": str(
                 getattr(module, "TDS_NATIVE_HANDLE_REF_CONTRACT", "")
             ),
+            "has_frozen_index": bool(
+                hasattr(module, "NativeFrozenHandleIndex")
+                and hasattr(module, "NativeHandleIndex")
+                and hasattr(module.NativeHandleIndex, "freeze")
+            ),
+            "frozen_index_contract": str(
+                getattr(module, "TDS_NATIVE_FROZEN_INDEX_CONTRACT", "")
+            ),
+            "has_packed_lookup": bool(
+                hasattr(module, "NativeFrozenHandleIndex")
+                and hasattr(module.NativeFrozenHandleIndex, "lookup_packed")
+            ),
+            "packed_lookup_contract": str(
+                getattr(module, "TDS_NATIVE_PACKED_LOOKUP_CONTRACT", "")
+            ),
+            "packed_lookup_max_keys": int(
+                getattr(module, "TDS_NATIVE_PACKED_LOOKUP_MAX_KEYS", 0)
+            ),
             "has_checksum32": hasattr(module, "checksum32"),
             "has_checksum32_for_algorithm": hasattr(
                 module, "checksum32_for_algorithm"

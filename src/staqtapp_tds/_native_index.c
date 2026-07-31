@@ -55,7 +55,25 @@ typedef struct {
     pthread_rwlock_t lock;
 } NativeHandleIndex;
 
+typedef struct {
+    PyObject_HEAD
+    Slot *slots;
+    char *key_bytes;
+    Py_ssize_t capacity;
+    Py_ssize_t size;
+    Py_ssize_t key_bytes_size;
+    uint64_t snapshot_id;
+    uint64_t source_namespace_id;
+    uint64_t source_index_epoch;
+} NativeFrozenHandleIndex;
+
+#define TDS_PACKED_LOOKUP_MAX_KEYS 65536ULL
+#define TDS_FROZEN_INDEX_CONTRACT "immutable-rehash-copy;lock-free-read-v1"
+#define TDS_PACKED_LOOKUP_CONTRACT "keys-bytes;offsets-le64;handles-le-i64;caller-owned-output-v1"
+
+static PyTypeObject NativeFrozenHandleIndexType;
 static _Atomic uint64_t g_index_namespace_sequence = 0;
+static _Atomic uint64_t g_frozen_snapshot_sequence = 0;
 
 static int allocate_positive_identity(_Atomic uint64_t *counter, uint64_t *out) {
     uint64_t current = atomic_load_explicit(counter, memory_order_relaxed);
@@ -1249,13 +1267,13 @@ static void key_pool_destroy(TinyKeyPool *pool) {
     pool->free_list = NULL;
 }
 
-static Py_ssize_t find_slot(Slot *slots, Py_ssize_t cap, const char *key, Py_ssize_t len, uint64_t hash, int *found) {
+static Py_ssize_t find_slot(const Slot *slots, Py_ssize_t cap, const char *key, Py_ssize_t len, uint64_t hash, int *found) {
     Py_ssize_t mask = cap - 1;
     Py_ssize_t first_tomb = -1;
     Py_ssize_t idx = (Py_ssize_t)(hash & (uint64_t)mask);
     uint8_t ctrl = ctrl_from_hash(hash);
     for (Py_ssize_t probe = 0; probe < cap; ++probe) {
-        Slot *s = &slots[idx];
+        const Slot *s = &slots[idx];
         if (s->state == 0) {
             *found = 0;
             return first_tomb >= 0 ? first_tomb : idx;
@@ -1498,6 +1516,547 @@ static void pop_handles_nogil(NativeHandleIndex *self, const char **keys, Py_ssi
     pthread_rwlock_wrlock(&self->lock);
     for (Py_ssize_t i = 0; i < n; ++i) out[i] = pop_handle_locked(self, keys[i], lens[i]);
     pthread_rwlock_unlock(&self->lock);
+}
+
+static uint64_t load_le64(const unsigned char *source) {
+    uint64_t value = 0ULL;
+    value |= (uint64_t)source[0];
+    value |= (uint64_t)source[1] << 8;
+    value |= (uint64_t)source[2] << 16;
+    value |= (uint64_t)source[3] << 24;
+    value |= (uint64_t)source[4] << 32;
+    value |= (uint64_t)source[5] << 40;
+    value |= (uint64_t)source[6] << 48;
+    value |= (uint64_t)source[7] << 56;
+    return value;
+}
+
+static void store_le64(unsigned char *destination, uint64_t value) {
+    destination[0] = (unsigned char)(value & 0xffULL);
+    destination[1] = (unsigned char)((value >> 8) & 0xffULL);
+    destination[2] = (unsigned char)((value >> 16) & 0xffULL);
+    destination[3] = (unsigned char)((value >> 24) & 0xffULL);
+    destination[4] = (unsigned char)((value >> 32) & 0xffULL);
+    destination[5] = (unsigned char)((value >> 40) & 0xffULL);
+    destination[6] = (unsigned char)((value >> 48) & 0xffULL);
+    destination[7] = (unsigned char)((value >> 56) & 0xffULL);
+}
+
+static int frozen_capacity_for_size(
+    Py_ssize_t size,
+    Py_ssize_t *capacity_out
+) {
+    Py_ssize_t requested;
+    if (size < 0) return -1;
+    if (size == 0) {
+        *capacity_out = 16;
+        return 0;
+    }
+    if (size > PY_SSIZE_T_MAX / 2) return -1;
+    requested = size * 2;
+    if (requested < 16) requested = 16;
+    return round_pow2_checked(requested, capacity_out);
+}
+
+static int64_t frozen_lookup_handle_nogil(
+    const NativeFrozenHandleIndex *self,
+    const char *key,
+    Py_ssize_t len
+) {
+    uint64_t hash = fnv1a64(key, len);
+    int found = 0;
+    Py_ssize_t index = find_slot(
+        self->slots,
+        self->capacity,
+        key,
+        len,
+        hash,
+        &found
+    );
+    return (index >= 0 && found) ? self->slots[index].handle : -1;
+}
+
+static void frozen_lookup_packed_nogil(
+    const NativeFrozenHandleIndex *self,
+    const unsigned char *keys,
+    const unsigned char *offsets,
+    Py_ssize_t count,
+    unsigned char *output
+) {
+    Py_ssize_t index;
+    for (index = 0; index < count; ++index) {
+        uint64_t start = load_le64(offsets + ((size_t)index * 8U));
+        uint64_t end = load_le64(offsets + ((size_t)(index + 1) * 8U));
+        int64_t handle = frozen_lookup_handle_nogil(
+            self,
+            (const char *)(keys + (size_t)start),
+            (Py_ssize_t)(end - start)
+        );
+        store_le64(
+            output + ((size_t)index * 8U),
+            (uint64_t)handle
+        );
+    }
+}
+
+static void NativeFrozenHandleIndex_dealloc(NativeFrozenHandleIndex *self) {
+    free(self->slots);
+    free(self->key_bytes);
+    self->slots = NULL;
+    self->key_bytes = NULL;
+    Py_TYPE(self)->tp_free((PyObject *)self);
+}
+
+static PyObject *NativeFrozenHandleIndex_identity(
+    NativeFrozenHandleIndex *self,
+    PyObject *Py_UNUSED(ignored)
+) {
+    PyObject *result = PyDict_New();
+    PyObject *value;
+    if (result == NULL) return NULL;
+#define FROZEN_SET(name, expression) do { \
+    value = (expression); \
+    if (value == NULL || PyDict_SetItemString(result, (name), value) < 0) { \
+        Py_XDECREF(value); \
+        Py_DECREF(result); \
+        return NULL; \
+    } \
+    Py_DECREF(value); \
+} while (0)
+    FROZEN_SET("snapshot_id", PyLong_FromUnsignedLongLong(self->snapshot_id));
+    FROZEN_SET(
+        "source_namespace_id",
+        PyLong_FromUnsignedLongLong(self->source_namespace_id)
+    );
+    FROZEN_SET(
+        "source_index_epoch",
+        PyLong_FromUnsignedLongLong(self->source_index_epoch)
+    );
+    FROZEN_SET("size", PyLong_FromSsize_t(self->size));
+    FROZEN_SET("capacity", PyLong_FromSsize_t(self->capacity));
+    FROZEN_SET(
+        "frozen_index_contract",
+        PyUnicode_FromString(TDS_FROZEN_INDEX_CONTRACT)
+    );
+    FROZEN_SET(
+        "packed_lookup_contract",
+        PyUnicode_FromString(TDS_PACKED_LOOKUP_CONTRACT)
+    );
+#undef FROZEN_SET
+    return result;
+}
+
+static PyObject *NativeFrozenHandleIndex_get_handle(
+    NativeFrozenHandleIndex *self,
+    PyObject *args
+) {
+    PyObject *key_object;
+    const char *key;
+    Py_ssize_t len;
+    int64_t result;
+    if (!PyArg_ParseTuple(args, "O", &key_object)) return NULL;
+    if (!PyBytes_CheckExact(key_object)) {
+        PyErr_SetString(
+            PyExc_TypeError,
+            "frozen lookup key must be exact immutable bytes"
+        );
+        return NULL;
+    }
+    key = PyBytes_AS_STRING(key_object);
+    len = PyBytes_GET_SIZE(key_object);
+    Py_BEGIN_ALLOW_THREADS
+    result = frozen_lookup_handle_nogil(self, key, len);
+    Py_END_ALLOW_THREADS
+    return PyLong_FromLongLong(result);
+}
+
+static PyObject *NativeFrozenHandleIndex_contains(
+    NativeFrozenHandleIndex *self,
+    PyObject *args
+) {
+    PyObject *key_object;
+    const char *key;
+    Py_ssize_t len;
+    int64_t result;
+    if (!PyArg_ParseTuple(args, "O", &key_object)) return NULL;
+    if (!PyBytes_CheckExact(key_object)) {
+        PyErr_SetString(
+            PyExc_TypeError,
+            "frozen lookup key must be exact immutable bytes"
+        );
+        return NULL;
+    }
+    key = PyBytes_AS_STRING(key_object);
+    len = PyBytes_GET_SIZE(key_object);
+    Py_BEGIN_ALLOW_THREADS
+    result = frozen_lookup_handle_nogil(self, key, len);
+    Py_END_ALLOW_THREADS
+    if (result >= 0) Py_RETURN_TRUE;
+    Py_RETURN_FALSE;
+}
+
+static int validate_packed_offsets(
+    const unsigned char *offsets,
+    Py_ssize_t offset_bytes,
+    Py_ssize_t keys_bytes,
+    Py_ssize_t *count_out
+) {
+    Py_ssize_t offset_count;
+    Py_ssize_t index;
+    uint64_t previous;
+    uint64_t keys_limit = (uint64_t)keys_bytes;
+
+    if (offset_bytes < 8 || (offset_bytes % 8) != 0) {
+        PyErr_SetString(
+            PyExc_ValueError,
+            "packed offsets must contain count + 1 little-endian uint64 values"
+        );
+        return -1;
+    }
+    offset_count = offset_bytes / 8;
+    if ((uint64_t)(offset_count - 1) > TDS_PACKED_LOOKUP_MAX_KEYS) {
+        PyErr_SetString(PyExc_ValueError, "packed lookup key limit exceeded");
+        return -1;
+    }
+    previous = load_le64(offsets);
+    if (previous != 0ULL) {
+        PyErr_SetString(PyExc_ValueError, "first packed key offset must be zero");
+        return -1;
+    }
+    for (index = 1; index < offset_count; ++index) {
+        uint64_t current = load_le64(offsets + ((size_t)index * 8U));
+        if (current < previous) {
+            PyErr_SetString(PyExc_ValueError, "packed key offsets must be monotonic");
+            return -1;
+        }
+        if (current == previous) {
+            PyErr_SetString(PyExc_ValueError, "packed key spans must be non-empty");
+            return -1;
+        }
+        if (current > keys_limit) {
+            PyErr_SetString(PyExc_ValueError, "packed key offset exceeds key bytes");
+            return -1;
+        }
+        previous = current;
+    }
+    if (previous != keys_limit) {
+        PyErr_SetString(
+            PyExc_ValueError,
+            "final packed key offset must equal the key byte length"
+        );
+        return -1;
+    }
+    *count_out = offset_count - 1;
+    return 0;
+}
+
+static PyObject *NativeFrozenHandleIndex_lookup_packed(
+    NativeFrozenHandleIndex *self,
+    PyObject *args
+) {
+    PyObject *keys_object;
+    PyObject *offsets_object;
+    PyObject *output_object;
+    const unsigned char *keys;
+    const unsigned char *offsets;
+    Py_ssize_t keys_bytes;
+    Py_ssize_t offset_bytes;
+    Py_ssize_t count;
+    Py_ssize_t expected_output_bytes;
+    Py_buffer output_view;
+
+    if (!PyArg_ParseTuple(
+            args,
+            "OOO",
+            &keys_object,
+            &offsets_object,
+            &output_object)) {
+        return NULL;
+    }
+    if (!PyBytes_CheckExact(keys_object)) {
+        PyErr_SetString(PyExc_TypeError, "packed key storage must be exact immutable bytes");
+        return NULL;
+    }
+    if (!PyBytes_CheckExact(offsets_object)) {
+        PyErr_SetString(PyExc_TypeError, "packed offsets must be exact immutable bytes");
+        return NULL;
+    }
+    keys = (const unsigned char *)PyBytes_AS_STRING(keys_object);
+    keys_bytes = PyBytes_GET_SIZE(keys_object);
+    offsets = (const unsigned char *)PyBytes_AS_STRING(offsets_object);
+    offset_bytes = PyBytes_GET_SIZE(offsets_object);
+    if (validate_packed_offsets(
+            offsets,
+            offset_bytes,
+            keys_bytes,
+            &count) < 0) {
+        return NULL;
+    }
+    if (count > PY_SSIZE_T_MAX / 8) {
+        PyErr_SetString(PyExc_OverflowError, "packed lookup output size overflow");
+        return NULL;
+    }
+    expected_output_bytes = count * 8;
+    if (PyObject_GetBuffer(
+            output_object,
+            &output_view,
+            PyBUF_WRITABLE | PyBUF_C_CONTIGUOUS) < 0) {
+        return NULL;
+    }
+    if (output_view.ndim != 1 || output_view.itemsize != 1) {
+        PyBuffer_Release(&output_view);
+        PyErr_SetString(
+            PyExc_TypeError,
+            "packed lookup output must be a one-dimensional byte buffer"
+        );
+        return NULL;
+    }
+    if (output_view.len != expected_output_bytes) {
+        PyBuffer_Release(&output_view);
+        PyErr_SetString(
+            PyExc_ValueError,
+            "packed lookup output length must equal key count times eight"
+        );
+        return NULL;
+    }
+
+    Py_BEGIN_ALLOW_THREADS
+    frozen_lookup_packed_nogil(
+        self,
+        keys,
+        offsets,
+        count,
+        (unsigned char *)output_view.buf
+    );
+    Py_END_ALLOW_THREADS
+    PyBuffer_Release(&output_view);
+    return PyLong_FromSsize_t(count);
+}
+
+static PyObject *NativeFrozenHandleIndex_size(
+    NativeFrozenHandleIndex *self,
+    PyObject *Py_UNUSED(ignored)
+) {
+    return PyLong_FromSsize_t(self->size);
+}
+
+static PyObject *NativeFrozenHandleIndex_stats(
+    NativeFrozenHandleIndex *self,
+    PyObject *Py_UNUSED(ignored)
+) {
+    PyObject *result = PyDict_New();
+    PyObject *value;
+    if (result == NULL) return NULL;
+#define FROZEN_STAT(name, expression) do { \
+    value = (expression); \
+    if (value == NULL || PyDict_SetItemString(result, (name), value) < 0) { \
+        Py_XDECREF(value); \
+        Py_DECREF(result); \
+        return NULL; \
+    } \
+    Py_DECREF(value); \
+} while (0)
+    FROZEN_STAT("backend", PyUnicode_FromString("native-c-frozen-handle-index"));
+    FROZEN_STAT("size", PyLong_FromSsize_t(self->size));
+    FROZEN_STAT("capacity", PyLong_FromSsize_t(self->capacity));
+    FROZEN_STAT("key_bytes", PyLong_FromSsize_t(self->key_bytes_size));
+    FROZEN_STAT("snapshot_id", PyLong_FromUnsignedLongLong(self->snapshot_id));
+    FROZEN_STAT(
+        "source_namespace_id",
+        PyLong_FromUnsignedLongLong(self->source_namespace_id)
+    );
+    FROZEN_STAT(
+        "source_index_epoch",
+        PyLong_FromUnsignedLongLong(self->source_index_epoch)
+    );
+    FROZEN_STAT(
+        "frozen_index_contract",
+        PyUnicode_FromString(TDS_FROZEN_INDEX_CONTRACT)
+    );
+    FROZEN_STAT(
+        "packed_lookup_contract",
+        PyUnicode_FromString(TDS_PACKED_LOOKUP_CONTRACT)
+    );
+    FROZEN_STAT(
+        "packed_lookup_max_keys",
+        PyLong_FromUnsignedLongLong(TDS_PACKED_LOOKUP_MAX_KEYS)
+    );
+    FROZEN_STAT(
+        "request_path_lock",
+        PyUnicode_FromString("none")
+    );
+    FROZEN_STAT(
+        "shared_hot_path_state_writes",
+        PyLong_FromLong(0L)
+    );
+    FROZEN_STAT(
+        "general_heap_allocations_per_lookup",
+        PyLong_FromLong(0L)
+    );
+    FROZEN_STAT(
+        "caller_owned_output",
+        PyBool_FromLong(1L)
+    );
+#undef FROZEN_STAT
+    return result;
+}
+
+static PyObject *NativeHandleIndex_freeze(
+    NativeHandleIndex *self,
+    PyObject *Py_UNUSED(ignored)
+) {
+    NativeFrozenHandleIndex *frozen = NULL;
+    Py_ssize_t key_bytes_size = 0;
+    Py_ssize_t cursor = 0;
+    Py_ssize_t index;
+    uint64_t snapshot_id = 0ULL;
+    Py_ssize_t copied_count = 0;
+    Py_ssize_t frozen_capacity = 0;
+    int failed = 0;
+    int overflowed = 0;
+    int allocation_failed = 0;
+    int snapshot_mismatch = 0;
+
+    pthread_rwlock_rdlock(&self->lock);
+    for (index = 0; index < self->capacity; ++index) {
+        const Slot *source = &self->slots[index];
+        if (source->state != 1) continue;
+        if (source->len <= 0 || key_bytes_size > PY_SSIZE_T_MAX - source->len) {
+            failed = 1;
+            overflowed = 1;
+            break;
+        }
+        key_bytes_size += source->len;
+    }
+    if (!failed && frozen_capacity_for_size(
+            self->size,
+            &frozen_capacity) < 0) {
+        failed = 1;
+        overflowed = 1;
+    }
+    if (!failed) {
+        frozen = PyObject_New(
+            NativeFrozenHandleIndex,
+            &NativeFrozenHandleIndexType
+        );
+        if (frozen == NULL) {
+            failed = 1;
+        } else {
+            memset(
+                (char *)frozen + sizeof(PyObject),
+                0,
+                sizeof(NativeFrozenHandleIndex) - sizeof(PyObject)
+            );
+            frozen->capacity = frozen_capacity;
+            frozen->size = self->size;
+            frozen->key_bytes_size = key_bytes_size;
+            frozen->source_namespace_id = self->namespace_id;
+            frozen->source_index_epoch = self->index_epoch;
+            if ((size_t)frozen->capacity > SIZE_MAX / sizeof(Slot)) {
+                failed = 1;
+                overflowed = 1;
+            } else {
+                frozen->slots = (Slot *)calloc(
+                    (size_t)frozen->capacity,
+                    sizeof(Slot)
+                );
+                if (frozen->slots == NULL) {
+                    failed = 1;
+                    allocation_failed = 1;
+                }
+            }
+            if (!failed && key_bytes_size > 0) {
+                frozen->key_bytes = (char *)malloc((size_t)key_bytes_size);
+                if (frozen->key_bytes == NULL) {
+                    failed = 1;
+                    allocation_failed = 1;
+                }
+            }
+        }
+    }
+    if (!failed) {
+        for (index = 0; index < self->capacity; ++index) {
+            const Slot *source = &self->slots[index];
+            Py_ssize_t destination_index;
+            Slot *destination;
+            int found = 0;
+            if (source->state != 1) continue;
+            destination_index = find_slot(
+                frozen->slots,
+                frozen->capacity,
+                source->key,
+                source->len,
+                source->hash,
+                &found
+            );
+            if (destination_index < 0 || found) {
+                failed = 1;
+                snapshot_mismatch = 1;
+                break;
+            }
+            memcpy(
+                frozen->key_bytes + cursor,
+                source->key,
+                (size_t)source->len
+            );
+            destination = &frozen->slots[destination_index];
+            destination->key = frozen->key_bytes + cursor;
+            destination->len = source->len;
+            destination->handle = source->handle;
+            destination->state = 1;
+            destination->ctrl = source->ctrl;
+            destination->hash = source->hash;
+            destination->generation = source->generation;
+            cursor += source->len;
+            copied_count += 1;
+        }
+        if (!failed
+                && (cursor != key_bytes_size || copied_count != self->size)) {
+            failed = 1;
+            snapshot_mismatch = 1;
+        }
+    }
+    pthread_rwlock_unlock(&self->lock);
+
+    if (failed) {
+        if (frozen != NULL) {
+            free(frozen->slots);
+            free(frozen->key_bytes);
+            PyObject_Del(frozen);
+        }
+        if (!PyErr_Occurred()) {
+            if (overflowed) {
+                PyErr_SetString(
+                    PyExc_OverflowError,
+                    "frozen index key storage exceeds addressable bounds"
+                );
+            } else if (allocation_failed) {
+                PyErr_NoMemory();
+            } else if (snapshot_mismatch) {
+                PyErr_SetString(
+                    PyExc_RuntimeError,
+                    "frozen index snapshot count mismatch"
+                );
+            } else {
+                PyErr_SetString(
+                    PyExc_RuntimeError,
+                    "frozen index snapshot construction failed"
+                );
+            }
+        }
+        return NULL;
+    }
+    if (allocate_positive_identity(
+            &g_frozen_snapshot_sequence,
+            &snapshot_id) < 0) {
+        free(frozen->slots);
+        free(frozen->key_bytes);
+        PyObject_Del(frozen);
+        PyErr_SetString(PyExc_OverflowError, "frozen snapshot identity exhausted");
+        return NULL;
+    }
+    frozen->snapshot_id = snapshot_id;
+    return (PyObject *)frozen;
 }
 
 static PyObject *NativeHandleIndex_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
@@ -2179,6 +2738,7 @@ static PyMethodDef NativeHandleIndex_methods[] = {
     {"identity", (PyCFunction)NativeHandleIndex_identity, METH_NOARGS, "Return namespace and current index epoch."},
     {"get_handle_ref", (PyCFunction)NativeHandleIndex_get_handle_ref, METH_VARARGS, "Return a validated namespace/epoch/slot/generation handle reference."},
     {"resolve_handle_ref", (PyCFunction)NativeHandleIndex_resolve_handle_ref, METH_VARARGS, "Resolve a fixed handle reference or return -1."},
+    {"freeze", (PyCFunction)NativeHandleIndex_freeze, METH_NOARGS, "Build an immutable rehashed handle-only snapshot."},
     {"size", (PyCFunction)NativeHandleIndex_size, METH_NOARGS, "Return size."},
     {"stats", (PyCFunction)NativeHandleIndex_stats, METH_NOARGS, "Return native index stats."},
     {NULL}
@@ -2195,6 +2755,27 @@ static PyTypeObject NativeHandleIndexType = {
     .tp_init = (initproc)NativeHandleIndex_init,
     .tp_dealloc = (destructor)NativeHandleIndex_dealloc,
     .tp_methods = NativeHandleIndex_methods,
+};
+
+static PyMethodDef NativeFrozenHandleIndex_methods[] = {
+    {"identity", (PyCFunction)NativeFrozenHandleIndex_identity, METH_NOARGS, "Return immutable snapshot identity and source binding."},
+    {"get_handle", (PyCFunction)NativeFrozenHandleIndex_get_handle, METH_VARARGS, "Look up one bytes key without a request-path lock."},
+    {"contains", (PyCFunction)NativeFrozenHandleIndex_contains, METH_VARARGS, "Return whether one bytes key exists."},
+    {"lookup_packed", (PyCFunction)NativeFrozenHandleIndex_lookup_packed, METH_VARARGS, "Look up packed exact bytes into caller-owned little-endian int64 output."},
+    {"size", (PyCFunction)NativeFrozenHandleIndex_size, METH_NOARGS, "Return immutable entry count."},
+    {"stats", (PyCFunction)NativeFrozenHandleIndex_stats, METH_NOARGS, "Return immutable snapshot and execution statistics."},
+    {NULL}
+};
+
+static PyTypeObject NativeFrozenHandleIndexType = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name = "staqtapp_tds._native_index.NativeFrozenHandleIndex",
+    .tp_doc = "Immutable handle-only native index with lock-free reads and caller-owned packed output.",
+    .tp_basicsize = sizeof(NativeFrozenHandleIndex),
+    .tp_itemsize = 0,
+    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_dealloc = (destructor)NativeFrozenHandleIndex_dealloc,
+    .tp_methods = NativeFrozenHandleIndex_methods,
 };
 
 static PyMethodDef module_methods[] = {
@@ -2224,6 +2805,7 @@ static PyModuleDef moduledef = {
 PyMODINIT_FUNC PyInit__native_index(void) {
     PyObject *m;
     if (PyType_Ready(&NativeHandleIndexType) < 0) return NULL;
+    if (PyType_Ready(&NativeFrozenHandleIndexType) < 0) return NULL;
     if (!diag_atomics_lock_free()) {
         PyErr_SetString(PyExc_RuntimeError, "native diagnostics requires lock-free C11 atomics");
         return NULL;
@@ -2239,7 +2821,7 @@ PyMODINIT_FUNC PyInit__native_index(void) {
         Py_DECREF(m);
         return NULL;
     }
-    if (PyModule_AddStringConstant(m, "TDS_NATIVE_CAPABILITIES", "index,checksum32,checksum_registry,spiral_rank,utf8_chunks,utf8_strict,diagnostics,diagnostics_c11_ring,diagnostics_sampling,handle_refs_v1") < 0) {
+    if (PyModule_AddStringConstant(m, "TDS_NATIVE_CAPABILITIES", "index,checksum32,checksum_registry,spiral_rank,utf8_chunks,utf8_strict,diagnostics,diagnostics_c11_ring,diagnostics_sampling,handle_refs_v1,frozen_index_v1,packed_lookup_v1") < 0) {
         Py_DECREF(m);
         return NULL;
     }
@@ -2255,6 +2837,21 @@ PyMODINIT_FUNC PyInit__native_index(void) {
         Py_DECREF(m);
         return NULL;
     }
+    if (PyModule_AddStringConstant(m, "TDS_NATIVE_FROZEN_INDEX_CONTRACT", TDS_FROZEN_INDEX_CONTRACT) < 0) {
+        Py_DECREF(m);
+        return NULL;
+    }
+    if (PyModule_AddStringConstant(m, "TDS_NATIVE_PACKED_LOOKUP_CONTRACT", TDS_PACKED_LOOKUP_CONTRACT) < 0) {
+        Py_DECREF(m);
+        return NULL;
+    }
+    if (PyModule_AddIntConstant(
+            m,
+            "TDS_NATIVE_PACKED_LOOKUP_MAX_KEYS",
+            (int)TDS_PACKED_LOOKUP_MAX_KEYS) < 0) {
+        Py_DECREF(m);
+        return NULL;
+    }
     if (PyModule_AddStringConstant(m, "TDS_NATIVE_DIAG_PROTOCOL", "c11-atomic-slot-seqlock-mpsc-v1") < 0) {
         Py_DECREF(m);
         return NULL;
@@ -2266,6 +2863,15 @@ PyMODINIT_FUNC PyInit__native_index(void) {
     Py_INCREF(&NativeHandleIndexType);
     if (PyModule_AddObject(m, "NativeHandleIndex", (PyObject*)&NativeHandleIndexType) < 0) {
         Py_DECREF(&NativeHandleIndexType);
+        Py_DECREF(m);
+        return NULL;
+    }
+    Py_INCREF(&NativeFrozenHandleIndexType);
+    if (PyModule_AddObject(
+            m,
+            "NativeFrozenHandleIndex",
+            (PyObject *)&NativeFrozenHandleIndexType) < 0) {
+        Py_DECREF(&NativeFrozenHandleIndexType);
         Py_DECREF(m);
         return NULL;
     }

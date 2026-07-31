@@ -121,6 +121,7 @@ jobs:
         run: |
           set -euo pipefail
           tests=(
+            tests/test_v360_frozen_packed_index.py
             tests/test_v360_handle_generation_truth.py
             tests/test_v360_diagnostic_ring_truth.py
             tests/test_v360_checksum_utf8_truth.py
@@ -140,6 +141,90 @@ jobs:
               python -m pytest -q --disable-warnings -c /dev/null "${tests[@]}"
           fi
 
+  native-thread-sanitizer-qualification:
+    name: Native frozen-index thread sanitizer
+    needs: source-release-checks
+    runs-on: ubuntu-latest
+    env:
+      STAQTAPP_TDS_BUILD_NATIVE: '1'
+      STAQTAPP_TDS_SANITIZE: thread
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Build ThreadSanitizer native extensions
+        run: |
+          python -m pip install setuptools wheel
+          python setup.py build_ext --inplace --force
+      - name: Run direct extension-only frozen-index concurrency harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          tsan_runtime="$(gcc -print-file-name=libtsan.so)"
+          test -n "$tsan_runtime"
+          LD_PRELOAD="$tsan_runtime" \
+            TSAN_OPTIONS="halt_on_error=1:history_size=7:second_deadlock_stack=1" \
+            PYTHONPATH=src python -S tools/tsan_v360_frozen_index.py
+
+  native-frozen-format-fuzz:
+    name: Native frozen-index deterministic fuzz
+    needs: source-release-checks
+    runs-on: ubuntu-latest
+    env:
+      STAQTAPP_TDS_BUILD_NATIVE: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Build native extensions
+        run: python -m pip install ".[test]"
+      - name: Replay pinned valid and malformed packed requests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/fuzz_v360_frozen_index.py --seed 3542816 --cases 5000 \
+            > native-frozen-index-fuzz.json
+          cat native-frozen-index-fuzz.json
+      - name: Archive deterministic fuzz evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-frozen-index-fuzz
+          path: native-frozen-index-fuzz.json
+          if-no-files-found: error
+
+  native-frozen-performance-evidence:
+    name: Native frozen-index two-worker evidence
+    needs: source-release-checks
+    runs-on: ubuntu-latest
+    env:
+      STAQTAPP_TDS_BUILD_NATIVE: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Build native extensions
+        run: python -m pip install ".[test]"
+      - name: Require shared-runner aggregate no-regression evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/benchmark_v360_frozen_index.py \
+            --keys 4096 \
+            --iterations 128 \
+            --samples 7 \
+            --min-two-worker-factor 1.0 \
+            > native-frozen-index-performance.json
+          cat native-frozen-index-performance.json
+      - name: Archive separate performance evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-frozen-index-performance
+          path: native-frozen-index-performance.json
+          if-no-files-found: error
+
   build-distributions:
     name: Build and inspect distributions
     needs:
@@ -147,6 +232,9 @@ jobs:
       - platform-compatibility
       - native-extension-qualification
       - native-sanitizer-qualification
+      - native-thread-sanitizer-qualification
+      - native-frozen-format-fuzz
+      - native-frozen-performance-evidence
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -178,6 +266,9 @@ jobs:
       - platform-compatibility
       - native-extension-qualification
       - native-sanitizer-qualification
+      - native-thread-sanitizer-qualification
+      - native-frozen-format-fuzz
+      - native-frozen-performance-evidence
       - build-distributions
     runs-on: ubuntu-latest
     steps:
@@ -188,6 +279,9 @@ jobs:
           PLATFORM_RESULT: ${{ needs.platform-compatibility.result }}
           NATIVE_RESULT: ${{ needs.native-extension-qualification.result }}
           SANITIZER_RESULT: ${{ needs.native-sanitizer-qualification.result }}
+          THREAD_SANITIZER_RESULT: ${{ needs.native-thread-sanitizer-qualification.result }}
+          FUZZ_RESULT: ${{ needs.native-frozen-format-fuzz.result }}
+          PERFORMANCE_RESULT: ${{ needs.native-frozen-performance-evidence.result }}
           DISTRIBUTION_RESULT: ${{ needs.build-distributions.result }}
         run: |
           python - <<'PY'
@@ -199,6 +293,9 @@ jobs:
               "platform": os.environ["PLATFORM_RESULT"],
               "native": os.environ["NATIVE_RESULT"],
               "sanitizer": os.environ["SANITIZER_RESULT"],
+              "thread_sanitizer": os.environ["THREAD_SANITIZER_RESULT"],
+              "fuzz": os.environ["FUZZ_RESULT"],
+              "performance": os.environ["PERFORMANCE_RESULT"],
               "distribution": os.environ["DISTRIBUTION_RESULT"],
           }
           failed = {name: result for name, result in results.items() if result != "success"}
