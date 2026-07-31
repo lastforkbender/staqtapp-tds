@@ -1,6 +1,12 @@
 name: Apply verified v3.6 native architecture parity repair
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/native-architecture-parity.patch.gz.b64'
+      - '.github/workflows/apply-v360-native-architecture-parity.yml'
   push:
     branches:
       - agent/v360-native-architecture-parity
@@ -17,17 +23,28 @@ concurrency:
 
 jobs:
   apply:
-    if: github.actor != 'github-actions[bot]'
+    if: github.event_name == 'push' || github.head_ref == 'agent/v360-native-architecture-parity'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
           ref: agent/v360-native-architecture-parity
           fetch-depth: 0
+      - name: Detect pending source materialization
+        id: pending
+        shell: bash
+        run: |
+          if [[ -f .github/native-architecture-parity.patch.gz.b64 ]]; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/setup-python@v6
+        if: steps.pending.outputs.present == 'true'
         with:
           python-version: '3.13'
       - name: Verify and stage the exact native architecture parity repair
+        if: steps.pending.outputs.present == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -71,6 +88,7 @@ jobs:
           PY
           git diff --cached --check
       - name: Build strict native extensions and qualify the x86 semantic projection
+        if: steps.pending.outputs.present == 'true'
         shell: bash
         env:
           PYTHONDONTWRITEBYTECODE: '1'
@@ -117,6 +135,7 @@ jobs:
           python scripts/check_release.py
           git diff --cached --check
       - name: Commit qualified source
+        if: steps.pending.outputs.present == 'true'
         shell: bash
         run: |
           set -euo pipefail
