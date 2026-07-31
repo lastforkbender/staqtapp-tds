@@ -32,10 +32,14 @@ jobs:
         run: |
           set -euo pipefail
 
-          base64 --decode .github/native-truth/_native_index.c.xz.b64 \
+          cat .github/native-truth/chunks/native.part-* \
+            | tr -d '\r\n' \
+            | base64 --decode \
             | xz --decompress \
             > src/staqtapp_tds/_native_index.c
-          base64 --decode .github/native-truth/tds_filesystem.py.xz.b64 \
+          cat .github/native-truth/chunks/filesystem.part-* \
+            | tr -d '\r\n' \
+            | base64 --decode \
             | xz --decompress \
             > src/staqtapp_tds/tds_filesystem.py
 
