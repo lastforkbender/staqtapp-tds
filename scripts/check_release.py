@@ -11,6 +11,10 @@ import tomllib
 import subprocess
 import sys
 
+# The release checker scans for bytecode artifacts. Prevent its own helper
+# import from creating a repository-local ``scripts/__pycache__`` first.
+sys.dont_write_bytecode = True
+
 from release_version import (
     ReleaseVersionError,
     expected_tag,
