@@ -212,12 +212,15 @@ def csv_fixture(csv_native: Any) -> dict[str, Any]:
         )
         if scan["row_offsets"] != rows["row_offsets"]:
             raise RuntimeError("CSV scan and row-offset drift")
-        stable = {"scan": scan, "rows": rows}
+        semantic = {
+            "scan": {key: value for key, value in scan.items() if key != "chunk_count"},
+            "rows": {key: value for key, value in rows.items() if key != "chunk_count"},
+        }
         if baseline is None:
-            baseline = stable
-        elif stable != baseline:
-            raise RuntimeError(f"CSV result changed at chunk size {chunk_size}")
-        variants[str(chunk_size)] = stable
+            baseline = semantic
+        elif semantic != baseline:
+            raise RuntimeError(f"CSV semantics changed at chunk size {chunk_size}")
+        variants[str(chunk_size)] = {"scan": scan, "rows": rows}
     return {
         "raw_sha256": hashlib.sha256(raw).hexdigest(),
         "variants": variants,
