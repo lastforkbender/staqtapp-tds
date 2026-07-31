@@ -167,6 +167,14 @@ def native_diag_set_enabled(enabled: bool) -> bool:
     return True
 
 
+def native_diag_set_sampling(*, interval: int = 1024, burst: int = 64) -> bool:
+    mod = _native_module()
+    if mod is None or not hasattr(mod, "diag_set_sampling"):
+        return False
+    mod.diag_set_sampling(interval=int(interval), burst=int(burst))
+    return True
+
+
 def native_diag_mark_degraded(degraded: bool = True) -> bool:
     mod = _native_module()
     if mod is None or not hasattr(mod, "diag_mark_degraded"):

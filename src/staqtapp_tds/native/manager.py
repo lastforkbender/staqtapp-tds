@@ -167,6 +167,13 @@ class NativeEngineManager:
                 getattr(module, "TDS_NATIVE_UTF8_CHUNK_CONTRACT", "")
             ),
             "has_diag_snapshot": hasattr(module, "diag_snapshot"),
+            "has_diag_set_sampling": hasattr(module, "diag_set_sampling"),
+            "diag_protocol": str(
+                getattr(module, "TDS_NATIVE_DIAG_PROTOCOL", "")
+            ),
+            "diag_sampling": str(
+                getattr(module, "TDS_NATIVE_DIAG_SAMPLING", "")
+            ),
         }
         report = NativeLoadReport(
             requested="auto",
