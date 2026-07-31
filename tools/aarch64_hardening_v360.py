@@ -25,6 +25,7 @@ from typing import Any, Iterable
 
 FORMAT = "tds.v360.aarch64-hardening.v1"
 SEMANTIC_DOMAIN = b"TDS-V360-AARCH64-HARDENING-V1\0"
+EXPECTED_SEMANTIC_ROOT = "9ed03c78b6a99e1229808c764bee6bb0770aeb00c3905f40614665411006270a"
 
 
 def canonical_json(value: Any) -> bytes:
@@ -395,9 +396,21 @@ def main() -> int:
             "iterations": args.iterations,
         },
     }
+    root = semantic_root(projection)
+    official_profile = (
+        architecture == "aarch64"
+        and args.loops == 256
+        and args.keys == 8192
+        and args.workers == 4
+        and args.iterations == 128
+    )
+    expected_root = EXPECTED_SEMANTIC_ROOT if official_profile else ""
+    root_matches_expected = not expected_root or root == expected_root
     report = {
         "format": FORMAT,
-        "semantic_root": semantic_root(projection),
+        "semantic_root": root,
+        "expected_semantic_root": expected_root,
+        "root_matches_expected": root_matches_expected,
         "semantic_projection": projection,
         "evidence": {
             "architecture": architecture,
@@ -412,13 +425,13 @@ def main() -> int:
         },
         "functional_authority": False,
         "activation_authority": False,
-        "passed": True,
+        "passed": root_matches_expected,
     }
     encoded = json.dumps(report, sort_keys=True, indent=2) + "\n"
     if args.output:
         Path(args.output).write_text(encoded, encoding="utf-8", newline="\n")
     print(encoded, end="")
-    return 0
+    return 0 if root_matches_expected else 2
 
 
 if __name__ == "__main__":

@@ -46,6 +46,8 @@ def in_tree_extensions_are_built() -> bool:
 def test_v360_aarch64_hardening_contract_is_domain_separated() -> None:
     tool = load_tool()
     assert tool.FORMAT == "tds.v360.aarch64-hardening.v1"
+    assert tool.EXPECTED_SEMANTIC_ROOT == "9ed03c78b6a99e1229808c764bee6bb0770aeb00c3905f40614665411006270a"
+    assert len(bytes.fromhex(tool.EXPECTED_SEMANTIC_ROOT)) == 32
     assert tool.SEMANTIC_DOMAIN == b"TDS-V360-AARCH64-HARDENING-V1\0"
 
     projection = {

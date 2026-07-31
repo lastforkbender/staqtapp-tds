@@ -135,3 +135,32 @@ The repository package remains the historical `3.5.3.post2` identity during
 Foundation development. A completed Foundation Repair becomes `3.6.0` only after
 all required Phase-2 gates qualify. Corrections advance the patch number and do
 not create another `.postN` release.
+
+## First qualified native ARM result
+
+The initial complete hardening run was GitHub Actions run `30662625269` on
+merge candidate `1ac010b18e0a33a15454f8c97731b391c3313efb`. Every ARM lane
+passed. The official deterministic soak profile is now pinned to:
+
+```text
+semantic root:
+9ed03c78b6a99e1229808c764bee6bb0770aeb00c3905f40614665411006270a
+
+loops:       256
+keys:        8192
+workers:     4
+iterations:  128 per worker
+```
+
+The hosted four-core Neoverse-N2 evidence recorded a one-worker p50 of
+44.869 million lookups/second, two-worker aggregate p50 of 84.761 million
+lookups/second, and four-worker aggregate p50 of 161.860 million
+lookups/second. That corresponds to 1.8891x two-worker scaling and 3.6074x
+four-worker scaling, with 94.45% and 90.19% aggregate efficiency. This remains
+shared-runner evidence, not the final named-reference-CPU claim.
+
+The 10,000-case deterministic fuzz lane rejected all 10,000 malformed packed
+requests before output mutation and all 10,000 malformed UTF-8 fixtures.
+AddressSanitizer, UndefinedBehaviorSanitizer, ThreadSanitizer, the ARM
+subinterpreter rejection harness, and the aggregate ARM hardening gate all
+passed.
