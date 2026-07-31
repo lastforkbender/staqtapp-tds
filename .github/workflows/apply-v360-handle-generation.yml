@@ -1,0 +1,136 @@
+name: Apply verified v3.6 handle-generation repair
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/handle-generation.patch.gz.b64'
+      - '.github/workflows/apply-v360-handle-generation.yml'
+  push:
+    branches:
+      - agent/v360-handle-generation-truth
+    paths:
+      - '.github/handle-generation.patch.gz.b64'
+      - '.github/workflows/apply-v360-handle-generation.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-v360-handle-generation
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.event_name == 'push' || github.head_ref == 'agent/v360-handle-generation-truth'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/v360-handle-generation-truth
+          fetch-depth: 0
+      - name: Detect pending source materialization
+        id: pending
+        shell: bash
+        run: |
+          if [[ -f .github/handle-generation.patch.gz.b64 ]]; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-python@v6
+        if: steps.pending.outputs.present == 'true'
+        with:
+          python-version: '3.13'
+      - name: Verify and stage the exact handle repair
+        if: steps.pending.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor \
+            '297d60dc6b2f8874e3d9032957a5056c58c3dd5b' HEAD
+          tr -d '\r\n' < .github/handle-generation.patch.gz.b64 \
+            > /tmp/v360-handle-generation.patch.gz.b64
+          printf '%s  %s\n' \
+            '5e191e7df3d77709f711fde8aad1dcaaa0445fa409ae711b7ab864d4b7d352e4' \
+            '/tmp/v360-handle-generation.patch.gz.b64' | sha256sum -c -
+          base64 --decode /tmp/v360-handle-generation.patch.gz.b64 \
+            | gzip --decompress \
+            > /tmp/v360-handle-generation.patch
+          printf '%s  %s\n' \
+            '39f0a9318df473f2044e1c9c6d2c36654009fbd25058cfa80808f84fc0f70b38' \
+            '/tmp/v360-handle-generation.patch' | sha256sum -c -
+          git apply --check /tmp/v360-handle-generation.patch
+          git apply --index /tmp/v360-handle-generation.patch
+
+          # GitHub Actions cannot update workflow definitions through its token.
+          # Keep release.yml and this one-shot workflow outside the bot commit;
+          # the authenticated repository connector updates/removes them after
+          # exact source materialization succeeds.
+          git reset -- .github/workflows/release.yml
+          git checkout -- .github/workflows/release.yml
+          git rm .github/handle-generation.patch.gz.b64
+
+          python - <<'PY'
+          import subprocess
+
+          expected = {
+              '.github/handle-generation.patch.gz.b64',
+              'DEV14_NATIVE_HANDLE_GENERATION_STATUS.txt',
+              'docs/124_v360_Handle_Generation_Truth.md',
+              'src/staqtapp_tds/_native_index.c',
+              'src/staqtapp_tds/backends/native_index.py',
+              'src/staqtapp_tds/native/manager.py',
+              'tests/test_v360_handle_generation_truth.py',
+          }
+          staged = set(
+              subprocess.check_output(
+                  ['git', 'diff', '--cached', '--name-only'], text=True
+              ).splitlines()
+          )
+          if staged != expected:
+              raise SystemExit(
+                  f'unexpected staged paths: missing={sorted(expected-staged)} '
+                  f'extra={sorted(staged-expected)}'
+              )
+          PY
+          git diff --cached --check
+      - name: Build strict native extensions and qualify the repair
+        if: steps.pending.outputs.present == 'true'
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+          STAQTAPP_TDS_BUILD_NATIVE: '1'
+          CFLAGS: '-std=c11 -Wall -Wextra -Werror -Wconversion -Wshadow -Wpedantic -Wno-cast-function-type'
+        run: |
+          set -euo pipefail
+          python -m pip install setuptools wheel pytest numpy PyQt5
+          python setup.py build_ext --inplace --force
+          PYTHONPATH=src python -m pytest -q --disable-warnings -c /dev/null \
+            tests/test_v360_handle_generation_truth.py \
+            tests/test_v360_diagnostic_ring_truth.py \
+            tests/test_v360_checksum_utf8_truth.py \
+            tests/test_v360_native_csv_input_safety.py \
+            tests/test_v270_native_diagnostics.py \
+            tests/test_v271_transition_ring.py \
+            tests/test_v302_native_keypool_safety.py \
+            tests/test_v242_metadata_native_engine.py \
+            tests/test_v240_native_execution.py \
+            tests/test_v301_native_engine_manager.py \
+            tests/test_v201_radix_swiss.py
+          rm -rf build
+          find src -maxdepth 3 -type f \( -name '*.so' -o -name '*.pyd' -o -name '*.dll' -o -name '*.dylib' \) -delete
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          rm -rf src/staqtapp_tds.egg-info
+          python scripts/check_release.py
+          git diff --cached --check
+      - name: Commit qualified source
+        if: steps.pending.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'staqtapp-release-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git commit -m 'Implement monotonic handles and generation-bound references'
+          git push origin HEAD:agent/v360-handle-generation-truth
