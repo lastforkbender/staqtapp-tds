@@ -1,0 +1,1 @@
+v3.6.0 candidate: C11 diagnostic ring and bounded automatic sampling; no learned serving or release version bump.
