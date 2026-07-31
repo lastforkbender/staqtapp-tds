@@ -1,0 +1,126 @@
+name: Apply verified v3.6 native architecture parity repair
+
+on:
+  push:
+    branches:
+      - agent/v360-native-architecture-parity
+    paths:
+      - '.github/native-architecture-parity.patch.gz.b64'
+      - '.github/workflows/apply-v360-native-architecture-parity.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-v360-native-architecture-parity
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/v360-native-architecture-parity
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Verify and stage the exact native architecture parity repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor \
+            'b606f37a342d430b71e5c9d3e9addb1c622add2d' HEAD
+          test "$(git hash-object .github/native-architecture-parity.patch.gz.b64)" = \
+            '0ce88e291128840da111a5ea28a5519c9b65781c'
+          tr -d '\r\n' < .github/native-architecture-parity.patch.gz.b64 \
+            > /tmp/v360-native-architecture-parity.patch.gz.b64
+          base64 --decode /tmp/v360-native-architecture-parity.patch.gz.b64 \
+            | gzip --decompress \
+            > /tmp/v360-native-architecture-parity.patch
+          printf '%s  %s\n' \
+            '873c961dfed158e79ad63e93c1e2c90d8cabb8cbec6123ad1d09c4af269661a3' \
+            '/tmp/v360-native-architecture-parity.patch' | sha256sum -c -
+          git apply --check /tmp/v360-native-architecture-parity.patch
+          git apply --index /tmp/v360-native-architecture-parity.patch
+          git rm .github/native-architecture-parity.patch.gz.b64
+          python - <<'PY'
+          import subprocess
+
+          expected = {
+              '.github/native-architecture-parity.patch.gz.b64',
+              '.github/workflows/release.yml',
+              'DEV17_NATIVE_ARCHITECTURE_PARITY_STATUS.txt',
+              'docs/127_v360_Native_Architecture_Parity.md',
+              'tests/test_v360_native_architecture_parity.py',
+              'tools/architecture_parity_v360_native.py',
+          }
+          staged = set(
+              subprocess.check_output(
+                  ['git', 'diff', '--cached', '--name-only'],
+                  text=True,
+              ).splitlines()
+          )
+          if staged != expected:
+              raise SystemExit(
+                  f'unexpected staged paths: missing={sorted(expected-staged)} '
+                  f'extra={sorted(staged-expected)}'
+              )
+          PY
+          git diff --cached --check
+      - name: Build strict native extensions and qualify the x86 semantic projection
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+          STAQTAPP_TDS_BUILD_NATIVE: '1'
+          CFLAGS: '-std=c11 -Wall -Wextra -Werror -Wconversion -Wshadow -Wpedantic -Wno-cast-function-type'
+        run: |
+          set -euo pipefail
+          python -m pip install setuptools wheel pytest numpy PyQt5
+          python setup.py build_ext --inplace --force
+          PYTHONPATH=src python -m pytest -q --disable-warnings -c /dev/null \
+            tests/test_v360_native_architecture_parity.py \
+            tests/test_v360_native_lifecycle_admission.py \
+            tests/test_v360_frozen_packed_index.py \
+            tests/test_v360_handle_generation_truth.py \
+            tests/test_v360_diagnostic_ring_truth.py \
+            tests/test_v360_checksum_utf8_truth.py \
+            tests/test_v360_native_csv_input_safety.py \
+            tests/test_v346_csv_native_scan_kernel_prototype.py \
+            tests/test_v347_csv_native_row_anchor_kernel.py
+          PYTHONPATH=src python tools/architecture_parity_v360_native.py \
+            --expected-architecture x86_64 \
+            --expected-root d2e839477d432cdf9e328982e6e9a245295dd05c80ddac4937232c0b72bc9d09 \
+            --output /tmp/native-architecture-x86_64.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path('/tmp/native-architecture-x86_64.json').read_text(
+                  encoding='utf-8'
+              )
+          )
+          assert report['semantic_root'] == (
+              'd2e839477d432cdf9e328982e6e9a245295dd05c80ddac4937232c0b72bc9d09'
+          )
+          assert report['functional_authority'] is False
+          assert report['activation_authority'] is False
+          PY
+          rm -rf build
+          find src -maxdepth 3 -type f \
+            \( -name '*.so' -o -name '*.pyd' -o -name '*.dll' -o -name '*.dylib' \) \
+            -delete
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          python scripts/check_release.py
+          git diff --cached --check
+      - name: Commit qualified source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'staqtapp-release-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git commit -m 'Add native x86-64 and AArch64 semantic parity qualification'
+          git push origin HEAD:agent/v360-native-architecture-parity
