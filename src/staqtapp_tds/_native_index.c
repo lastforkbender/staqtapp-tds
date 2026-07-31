@@ -270,6 +270,7 @@ static PyObject *diag_event_list(Py_ssize_t limit) {
 }
 
 static PyObject *module_diag_snapshot(PyObject *self, PyObject *args, PyObject *kwargs) {
+    (void)self;
     Py_ssize_t event_limit = 32;
     static char *kwlist[] = {"event_limit", NULL};
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|n", kwlist, &event_limit)) return NULL;
@@ -302,6 +303,7 @@ static PyObject *module_diag_snapshot(PyObject *self, PyObject *args, PyObject *
 }
 
 static PyObject *module_diag_reset(PyObject *self, PyObject *Py_UNUSED(ignored)) {
+    (void)self;
     for (int i = 0; i < DIAG_COUNTER_MAX; ++i) g_diag_counters[i] = 0;
     g_diag_sequence = 0;
     g_diag_degraded = 0;
@@ -311,6 +313,7 @@ static PyObject *module_diag_reset(PyObject *self, PyObject *Py_UNUSED(ignored))
 }
 
 static PyObject *module_diag_set_enabled(PyObject *self, PyObject *args) {
+    (void)self;
     int enabled = 1;
     if (!PyArg_ParseTuple(args, "p", &enabled)) return NULL;
     g_diag_enabled = enabled ? 1 : 0;
@@ -318,6 +321,7 @@ static PyObject *module_diag_set_enabled(PyObject *self, PyObject *args) {
 }
 
 static PyObject *module_diag_mark_degraded(PyObject *self, PyObject *args) {
+    (void)self;
     int degraded = 1;
     if (!PyArg_ParseTuple(args, "|p", &degraded)) return NULL;
     g_diag_degraded = degraded ? 1 : 0;
@@ -326,6 +330,7 @@ static PyObject *module_diag_mark_degraded(PyObject *self, PyObject *args) {
 }
 
 static PyObject *module_diag_emit(PyObject *self, PyObject *args) {
+    (void)self;
     unsigned int code; unsigned long long a = 0, b = 0;
     if (!PyArg_ParseTuple(args, "I|KK", &code, &a, &b)) return NULL;
     diag_count_transition((DiagEventCode)code);
@@ -350,6 +355,277 @@ static uint32_t fnv1a32(const char *data, Py_ssize_t len) {
         h *= 16777619u;
     }
     return h ? h : 1u;
+}
+
+
+/*
+ * Immutable input ownership for GIL-free native truth operations.
+ * Exact bytes are held zero-copy. Every other contiguous exporter is copied
+ * once while the GIL is held, then the original Py_buffer is released before
+ * native work begins.
+ */
+typedef struct {
+    PyObject *owner;
+    const char *data;
+    Py_ssize_t len;
+} TDSStableInput;
+
+static void stable_input_init(TDSStableInput *input) {
+    input->owner = NULL;
+    input->data = NULL;
+    input->len = 0;
+}
+
+static void stable_input_release(TDSStableInput *input) {
+    Py_CLEAR(input->owner);
+    input->data = NULL;
+    input->len = 0;
+}
+
+static int stable_input_acquire(PyObject *object, TDSStableInput *input, const char *label) {
+    Py_buffer view;
+    PyObject *snapshot = NULL;
+
+    stable_input_init(input);
+    if (PyBytes_CheckExact(object)) {
+        Py_INCREF(object);
+        input->owner = object;
+        input->data = PyBytes_AS_STRING(object);
+        input->len = PyBytes_GET_SIZE(object);
+        return 0;
+    }
+    if (PyObject_GetBuffer(object, &view, PyBUF_CONTIG_RO) < 0) {
+        return -1;
+    }
+    if (view.len < 0) {
+        PyBuffer_Release(&view);
+        PyErr_Format(PyExc_ValueError, "%s buffer length must not be negative", label);
+        return -1;
+    }
+    snapshot = PyBytes_FromStringAndSize(
+        view.len == 0 ? "" : (const char *)view.buf,
+        view.len
+    );
+    PyBuffer_Release(&view);
+    if (snapshot == NULL) {
+        return -1;
+    }
+    input->owner = snapshot;
+    input->data = PyBytes_AS_STRING(snapshot);
+    input->len = PyBytes_GET_SIZE(snapshot);
+    return 0;
+}
+
+static uint32_t crc32_ieee_nogil(const char *data, Py_ssize_t len) {
+    static const uint32_t table[16] = {
+        0x00000000u, 0x1DB71064u, 0x3B6E20C8u, 0x26D930ACu,
+        0x76DC4190u, 0x6B6B51F4u, 0x4DB26158u, 0x5005713Cu,
+        0xEDB88320u, 0xF00F9344u, 0xD6D6A3E8u, 0xCB61B38Cu,
+        0x9B64C2B0u, 0x86D3D2D4u, 0xA00AE278u, 0xBDBDF21Cu
+    };
+    uint32_t crc = 0xFFFFFFFFu;
+    Py_ssize_t i;
+    for (i = 0; i < len; ++i) {
+        uint32_t byte = (uint32_t)(unsigned char)data[i];
+        crc = table[(crc ^ byte) & 0x0Fu] ^ (crc >> 4);
+        crc = table[(crc ^ (byte >> 4)) & 0x0Fu] ^ (crc >> 4);
+    }
+    return crc ^ 0xFFFFFFFFu;
+}
+
+typedef enum {
+    CHECKSUM_ALGORITHM_INVALID = 0,
+    CHECKSUM_ALGORITHM_CRC32_IEEE_V1 = 1,
+    CHECKSUM_ALGORITHM_FNV1A32_LEGACY_V1 = 2
+} ChecksumAlgorithm;
+
+static ChecksumAlgorithm checksum_algorithm_from_name(const char *name) {
+    if (strcmp(name, "crc32-ieee-v1") == 0) {
+        return CHECKSUM_ALGORITHM_CRC32_IEEE_V1;
+    }
+    if (strcmp(name, "fnv1a32-legacy-v1") == 0) {
+        return CHECKSUM_ALGORITHM_FNV1A32_LEGACY_V1;
+    }
+    return CHECKSUM_ALGORITHM_INVALID;
+}
+
+static uint32_t checksum32_for_algorithm_nogil(
+    const char *data,
+    Py_ssize_t len,
+    ChecksumAlgorithm algorithm
+) {
+    if (algorithm == CHECKSUM_ALGORITHM_CRC32_IEEE_V1) {
+        return crc32_ieee_nogil(data, len);
+    }
+    return fnv1a32(data, len);
+}
+
+typedef enum {
+    UTF8_ERROR_NONE = 0,
+    UTF8_ERROR_INVALID_START = 1,
+    UTF8_ERROR_INVALID_CONTINUATION = 2,
+    UTF8_ERROR_TRUNCATED = 3,
+    UTF8_ERROR_OVERLONG = 4,
+    UTF8_ERROR_SURROGATE = 5,
+    UTF8_ERROR_OUT_OF_RANGE = 6,
+    UTF8_ERROR_BOUND_CAPACITY = 7
+} UTF8ErrorCode;
+
+typedef struct {
+    UTF8ErrorCode code;
+    Py_ssize_t start;
+    Py_ssize_t end;
+} UTF8Error;
+
+static int utf8_is_continuation(unsigned char value) {
+    return value >= 0x80u && value <= 0xBFu;
+}
+
+static int utf8_width_nogil(
+    const unsigned char *data,
+    Py_ssize_t len,
+    Py_ssize_t position,
+    Py_ssize_t *width,
+    UTF8Error *error
+) {
+    unsigned char lead = data[position];
+    Py_ssize_t remaining = len - position;
+    unsigned char second;
+    Py_ssize_t expected = 0;
+
+    if (lead <= 0x7Fu) {
+        *width = 1;
+        return 1;
+    }
+    if (lead >= 0xC2u && lead <= 0xDFu) {
+        expected = 2;
+    } else if (lead >= 0xE0u && lead <= 0xEFu) {
+        expected = 3;
+    } else if (lead >= 0xF0u && lead <= 0xF4u) {
+        expected = 4;
+    } else {
+        error->code = UTF8_ERROR_INVALID_START;
+        error->start = position;
+        error->end = position + 1;
+        return 0;
+    }
+    if (remaining < expected) {
+        error->code = UTF8_ERROR_TRUNCATED;
+        error->start = position;
+        error->end = len;
+        return 0;
+    }
+    for (Py_ssize_t offset = 1; offset < expected; ++offset) {
+        if (!utf8_is_continuation(data[position + offset])) {
+            error->code = UTF8_ERROR_INVALID_CONTINUATION;
+            error->start = position + offset;
+            error->end = position + offset + 1;
+            return 0;
+        }
+    }
+    second = data[position + 1];
+    if (lead == 0xE0u && second < 0xA0u) {
+        error->code = UTF8_ERROR_OVERLONG;
+        error->start = position;
+        error->end = position + expected;
+        return 0;
+    }
+    if (lead == 0xEDu && second > 0x9Fu) {
+        error->code = UTF8_ERROR_SURROGATE;
+        error->start = position;
+        error->end = position + expected;
+        return 0;
+    }
+    if (lead == 0xF0u && second < 0x90u) {
+        error->code = UTF8_ERROR_OVERLONG;
+        error->start = position;
+        error->end = position + expected;
+        return 0;
+    }
+    if (lead == 0xF4u && second > 0x8Fu) {
+        error->code = UTF8_ERROR_OUT_OF_RANGE;
+        error->start = position;
+        error->end = position + expected;
+        return 0;
+    }
+    *width = expected;
+    return 1;
+}
+
+static Py_ssize_t utf8_plan_bounds_nogil(
+    const unsigned char *data,
+    Py_ssize_t len,
+    Py_ssize_t chunk_size,
+    Py_ssize_t *bounds,
+    Py_ssize_t capacity,
+    UTF8Error *error
+) {
+    Py_ssize_t position = 0;
+    Py_ssize_t chunk_start = 0;
+    Py_ssize_t count = 0;
+
+    error->code = UTF8_ERROR_NONE;
+    error->start = 0;
+    error->end = 0;
+    while (position < len) {
+        Py_ssize_t width = 0;
+        Py_ssize_t used = position - chunk_start;
+        if (!utf8_width_nogil(data, len, position, &width, error)) {
+            return -1;
+        }
+        if (position > chunk_start && width > chunk_size - used) {
+            if (count >= capacity) {
+                error->code = UTF8_ERROR_BOUND_CAPACITY;
+                return -1;
+            }
+            bounds[count++] = position;
+            chunk_start = position;
+        }
+        position += width;
+        if (position - chunk_start >= chunk_size) {
+            if (count >= capacity) {
+                error->code = UTF8_ERROR_BOUND_CAPACITY;
+                return -1;
+            }
+            bounds[count++] = position;
+            chunk_start = position;
+        }
+    }
+    if (position > chunk_start) {
+        if (count >= capacity) {
+            error->code = UTF8_ERROR_BOUND_CAPACITY;
+            return -1;
+        }
+        bounds[count++] = position;
+    }
+    return count;
+}
+
+static const char *utf8_error_reason(UTF8ErrorCode code) {
+    switch (code) {
+        case UTF8_ERROR_INVALID_START: return "invalid start byte";
+        case UTF8_ERROR_INVALID_CONTINUATION: return "invalid continuation byte";
+        case UTF8_ERROR_TRUNCATED: return "unexpected end of data";
+        case UTF8_ERROR_OVERLONG: return "invalid overlong encoding";
+        case UTF8_ERROR_SURROGATE: return "UTF-8 surrogate encoding";
+        case UTF8_ERROR_OUT_OF_RANGE: return "code point exceeds U+10FFFF";
+        default: return "invalid UTF-8";
+    }
+}
+
+static void utf8_raise_decode_error(const TDSStableInput *input, const UTF8Error *error) {
+    PyObject *exception = PyUnicodeDecodeError_Create(
+        "utf-8",
+        input->data,
+        input->len,
+        error->start,
+        error->end,
+        utf8_error_reason(error->code)
+    );
+    if (exception != NULL) {
+        PyErr_SetObject(PyExc_UnicodeDecodeError, exception);
+        Py_DECREF(exception);
+    }
 }
 
 static Py_ssize_t round_pow2(Py_ssize_t n) {
@@ -623,6 +899,8 @@ static void pop_handles_nogil(NativeHandleIndex *self, const char **keys, Py_ssi
 }
 
 static PyObject *NativeHandleIndex_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
+    (void)args;
+    (void)kwds;
     NativeHandleIndex *self = (NativeHandleIndex*)type->tp_alloc(type, 0);
     if (!self) return NULL;
     memset((char*)self + sizeof(PyObject), 0, sizeof(NativeHandleIndex) - sizeof(PyObject));
@@ -859,8 +1137,6 @@ static PyObject *NativeHandleIndex_stats(NativeHandleIndex *self, PyObject *Py_U
     return d;
 }
 
-static uint32_t checksum32_nogil(const char *data, Py_ssize_t len) { return fnv1a32(data, len); }
-
 
 /* =============================================================================
  * v2.8.9 Native Spiral Rank scoring engine
@@ -877,6 +1153,7 @@ static inline double tds_clamp01(double x) {
 }
 
 static PyObject *module_spiral_rank_scores(PyObject *self, PyObject *args, PyObject *kwargs) {
+    (void)self;
     PyObject *scores_obj = NULL;
     PyObject *conf_obj = Py_None;
     PyObject *depth_obj = Py_None;
@@ -974,103 +1251,205 @@ fail:
     return NULL;
 }
 
-static PyObject *module_checksum32(PyObject *self, PyObject *args) {
-    const char *data; Py_ssize_t len; uint32_t out;
-    if (!PyArg_ParseTuple(args, "y#", &data, &len)) return NULL;
+static PyObject *module_checksum32_legacy(PyObject *self, PyObject *args) {
+    PyObject *payload = NULL;
+    TDSStableInput input;
+    uint32_t out;
+    (void)self;
+    if (!PyArg_ParseTuple(args, "O", &payload)) return NULL;
+    if (stable_input_acquire(payload, &input, "checksum") < 0) return NULL;
     diag_note_gil_released(DIAG_COUNTER_NATIVE_CHECKSUM_CALLS);
     Py_BEGIN_ALLOW_THREADS
-    out = checksum32_nogil(data, len);
+    out = checksum32_for_algorithm_nogil(
+        input.data,
+        input.len,
+        CHECKSUM_ALGORITHM_FNV1A32_LEGACY_V1
+    );
     Py_END_ALLOW_THREADS
+    stable_input_release(&input);
     return PyLong_FromUnsignedLong((unsigned long)out);
 }
 
-static PyObject *module_checksum32_many(PyObject *self, PyObject *args) {
-    PyObject *seq;
-    if (!PyArg_ParseTuple(args, "O", &seq)) return NULL;
-    diag_note_gil_released(DIAG_COUNTER_NATIVE_CHECKSUM_BATCH_CALLS);
-    PyObject *fast = PySequence_Fast(seq, "checksum32_many expects an iterable of bytes-like objects");
-    if (!fast) return NULL;
-    Py_ssize_t n = PySequence_Fast_GET_SIZE(fast);
-    PyObject **items = PySequence_Fast_ITEMS(fast);
-    const char **ptrs = (const char**)calloc((size_t)n, sizeof(char*));
-    Py_ssize_t *lens = (Py_ssize_t*)calloc((size_t)n, sizeof(Py_ssize_t));
-    uint32_t *outs = (uint32_t*)calloc((size_t)n, sizeof(uint32_t));
-    if (!ptrs || !lens || !outs) {
-        Py_DECREF(fast); free(ptrs); free(lens); free(outs); PyErr_NoMemory(); return NULL;
+static PyObject *module_checksum32_for_algorithm(PyObject *self, PyObject *args) {
+    PyObject *payload = NULL;
+    const char *algorithm_name = NULL;
+    ChecksumAlgorithm algorithm;
+    TDSStableInput input;
+    uint32_t out;
+    (void)self;
+    if (!PyArg_ParseTuple(args, "Os", &payload, &algorithm_name)) return NULL;
+    algorithm = checksum_algorithm_from_name(algorithm_name);
+    if (algorithm == CHECKSUM_ALGORITHM_INVALID) {
+        PyErr_Format(PyExc_ValueError, "unsupported checksum algorithm: %s", algorithm_name);
+        return NULL;
     }
-    /* Acquire stable buffers before releasing the GIL. */
-    Py_buffer *views = (Py_buffer*)calloc((size_t)n, sizeof(Py_buffer));
-    if (!views) { Py_DECREF(fast); free(ptrs); free(lens); free(outs); PyErr_NoMemory(); return NULL; }
-    for (Py_ssize_t i = 0; i < n; ++i) {
-        if (PyObject_GetBuffer(items[i], &views[i], PyBUF_SIMPLE) < 0) {
-            for (Py_ssize_t j = 0; j < i; ++j) PyBuffer_Release(&views[j]);
-            Py_DECREF(fast); free(ptrs); free(lens); free(outs); free(views); return NULL;
-        }
-        ptrs[i] = (const char*)views[i].buf;
-        lens[i] = views[i].len;
-    }
+    if (stable_input_acquire(payload, &input, "checksum") < 0) return NULL;
+    diag_note_gil_released(DIAG_COUNTER_NATIVE_CHECKSUM_CALLS);
     Py_BEGIN_ALLOW_THREADS
-    for (Py_ssize_t i = 0; i < n; ++i) outs[i] = checksum32_nogil(ptrs[i], lens[i]);
+    out = checksum32_for_algorithm_nogil(input.data, input.len, algorithm);
     Py_END_ALLOW_THREADS
-    PyObject *list = PyList_New(n);
-    if (!list) {
-        for (Py_ssize_t i = 0; i < n; ++i) PyBuffer_Release(&views[i]);
-        Py_DECREF(fast); free(ptrs); free(lens); free(outs); free(views); return NULL;
+    stable_input_release(&input);
+    return PyLong_FromUnsignedLong((unsigned long)out);
+}
+
+static PyObject *checksum32_many_impl(
+    PyObject *sequence,
+    ChecksumAlgorithm algorithm,
+    const char *error_message
+) {
+    PyObject *fast = PySequence_Fast(sequence, error_message);
+    TDSStableInput *inputs = NULL;
+    uint32_t *outputs = NULL;
+    PyObject *list = NULL;
+    Py_ssize_t n;
+    Py_ssize_t acquired = 0;
+
+    if (fast == NULL) return NULL;
+    n = PySequence_Fast_GET_SIZE(fast);
+    if (n == 0) {
+        Py_DECREF(fast);
+        return PyList_New(0);
+    }
+    if ((size_t)n > SIZE_MAX / sizeof(TDSStableInput)
+            || (size_t)n > SIZE_MAX / sizeof(uint32_t)) {
+        Py_DECREF(fast);
+        PyErr_SetString(PyExc_OverflowError, "checksum batch allocation overflow");
+        return NULL;
+    }
+    inputs = (TDSStableInput *)PyMem_Calloc((size_t)n, sizeof(TDSStableInput));
+    outputs = (uint32_t *)PyMem_Malloc((size_t)n * sizeof(uint32_t));
+    if (inputs == NULL || outputs == NULL) {
+        Py_DECREF(fast);
+        PyMem_Free(inputs);
+        PyMem_Free(outputs);
+        PyErr_NoMemory();
+        return NULL;
     }
     for (Py_ssize_t i = 0; i < n; ++i) {
-        PyObject *v = PyLong_FromUnsignedLong((unsigned long)outs[i]);
-        if (!v) { Py_DECREF(list); list = NULL; break; }
-        PyList_SET_ITEM(list, i, v);
+        PyObject *item = PySequence_Fast_GET_ITEM(fast, i);
+        if (stable_input_acquire(item, &inputs[i], "checksum") < 0) {
+            goto done;
+        }
+        acquired += 1;
     }
-    for (Py_ssize_t i = 0; i < n; ++i) PyBuffer_Release(&views[i]);
-    Py_DECREF(fast); free(ptrs); free(lens); free(outs); free(views);
+    diag_note_gil_released(DIAG_COUNTER_NATIVE_CHECKSUM_BATCH_CALLS);
+    Py_BEGIN_ALLOW_THREADS
+    for (Py_ssize_t i = 0; i < n; ++i) {
+        outputs[i] = checksum32_for_algorithm_nogil(inputs[i].data, inputs[i].len, algorithm);
+    }
+    Py_END_ALLOW_THREADS
+    list = PyList_New(n);
+    if (list == NULL) goto done;
+    for (Py_ssize_t i = 0; i < n; ++i) {
+        PyObject *value = PyLong_FromUnsignedLong((unsigned long)outputs[i]);
+        if (value == NULL) {
+            Py_CLEAR(list);
+            goto done;
+        }
+        PyList_SET_ITEM(list, i, value);
+    }
+
+done:
+    for (Py_ssize_t i = 0; i < acquired; ++i) stable_input_release(&inputs[i]);
+    PyMem_Free(inputs);
+    PyMem_Free(outputs);
+    Py_DECREF(fast);
     return list;
 }
 
-static Py_ssize_t utf8_safe_cut_nogil(const unsigned char *buf, Py_ssize_t n, Py_ssize_t limit) {
-    if (limit >= n) return n;
-    if (limit <= 0) return 0;
-    Py_ssize_t cut = limit;
-    while (cut > 0 && (buf[cut] & 0xC0) == 0x80) cut--;
-    if (cut == 0) return limit;
-    unsigned char lead = buf[cut];
-    Py_ssize_t need = 1;
-    if ((lead & 0x80) == 0) need = 1;
-    else if ((lead & 0xE0) == 0xC0) need = 2;
-    else if ((lead & 0xF0) == 0xE0) need = 3;
-    else if ((lead & 0xF8) == 0xF0) need = 4;
-    else return cut;
-    return (cut + need <= limit) ? limit : cut;
+static PyObject *module_checksum32_many_legacy(PyObject *self, PyObject *args) {
+    PyObject *sequence = NULL;
+    (void)self;
+    if (!PyArg_ParseTuple(args, "O", &sequence)) return NULL;
+    return checksum32_many_impl(
+        sequence,
+        CHECKSUM_ALGORITHM_FNV1A32_LEGACY_V1,
+        "checksum32_many expects an iterable of bytes-like objects"
+    );
+}
+
+static PyObject *module_checksum32_many_for_algorithm(PyObject *self, PyObject *args) {
+    PyObject *sequence = NULL;
+    const char *algorithm_name = NULL;
+    ChecksumAlgorithm algorithm;
+    (void)self;
+    if (!PyArg_ParseTuple(args, "Os", &sequence, &algorithm_name)) return NULL;
+    algorithm = checksum_algorithm_from_name(algorithm_name);
+    if (algorithm == CHECKSUM_ALGORITHM_INVALID) {
+        PyErr_Format(PyExc_ValueError, "unsupported checksum algorithm: %s", algorithm_name);
+        return NULL;
+    }
+    return checksum32_many_impl(
+        sequence,
+        algorithm,
+        "checksum32_many_for_algorithm expects an iterable of bytes-like objects"
+    );
 }
 
 static PyObject *module_utf8_chunk_bounds(PyObject *self, PyObject *args) {
-    const char *data; Py_ssize_t len; Py_ssize_t chunk;
-    if (!PyArg_ParseTuple(args, "y#n", &data, &len, &chunk)) return NULL;
+    PyObject *payload = NULL;
+    Py_ssize_t chunk_size = 0;
+    TDSStableInput input;
+    Py_ssize_t *bounds = NULL;
+    Py_ssize_t count;
+    PyObject *list = NULL;
+    UTF8Error error;
+    (void)self;
+
+    if (!PyArg_ParseTuple(args, "On", &payload, &chunk_size)) return NULL;
+    if (chunk_size <= 0) {
+        PyErr_SetString(PyExc_ValueError, "chunk size must be positive");
+        return NULL;
+    }
+    if (stable_input_acquire(payload, &input, "UTF-8") < 0) return NULL;
+    if (input.len == 0) {
+        stable_input_release(&input);
+        return PyList_New(0);
+    }
+    if ((size_t)input.len > SIZE_MAX / sizeof(Py_ssize_t)) {
+        stable_input_release(&input);
+        PyErr_SetString(PyExc_OverflowError, "UTF-8 boundary allocation overflow");
+        return NULL;
+    }
+    bounds = (Py_ssize_t *)PyMem_Malloc((size_t)input.len * sizeof(Py_ssize_t));
+    if (bounds == NULL) {
+        stable_input_release(&input);
+        PyErr_NoMemory();
+        return NULL;
+    }
     diag_note_gil_released(DIAG_COUNTER_NATIVE_CHUNK_SCAN_CALLS);
-    if (chunk <= 0) { PyErr_SetString(PyExc_ValueError, "chunk size must be positive"); return NULL; }
-    Py_ssize_t cap = (len / chunk) + 2;
-    Py_ssize_t *bounds = (Py_ssize_t*)calloc((size_t)cap, sizeof(Py_ssize_t));
-    if (!bounds) { PyErr_NoMemory(); return NULL; }
-    Py_ssize_t count = 0;
     Py_BEGIN_ALLOW_THREADS
-    Py_ssize_t pos = 0;
-    while (pos < len) {
-        Py_ssize_t limit = pos + chunk;
-        Py_ssize_t next = utf8_safe_cut_nogil((const unsigned char*)data + pos, len - pos, chunk) + pos;
-        if (next <= pos) next = (limit < len) ? limit : len;
-        bounds[count++] = next;
-        if (count >= cap) break;
-        pos = next;
-    }
+    count = utf8_plan_bounds_nogil(
+        (const unsigned char *)input.data,
+        input.len,
+        chunk_size,
+        bounds,
+        input.len,
+        &error
+    );
     Py_END_ALLOW_THREADS
-    PyObject *list = PyList_New(count);
-    if (!list) { free(bounds); return NULL; }
-    for (Py_ssize_t i = 0; i < count; ++i) {
-        PyObject *v = PyLong_FromSsize_t(bounds[i]);
-        if (!v) { Py_DECREF(list); free(bounds); return NULL; }
-        PyList_SET_ITEM(list, i, v);
+    if (count < 0) {
+        if (error.code == UTF8_ERROR_BOUND_CAPACITY) {
+            PyErr_SetString(PyExc_OverflowError, "UTF-8 boundary capacity exceeded");
+        } else {
+            utf8_raise_decode_error(&input, &error);
+        }
+        goto done;
     }
-    free(bounds);
+    list = PyList_New(count);
+    if (list == NULL) goto done;
+    for (Py_ssize_t i = 0; i < count; ++i) {
+        PyObject *value = PyLong_FromSsize_t(bounds[i]);
+        if (value == NULL) {
+            Py_CLEAR(list);
+            goto done;
+        }
+        PyList_SET_ITEM(list, i, value);
+    }
+
+done:
+    PyMem_Free(bounds);
+    stable_input_release(&input);
     return list;
 }
 
@@ -1101,10 +1480,12 @@ static PyTypeObject NativeHandleIndexType = {
 };
 
 static PyMethodDef module_methods[] = {
-    {"checksum32", module_checksum32, METH_VARARGS, "FNV-1a 32-bit checksum with GIL released."},
-    {"checksum32_many", module_checksum32_many, METH_VARARGS, "Batch FNV-1a 32-bit checksums with the GIL released."},
+    {"checksum32", module_checksum32_legacy, METH_VARARGS, "Historical FNV-1a 32-bit checksum over an immutable input snapshot."},
+    {"checksum32_many", module_checksum32_many_legacy, METH_VARARGS, "Historical batch FNV-1a checksums over immutable input snapshots."},
+    {"checksum32_for_algorithm", module_checksum32_for_algorithm, METH_VARARGS, "Compute a registered 32-bit checksum over an immutable input snapshot."},
+    {"checksum32_many_for_algorithm", module_checksum32_many_for_algorithm, METH_VARARGS, "Compute registered 32-bit checksums over immutable input snapshots."},
     {"spiral_rank_scores", (PyCFunction)module_spiral_rank_scores, METH_VARARGS | METH_KEYWORDS, "Native Spiral rank scoring loop with released GIL."},
-    {"utf8_chunk_bounds", module_utf8_chunk_bounds, METH_VARARGS, "Return UTF-8 safe chunk end offsets with GIL released."},
+    {"utf8_chunk_bounds", module_utf8_chunk_bounds, METH_VARARGS, "Return strict RFC 3629 complete-codepoint chunk boundaries."},
     {"diag_snapshot", (PyCFunction)module_diag_snapshot, METH_VARARGS | METH_KEYWORDS, "Return immutable native diagnostic snapshot."},
     {"diag_reset", module_diag_reset, METH_NOARGS, "Reset native diagnostic counters and event ring."},
     {"diag_set_enabled", module_diag_set_enabled, METH_VARARGS, "Enable or disable native diagnostics."},
@@ -1134,7 +1515,15 @@ PyMODINIT_FUNC PyInit__native_index(void) {
         Py_DECREF(m);
         return NULL;
     }
-    if (PyModule_AddStringConstant(m, "TDS_NATIVE_CAPABILITIES", "index,checksum32,spiral_rank,utf8_chunks,diagnostics") < 0) {
+    if (PyModule_AddStringConstant(m, "TDS_NATIVE_CAPABILITIES", "index,checksum32,checksum_registry,spiral_rank,utf8_chunks,utf8_strict,diagnostics") < 0) {
+        Py_DECREF(m);
+        return NULL;
+    }
+    if (PyModule_AddStringConstant(m, "TDS_NATIVE_CHECKSUM_ALGORITHMS", "crc32-ieee-v1,fnv1a32-legacy-v1") < 0) {
+        Py_DECREF(m);
+        return NULL;
+    }
+    if (PyModule_AddStringConstant(m, "TDS_NATIVE_UTF8_CHUNK_CONTRACT", "strict-rfc3629-complete-codepoints-v1") < 0) {
         Py_DECREF(m);
         return NULL;
     }

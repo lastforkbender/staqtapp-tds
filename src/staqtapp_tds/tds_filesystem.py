@@ -41,6 +41,15 @@ from staqtapp_tds.provenance import ProvenanceTag, ProvenanceClass
 from staqtapp_tds.radix import RadixDirectoryRouter
 from staqtapp_tds.config import RuntimeConfig, ConfigRegistry
 from staqtapp_tds.crypto import CryptoProvider, NoopCryptoProvider
+from staqtapp_tds.native.checksums import (
+    DEFAULT_CHECKSUM32_ALGORITHM,
+    checksum32_many as registered_checksum32_many,
+    manifest_checksum32_algorithm,
+)
+from staqtapp_tds.native.utf8 import (
+    UTF8_CHUNK_CONTRACT,
+    utf8_chunk_bounds as registered_utf8_chunk_bounds,
+)
 
 try:
     from numba import njit, prange
@@ -788,64 +797,44 @@ class TDSEntry:
 # ////////////////////////////////////////////////////////////////////////////////
 
 
-def _native_checksum32_many(chunks: List[bytes]) -> Tuple[List[int], str]:
-    """Return per-chunk FNV-1a checksums, batching in native code when present."""
-    if not chunks:
-        return [], "empty"
-    try:
-        from staqtapp_tds import _native_index  # type: ignore
-        if hasattr(_native_index, "checksum32_many"):
-            return [int(v) for v in _native_index.checksum32_many(chunks)], "native"
-    except Exception:
-        pass
-    return [zlib.crc32(c) & 0xFFFFFFFF for c in chunks], "python"
+def _native_checksum32_many(
+    chunks: List[bytes],
+    *,
+    algorithm: str = DEFAULT_CHECKSUM32_ALGORITHM,
+) -> Tuple[List[int], str]:
+    """Return registered per-chunk checksums over immutable input snapshots."""
+
+    values, backend = registered_checksum32_many(chunks, algorithm=algorithm)
+    return [int(value) for value in values], backend
+
+
+def _split_utf8_chunks_with_evidence(
+    raw: bytes,
+    chunk_size: int,
+) -> Tuple[List[bytes], str]:
+    """Split strict UTF-8 bytes and report the qualified boundary backend."""
+
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be positive")
+    bounds, backend = registered_utf8_chunk_bounds(raw, int(chunk_size))
+    start = 0
+    chunks: List[bytes] = []
+    for end in bounds:
+        if end <= start or end > len(raw):
+            raise ValueError("UTF-8 chunk boundaries are not strictly increasing")
+        chunk = raw[start:end]
+        chunk.decode("utf-8")
+        chunks.append(chunk)
+        start = end
+    if start != len(raw):
+        raise ValueError("UTF-8 chunk boundaries do not cover the full input")
+    return chunks, backend
 
 
 def _split_utf8_chunks(raw: bytes, chunk_size: int) -> List[bytes]:
-    """Split UTF-8 encoded bytes without cutting through a code point.
+    """Compatibility wrapper returning strict complete-codepoint UTF-8 chunks."""
 
-    v2.6 first attempts the native UTF-8 boundary scanner, which releases the
-    GIL while walking the payload. If the optional extension is unavailable, the
-    existing pure-Python splitter remains the deterministic fallback.
-    """
-    if chunk_size <= 0:
-        raise ValueError("chunk_size must be positive")
-    try:
-        from staqtapp_tds import _native_index  # optional extension
-        bounds = [int(x) for x in _native_index.utf8_chunk_bounds(raw, int(chunk_size))]
-        if bounds:
-            start = 0
-            chunks: List[bytes] = []
-            for end in bounds:
-                if end < start or end > len(raw):
-                    raise ValueError("native utf8_chunk_bounds returned invalid bounds")
-                chunks.append(raw[start:end])
-                start = end
-            if start == len(raw):
-                return chunks
-    except Exception:
-        pass
-    chunks: List[bytes] = []
-    i = 0
-    n = len(raw)
-    while i < n:
-        end = min(i + chunk_size, n)
-        while end > i:
-            try:
-                raw[i:end].decode('utf-8')
-                break
-            except UnicodeDecodeError:
-                end -= 1
-        if end == i:
-            end = min(i + 4, n)
-            while end <= n:
-                try:
-                    raw[i:end].decode('utf-8')
-                    break
-                except UnicodeDecodeError:
-                    end += 1
-        chunks.append(raw[i:end])
-        i = end
+    chunks, _backend = _split_utf8_chunks_with_evidence(raw, chunk_size)
     return chunks
 
 class TDSDirectory:
@@ -1084,8 +1073,13 @@ class TDSDirectory:
         raw = text.encode('utf-8')
         prefix = self._text_chunk_prefix(name)
         chunk_scan_start = time.perf_counter_ns()
-        chunks_raw = _split_utf8_chunks(raw, int(chunk_size)) or [b'']
-        chunk_checksums, chunk_checksum_backend = _native_checksum32_many(chunks_raw)
+        chunks_raw, chunk_boundary_backend = _split_utf8_chunks_with_evidence(
+            raw, int(chunk_size)
+        )
+        chunks_raw = chunks_raw or [b'']
+        chunk_checksums, chunk_checksum_backend = _native_checksum32_many(
+            chunks_raw, algorithm=DEFAULT_CHECKSUM32_ALGORITHM
+        )
         if len(chunk_checksums) != len(chunks_raw):
             self.telemetry_manager.record_chunk_transition("quarantined")
             return TDSResult.fail(TDSResultCode.TEXT_CHUNK_CHECKSUM_ERROR, 'Chunk checksum batch returned inconsistent length.', name=name, path=self.path())
@@ -1109,21 +1103,51 @@ class TDSDirectory:
             'chunk_size': int(chunk_size), 'chunk_size_unit': 'utf8_bytes',
             'chunks': chunk_names, 'content_hash': content_hash_bytes(raw),
             'raw_size': len(raw), 'chunk_count': len(chunk_names),
-            'chunk_checksums32': chunk_checksums, 'chunk_checksum_backend': chunk_checksum_backend,
+            'chunk_checksums32': chunk_checksums,
+            'chunk_checksum_algorithm': DEFAULT_CHECKSUM32_ALGORITHM,
+            'chunk_checksum_backend': chunk_checksum_backend,
+            'chunk_boundary_contract': UTF8_CHUNK_CONTRACT,
+            'chunk_boundary_backend': chunk_boundary_backend,
         }
         self._write_entry(name, manifest, fmt_id=FmtID.JSON_UTF8, compress=False)
         self.telemetry_manager.record_chunk(len(chunk_names), time.perf_counter_ns() - chunk_scan_start)
-        return TDSResult.success(TDSResultCode.TEXT_CHUNKED_WRITTEN if not exists else TDSResultCode.TEXT_CHUNKED_OVERWRITTEN, 'Chunked text entry stored.', name=name, path=self.path(), meta={'chunks': len(chunk_names), 'content_hash': manifest['content_hash'], 'raw_size': len(raw), 'chunk_checksum_backend': chunk_checksum_backend})
+        return TDSResult.success(
+            TDSResultCode.TEXT_CHUNKED_WRITTEN
+            if not exists
+            else TDSResultCode.TEXT_CHUNKED_OVERWRITTEN,
+            'Chunked text entry stored.',
+            name=name,
+            path=self.path(),
+            meta={
+                'chunks': len(chunk_names),
+                'content_hash': manifest['content_hash'],
+                'raw_size': len(raw),
+                'chunk_checksum_algorithm': DEFAULT_CHECKSUM32_ALGORITHM,
+                'chunk_checksum_backend': chunk_checksum_backend,
+                'chunk_boundary_contract': UTF8_CHUNK_CONTRACT,
+                'chunk_boundary_backend': chunk_boundary_backend,
+            },
+        )
 
     def read_text(self, name: str) -> str:
         value = self.read_value(name)
         if isinstance(value, dict) and value.get('kind') == 'TEXT_CHUNKED_UTF8':
             chunk_names = list(value.get('chunks', []) or [])
             parts = [self.read_value(chunk_name) for chunk_name in chunk_names]
+            boundary_contract = value.get('chunk_boundary_contract')
+            if boundary_contract is not None and boundary_contract != UTF8_CHUNK_CONTRACT:
+                self.telemetry_manager.record_chunk_transition("quarantined")
+                raise ValueError(
+                    f"Unsupported UTF-8 chunk boundary contract for {name!r}: "
+                    f"{boundary_contract!r}"
+                )
             expected = value.get('chunk_checksums32')
             if expected is not None:
                 raw_parts = [str(part).encode('utf-8') for part in parts]
-                actual, _backend = _native_checksum32_many(raw_parts)
+                algorithm = manifest_checksum32_algorithm(value)
+                actual, _backend = _native_checksum32_many(
+                    raw_parts, algorithm=algorithm
+                )
                 if [int(v) for v in expected] != [int(v) for v in actual]:
                     self.telemetry_manager.record_chunk_transition("quarantined")
                     raise ValueError(f"Chunk checksum mismatch for {name!r}")
