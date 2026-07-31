@@ -54,9 +54,9 @@ Input consists of:
 
 The first offset is zero, offsets are strictly increasing and in bounds, and
 the final offset equals the key-byte length. Empty key spans are rejected.
-Every offset is validated before any output
-byte is changed. Missing keys are encoded as signed `int64 -1`, whose canonical
-little-endian bytes are eight `0xff` values.
+Every offset is validated before any output byte is changed. Missing keys are
+encoded as signed `int64 -1`, whose canonical little-endian bytes are eight
+`0xff` values.
 
 The compatibility ceiling is 65,536 keys per packed call. The future Trace Rank
 ABI request profile may only narrow that bound.
@@ -92,24 +92,12 @@ aggregate distributions. Its output is performance evidence only. The Phase-2
 scaling gate must be replayed on a named reference CPU and bound to exact source,
 workload, hardware, and sample identities before release qualification.
 
-## Cross-architecture semantic parity
+## Remaining Phase-2 proofs
 
-Phase 2 requires the native truth surfaces to produce one semantic result on
-x86-64 and AArch64. `tools/architecture_parity_v360_native.py` projects only
-canonical contracts and deterministic results from the checksum registry,
-strict UTF-8 boundaries, CSV scan/offset kernels, handle generation/reference
-validation, immutable freeze, and caller-owned packed lookup.
-
-The projection deliberately excludes process-local namespace and snapshot IDs,
-host paths, wall-clock data, and performance measurements. Canonical JSON is
-rooted with SHA-256. Both native architectures must reproduce:
-
-```text
-6f45762b762ea7931bc185a95a9e9e253bd83ba0b48a9dd12f7ea130fb6cfb36
-```
-
-The release workflow executes the proof on native `x86_64` and `aarch64`
-GitHub-hosted Ubuntu runners. Each lane emits a complete architecture report;
-a root mismatch is a release failure. This evidence proves the bounded Phase-2
-integer/byte semantics covered by the projection. It does not yet qualify a
-waypoint graph, fixed-point planner, sentinel forest, or learned serving path.
+This tranche does not close the full Phase-2 release gate. A separately rooted
+qualification must still prove identical deterministic native semantics on
+`x86_64` and `aarch64`, explicit module lifecycle and cleanup, subinterpreter
+behavior, free-threaded CPython admission, and named-reference-CPU scaling.
+Those proofs may consume this frozen packed interface, but they must not be
+represented as completed merely because the immutable lookup implementation
+qualifies.
