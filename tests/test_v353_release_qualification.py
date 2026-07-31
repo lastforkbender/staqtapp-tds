@@ -107,8 +107,8 @@ def test_release_workflow_makes_publication_depend_on_every_gate() -> None:
     assert workflow.index("build-distributions:") < workflow.index("publish-pypi:")
     assert "needs: release-gates-complete" in workflow
     assert "name: Release gates complete" in workflow
-    assert "github.ref_name == 'v3.5.3.post2'" in workflow
-    assert "staqtapp-tds-3.5.3.post2-distributions" in workflow
+    assert "if: github.ref_type == 'tag'" in workflow
+    assert "staqtapp-tds-distributions" in workflow
     assert "id-token: write" in workflow
     assert not (ROOT / ".github" / "workflows" / "publish.yml").exists()
 
@@ -130,7 +130,7 @@ def test_production_pypi_smoke_covers_every_supported_os() -> None:
     assert "python scripts/verify_pypi_presentation.py" in workflow
     assert "PRESENTATION_RESULT" in workflow
     assert "name: Production PyPI smoke complete" in workflow
-    assert "default: '3.5.3.post2'" in workflow
+    assert "default:" not in workflow.split("inputs:", 1)[1].split("permissions:", 1)[0]
 
     verifier = (ROOT / "scripts" / "verify_pypi_presentation.py").read_text(
         encoding="utf-8"

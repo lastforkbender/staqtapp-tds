@@ -11,8 +11,18 @@ import tomllib
 import subprocess
 import sys
 
+# The release checker scans for bytecode artifacts. Prevent its own helper
+# import from creating a repository-local ``scripts/__pycache__`` first.
+sys.dont_write_bytecode = True
+
+from release_version import (
+    ReleaseVersionError,
+    expected_tag,
+    read_source_version,
+    validate_tag,
+)
+
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "3.5.3.post2"
 BANNED_SUFFIXES = {".so", ".pyd", ".dll", ".dylib", ".pyc"}
 BANNED_DIRS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "build", "dist"}
 BROWSER_CAPTURES = (
@@ -56,9 +66,10 @@ def fail(message: str) -> int:
 
 
 def main() -> int:
-    version_py = ROOT / "src" / "staqtapp_tds" / "version.py"
-    if f'__version__ = "{EXPECTED_VERSION}"' not in version_py.read_text():
-        return fail("src/staqtapp_tds/version.py has an unexpected version")
+    try:
+        expected_version = read_source_version(ROOT)
+    except ReleaseVersionError as exc:
+        return fail(str(exc))
 
     pyproject = ROOT / "pyproject.toml"
     project_data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
@@ -80,9 +91,14 @@ def main() -> int:
         return fail("project URLs do not target the release repository")
 
     if os.environ.get("GITHUB_REF_TYPE") == "tag":
-        expected_tag = f"v{EXPECTED_VERSION}"
-        if os.environ.get("GITHUB_REF_NAME") != expected_tag:
-            return fail(f"release tag must be exactly {expected_tag}")
+        ref_name = os.environ.get("GITHUB_REF_NAME", "")
+        try:
+            validate_tag(ref_name, source_version=expected_version)
+        except ReleaseVersionError as exc:
+            return fail(str(exc))
+        canonical_tag = expected_tag(expected_version)
+        if ref_name != canonical_tag:
+            return fail(f"release tag must be exactly {canonical_tag}")
 
     required_evidence = (
         ROOT / "DEV6_GUARANTEED_STORAGE_TRANSITION_STATUS.txt",
