@@ -98,10 +98,10 @@ jobs:
             tests/test_v360_native_csv_input_safety.py \
             tests/test_v346_csv_native_scan_kernel_prototype.py \
             tests/test_v347_csv_native_row_anchor_kernel.py
-          python scripts/check_release.py
           rm -rf build
           find src -maxdepth 3 -type f \( -name '*.so' -o -name '*.pyd' -o -name '*.dll' -o -name '*.dylib' \) -delete
           find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          python scripts/check_release.py
           git diff --cached --check
       - name: Commit qualified source and remove transfer artifacts
         shell: bash
