@@ -50,11 +50,10 @@ jobs:
           set -euo pipefail
           git merge-base --is-ancestor \
             '062aa0ade4b636b807d8deb3e2f7833990ad7406' HEAD
+          test "$(git hash-object .github/frozen-packed-index.patch.gz.b64)" = \
+            '0caeed8317daef2a3f348ddeeb66a86fe99bbf48'
           tr -d '\r\n' < .github/frozen-packed-index.patch.gz.b64 \
             > /tmp/v360-frozen-packed-index.patch.gz.b64
-          printf '%s  %s\n' \
-            'ad33312a8e7f4ac50d38a14053a4fe06ba2057cada3f73a28b60d921c9242358' \
-            '/tmp/v360-frozen-packed-index.patch.gz.b64' | sha256sum -c -
           base64 --decode /tmp/v360-frozen-packed-index.patch.gz.b64 \
             | gzip --decompress \
             > /tmp/v360-frozen-packed-index.patch
