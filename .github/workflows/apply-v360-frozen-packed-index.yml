@@ -1,0 +1,132 @@
+name: Apply verified v3.6 frozen packed index repair
+
+on:
+  push:
+    branches:
+      - agent/v360-frozen-packed-index
+    paths:
+      - '.github/frozen-packed-index.patch.gz.b64'
+      - '.github/workflows/apply-v360-frozen-packed-index.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-v360-frozen-packed-index
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/v360-frozen-packed-index
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Verify and stage the exact frozen-index repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor \
+            '062aa0ade4b636b807d8deb3e2f7833990ad7406' HEAD
+          tr -d '\r\n' < .github/frozen-packed-index.patch.gz.b64 \
+            > /tmp/v360-frozen-packed-index.patch.gz.b64
+          printf '%s  %s\n' \
+            'ad33312a8e7f4ac50d38a14053a4fe06ba2057cada3f73a28b60d921c9242358' \
+            '/tmp/v360-frozen-packed-index.patch.gz.b64' | sha256sum -c -
+          base64 --decode /tmp/v360-frozen-packed-index.patch.gz.b64 \
+            | gzip --decompress \
+            > /tmp/v360-frozen-packed-index.patch
+          printf '%s  %s\n' \
+            'aa93dac8fe736ab63f5efc2e413fadbef0c16d3545e1a9ec09a24467e4dd4f47' \
+            '/tmp/v360-frozen-packed-index.patch' | sha256sum -c -
+          git apply --check /tmp/v360-frozen-packed-index.patch
+          git apply --index /tmp/v360-frozen-packed-index.patch
+          git rm .github/frozen-packed-index.patch.gz.b64
+          python - <<'PY'
+          import subprocess
+
+          expected = {
+              '.github/frozen-packed-index.patch.gz.b64',
+              'DEV15_NATIVE_FROZEN_PACKED_INDEX_STATUS.txt',
+              'docs/125_v360_Frozen_Packed_Index.md',
+              'scripts/benchmark_v360_frozen_index.py',
+              'scripts/qualify_v360_frozen_tsan.py',
+              'src/staqtapp_tds/_native_index.c',
+              'src/staqtapp_tds/backends/native_index.py',
+              'src/staqtapp_tds/native/manager.py',
+              'tests/test_v360_frozen_packed_index.py',
+          }
+          staged = set(
+              subprocess.check_output(
+                  ['git', 'diff', '--cached', '--name-only'],
+                  text=True,
+              ).splitlines()
+          )
+          if staged != expected:
+              raise SystemExit(
+                  f'unexpected staged paths: missing={sorted(expected-staged)} '
+                  f'extra={sorted(staged-expected)}'
+              )
+          PY
+          git diff --cached --check
+      - name: Build strict native extensions and qualify the repair
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+          STAQTAPP_TDS_BUILD_NATIVE: '1'
+          CFLAGS: '-std=c11 -Wall -Wextra -Werror -Wconversion -Wshadow -Wpedantic -Wno-cast-function-type'
+        run: |
+          set -euo pipefail
+          python -m pip install setuptools wheel pytest numpy PyQt5
+          python setup.py build_ext --inplace --force
+          PYTHONPATH=src python -m pytest -q --disable-warnings -c /dev/null \
+            tests/test_v360_frozen_packed_index.py \
+            tests/test_v360_handle_generation_truth.py \
+            tests/test_v360_diagnostic_ring_truth.py \
+            tests/test_v360_checksum_utf8_truth.py \
+            tests/test_v360_native_csv_input_safety.py \
+            tests/test_v346_csv_native_scan_kernel_prototype.py \
+            tests/test_v347_csv_native_row_anchor_kernel.py
+          PYTHONPATH=src python scripts/benchmark_v360_frozen_index.py \
+            --keys 1024 --iterations 20 --samples 1 --workers 2 \
+            > /tmp/v360-frozen-packed-index-smoke.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path('/tmp/v360-frozen-packed-index-smoke.json').read_text(
+                  encoding='utf-8'
+              )
+          )
+          if report['functional_authority'] is not False:
+              raise SystemExit('candidate benchmark must remain non-authoritative')
+          if report['contracts']['frozen_index'] != (
+              'immutable-rehash-copy;lock-free-read-v1'
+          ):
+              raise SystemExit('unexpected frozen index contract')
+          if report['contracts']['packed_lookup'] != (
+              'keys-bytes;offsets-le64;handles-le-i64;caller-owned-output-v1'
+          ):
+              raise SystemExit('unexpected packed lookup contract')
+          PY
+          rm -rf build
+          find src -maxdepth 3 -type f \
+            \( -name '*.so' -o -name '*.pyd' -o -name '*.dll' -o -name '*.dylib' \) \
+            -delete
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          python scripts/check_release.py
+          git diff --cached --check
+      - name: Commit qualified source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'staqtapp-release-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git commit -m 'Add immutable frozen index and caller-owned packed lookup'
+          git push origin HEAD:agent/v360-frozen-packed-index
