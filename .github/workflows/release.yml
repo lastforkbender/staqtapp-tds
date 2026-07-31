@@ -18,8 +18,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Report checked-out Git tree
-        run: echo "TDS_CHECKED_OUT_TREE=$(git rev-parse HEAD^{tree})"
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
