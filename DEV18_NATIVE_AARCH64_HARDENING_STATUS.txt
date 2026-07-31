@@ -1,0 +1,1 @@
+v3.6.0 candidate: native AArch64 soak, sanitizer, TSan, deterministic fuzz, and one/two/four-worker evidence; qualification pending, no learned serving or version bump.
