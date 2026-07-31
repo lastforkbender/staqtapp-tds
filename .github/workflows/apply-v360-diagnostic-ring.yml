@@ -37,7 +37,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD^^^)" = '0b23507a17b40629485618035b67a93afbe105ef'
+          git merge-base --is-ancestor \
+            '0b23507a17b40629485618035b67a93afbe105ef' HEAD
           tr -d '\r\n' < .github/diagnostic-ring.patch.gz.b64 > /tmp/v360-diagnostic-ring.patch.gz.b64
           printf '%s  %s\n' \
             '99d9828aa1ba8dabef7f41b9580aebae4c84a90a6013b556db0fbc409b1b8871' \
@@ -87,7 +88,7 @@ jobs:
           CFLAGS: '-std=c11 -Wall -Wextra -Werror -Wconversion -Wshadow -Wpedantic -Wno-cast-function-type'
         run: |
           set -euo pipefail
-          python -m pip install pytest numpy PyQt5
+          python -m pip install setuptools wheel pytest numpy PyQt5
           python setup.py build_ext --inplace --force
           PYTHONPATH=src python -m pytest -q --disable-warnings -c /dev/null \
             tests/test_v360_diagnostic_ring_truth.py \
