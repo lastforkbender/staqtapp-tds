@@ -1,0 +1,109 @@
+name: Apply pinned v3.6 native repair source patch
+
+on:
+  push:
+    branches:
+      - agent/v360-native-repair
+    paths:
+      - '.github/native-repair-patch.part-00'
+      - '.github/workflows/apply-v360-native-repair.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-v360-native-repair
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/v360-native-repair
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Verify and stage the exact repair patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = '763a53710f020b603547bf2c7d09c4ee6cc438ba'
+          printf '%s  %s\n' \
+            'cf07fdfde385b874e745c1fcdb5957228fb062543d87253eb4930952ed32939f' \
+            '.github/native-repair-patch.part-00' | sha256sum -c -
+          base64 --decode .github/native-repair-patch.part-00 | gzip --decompress > /tmp/v360-native-repair.patch
+          printf '%s  %s\n' \
+            '52c28440ec12ac51e92818448eba55c7e173e1f1a616dff45dda96cb06b93953' \
+            '/tmp/v360-native-repair.patch' | sha256sum -c -
+          git apply --check /tmp/v360-native-repair.patch
+          git apply --index /tmp/v360-native-repair.patch
+          git reset -- .github/workflows/native-repair.yml
+          rm -f .github/workflows/native-repair.yml
+          git rm .github/native-repair-patch.part-00
+          git rm .github/workflows/apply-v360-native-repair.yml
+          python - <<'PY'
+          import subprocess
+
+          expected = {
+              '.github/native-repair-patch.part-00',
+              '.github/workflows/apply-v360-native-repair.yml',
+              'DEV12_NATIVE_CORRECTNESS_REPAIR_STATUS.txt',
+              'docs/121_v360_Native_Correctness_Repair.md',
+              'setup.py',
+              'src/staqtapp_tds/__init__.py',
+              'src/staqtapp_tds/_csv_scan_kernel.c',
+              'src/staqtapp_tds/_native_index.c',
+              'src/staqtapp_tds/backends/native_index.py',
+              'src/staqtapp_tds/csv_layer/native_row_anchor.py',
+              'src/staqtapp_tds/csv_layer/native_scan.py',
+              'src/staqtapp_tds/diagnostics.py',
+              'src/staqtapp_tds/native/__init__.py',
+              'src/staqtapp_tds/native/checksum.py',
+              'src/staqtapp_tds/native/manager.py',
+              'src/staqtapp_tds/spiral/rank.py',
+              'src/staqtapp_tds/tds_filesystem.py',
+              'tests/test_v360_native_repair.py',
+              'tools/benchmark_v360_frozen_index.py',
+              'tools/fuzz_v360_native_repair.py',
+              'tools/tsan_v360_native_repair.py',
+          }
+          staged = set(subprocess.check_output(
+              ['git', 'diff', '--cached', '--name-only'], text=True
+          ).splitlines())
+          if staged != expected:
+              raise SystemExit(f'unexpected staged paths: missing={sorted(expected-staged)} extra={sorted(staged-expected)}')
+          PY
+          git diff --cached --check
+      - name: Build strict native extensions and run bounded repair qualification
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+          STAQTAPP_TDS_BUILD_NATIVE: '1'
+          STAQTAPP_TDS_STRICT_NATIVE: '1'
+        run: |
+          set -euo pipefail
+          python -m pip install pytest numpy PyQt5
+          python setup.py build_ext --inplace --force
+          PYTHONPATH=src python -m pytest -q --disable-warnings \
+            tests/test_v360_native_repair.py \
+            tests/test_v270_native_diagnostics.py \
+            tests/test_v271_transition_ring.py \
+            tests/test_v302_native_keypool_safety.py \
+            tests/test_v346_csv_native_scan_kernel_prototype.py \
+            tests/test_v347_csv_native_row_anchor_kernel.py
+          rm -rf build
+          find src -maxdepth 3 -type f \( -name '*.so' -o -name '*.pyd' -o -name '*.dll' -o -name '*.dylib' \) -delete
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          git diff --cached --check
+      - name: Commit qualified real source and remove transfer artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'staqtapp-release-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git commit -m 'Implement v3.6 native correctness repair candidate'
+          git push origin HEAD:agent/v360-native-repair
