@@ -1,0 +1,97 @@
+name: Pin qualified v3.6 AArch64 hardening root
+
+on:
+  push:
+    branches:
+      - agent/v360-aarch64-hardening
+    paths:
+      - '.github/workflows/pin-v360-aarch64-hardening-root.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  pin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/v360-aarch64-hardening
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Bind the official native ARM soak root and evidence identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          expected_root = "9ed03c78b6a99e1229808c764bee6bb0770aeb00c3905f40614665411006270a"
+
+          tool_path = Path("tools/aarch64_hardening_v360.py")
+          tool = tool_path.read_text(encoding="utf-8")
+          marker = 'SEMANTIC_DOMAIN = b"TDS-V360-AARCH64-HARDENING-V1\\0"\n'
+          replacement = marker + f'EXPECTED_SEMANTIC_ROOT = "{expected_root}"\n'
+          if marker not in tool or "EXPECTED_SEMANTIC_ROOT" in tool:
+              raise SystemExit("unexpected hardening-root constant state")
+          tool = tool.replace(marker, replacement, 1)
+
+          old_report = '''    report = {\n        "format": FORMAT,\n        "semantic_root": semantic_root(projection),\n        "semantic_projection": projection,\n        "evidence": {\n            "architecture": architecture,\n            "machine": platform.machine(),\n            "processor": platform.processor(),\n            "platform": platform.platform(),\n            "python": sys.version,\n            "byteorder": sys.byteorder,\n            "pointer_bits": calcsize("P") * 8,\n            "logical_cpu_count": os.cpu_count(),\n            "source_commit": source_commit(),\n        },\n        "functional_authority": False,\n        "activation_authority": False,\n        "passed": True,\n    }\n    encoded = json.dumps(report, sort_keys=True, indent=2) + "\\n"\n    if args.output:\n        Path(args.output).write_text(encoded, encoding="utf-8", newline="\\n")\n    print(encoded, end="")\n    return 0\n'''
+          new_report = '''    root = semantic_root(projection)\n    official_profile = (\n        architecture == "aarch64"\n        and args.loops == 256\n        and args.keys == 8192\n        and args.workers == 4\n        and args.iterations == 128\n    )\n    expected_root = EXPECTED_SEMANTIC_ROOT if official_profile else ""\n    root_matches_expected = not expected_root or root == expected_root\n    report = {\n        "format": FORMAT,\n        "semantic_root": root,\n        "expected_semantic_root": expected_root,\n        "root_matches_expected": root_matches_expected,\n        "semantic_projection": projection,\n        "evidence": {\n            "architecture": architecture,\n            "machine": platform.machine(),\n            "processor": platform.processor(),\n            "platform": platform.platform(),\n            "python": sys.version,\n            "byteorder": sys.byteorder,\n            "pointer_bits": calcsize("P") * 8,\n            "logical_cpu_count": os.cpu_count(),\n            "source_commit": source_commit(),\n        },\n        "functional_authority": False,\n        "activation_authority": False,\n        "passed": root_matches_expected,\n    }\n    encoded = json.dumps(report, sort_keys=True, indent=2) + "\\n"\n    if args.output:\n        Path(args.output).write_text(encoded, encoding="utf-8", newline="\\n")\n    print(encoded, end="")\n    return 0 if root_matches_expected else 2\n'''
+          if old_report not in tool:
+              raise SystemExit("expected hardening report block not found")
+          tool_path.write_text(
+              tool.replace(old_report, new_report, 1),
+              encoding="utf-8",
+              newline="\n",
+          )
+
+          test_path = Path("tests/test_v360_aarch64_hardening.py")
+          tests = test_path.read_text(encoding="utf-8")
+          old_assert = '    assert tool.FORMAT == "tds.v360.aarch64-hardening.v1"\n'
+          new_assert = old_assert + (
+              f'    assert tool.EXPECTED_SEMANTIC_ROOT == "{expected_root}"\n'
+              '    assert len(bytes.fromhex(tool.EXPECTED_SEMANTIC_ROOT)) == 32\n'
+          )
+          if old_assert not in tests or "tool.EXPECTED_SEMANTIC_ROOT" in tests:
+              raise SystemExit("unexpected AArch64 hardening test state")
+          test_path.write_text(
+              tests.replace(old_assert, new_assert, 1),
+              encoding="utf-8",
+              newline="\n",
+          )
+
+          doc_path = Path("docs/128_v360_AArch64_Hardening.md")
+          doc = doc_path.read_text(encoding="utf-8")
+          appendix = f'''\n## First qualified native ARM result\n\nThe initial complete hardening run was GitHub Actions run `30662625269` on\nmerge candidate `1ac010b18e0a33a15454f8c97731b391c3313efb`. Every ARM lane\npassed. The official deterministic soak profile is now pinned to:\n\n```text\nsemantic root:\n{expected_root}\n\nloops:       256\nkeys:        8192\nworkers:     4\niterations:  128 per worker\n```\n\nThe hosted four-core Neoverse-N2 evidence recorded a one-worker p50 of\n44.869 million lookups/second, two-worker aggregate p50 of 84.761 million\nlookups/second, and four-worker aggregate p50 of 161.860 million\nlookups/second. That corresponds to 1.8891x two-worker scaling and 3.6074x\nfour-worker scaling, with 94.45% and 90.19% aggregate efficiency. This remains\nshared-runner evidence, not the final named-reference-CPU claim.\n\nThe 10,000-case deterministic fuzz lane rejected all 10,000 malformed packed\nrequests before output mutation and all 10,000 malformed UTF-8 fixtures.\nAddressSanitizer, UndefinedBehaviorSanitizer, ThreadSanitizer, the ARM\nsubinterpreter rejection harness, and the aggregate ARM hardening gate all\npassed.\n'''
+          if "## First qualified native ARM result" in doc:
+              raise SystemExit("qualified ARM result already recorded")
+          doc_path.write_text(doc.rstrip() + "\n" + appendix, encoding="utf-8", newline="\n")
+
+          Path("DEV18_NATIVE_AARCH64_HARDENING_STATUS.txt").write_text(
+              "v3.6.0 candidate: native AArch64 deterministic soak, ASan, UBSan, TSan, 10,000-case fuzz, and four-core scaling qualified; pinned root "
+              + expected_root
+              + "; no learned serving or version bump.\n",
+              encoding="utf-8",
+              newline="\n",
+          )
+          PY
+          python -m py_compile \
+            tools/aarch64_hardening_v360.py \
+            tests/test_v360_aarch64_hardening.py
+          git diff --check
+      - name: Commit pinned ARM qualification source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'staqtapp-release-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add \
+            tools/aarch64_hardening_v360.py \
+            tests/test_v360_aarch64_hardening.py \
+            docs/128_v360_AArch64_Hardening.md \
+            DEV18_NATIVE_AARCH64_HARDENING_STATUS.txt
+          git commit -m 'Pin qualified native AArch64 hardening evidence'
+          git push origin HEAD:agent/v360-aarch64-hardening
