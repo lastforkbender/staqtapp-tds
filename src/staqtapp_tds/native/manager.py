@@ -173,6 +173,18 @@ class NativeEngineManager:
             "packed_lookup_max_keys": int(
                 getattr(module, "TDS_NATIVE_PACKED_LOOKUP_MAX_KEYS", 0)
             ),
+            "module_init": str(
+                getattr(module, "TDS_NATIVE_MODULE_INIT", "")
+            ),
+            "multi_interpreter_policy": str(
+                getattr(module, "TDS_NATIVE_MULTI_INTERPRETER_POLICY", "")
+            ),
+            "gil_policy": str(
+                getattr(module, "TDS_NATIVE_GIL_POLICY", "")
+            ),
+            "reinitialization_policy": str(
+                getattr(module, "TDS_NATIVE_REINITIALIZATION_POLICY", "")
+            ),
             "has_checksum32": hasattr(module, "checksum32"),
             "has_checksum32_for_algorithm": hasattr(
                 module, "checksum32_for_algorithm"

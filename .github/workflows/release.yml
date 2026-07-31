@@ -64,14 +64,25 @@ jobs:
         run: python -m pytest -q --disable-warnings
 
   native-extension-qualification:
-    name: ${{ matrix.os }} native extensions
+    name: ${{ matrix.os }} Python ${{ matrix.python-version }} native extensions
     needs: source-release-checks
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-        python-version: ['3.13']
+        include:
+          - os: ubuntu-latest
+            python-version: '3.10'
+          - os: ubuntu-latest
+            python-version: '3.11'
+          - os: ubuntu-latest
+            python-version: '3.12'
+          - os: ubuntu-latest
+            python-version: '3.13'
+          - os: ubuntu-latest
+            python-version: '3.14'
+          - os: macos-latest
+            python-version: '3.13'
     env:
       STAQTAPP_TDS_BUILD_NATIVE: '1'
     steps:
@@ -122,6 +133,7 @@ jobs:
           set -euo pipefail
           tests=(
             tests/test_v360_frozen_packed_index.py
+            tests/test_v360_native_lifecycle_admission.py
             tests/test_v360_handle_generation_truth.py
             tests/test_v360_diagnostic_ring_truth.py
             tests/test_v360_checksum_utf8_truth.py
@@ -166,6 +178,67 @@ jobs:
           LD_PRELOAD="$tsan_runtime" \
             TSAN_OPTIONS="halt_on_error=1:history_size=7:second_deadlock_stack=1" \
             PYTHONPATH=src python -S tools/tsan_v360_frozen_index.py
+
+  native-lifecycle-admission-qualification:
+    name: Python ${{ matrix.python-version }} native lifecycle admission
+    needs: source-release-checks
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
+    env:
+      STAQTAPP_TDS_BUILD_NATIVE: '1'
+      CFLAGS: '-std=c11 -Wall -Wextra -Werror -Wconversion -Wshadow -Wpedantic -Wno-cast-function-type'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Build strict native extensions
+        run: |
+          python -m pip install setuptools wheel pytest numpy PyQt5
+          python setup.py build_ext --inplace --force
+      - name: Run lifecycle policy qualification
+        run: >-
+          PYTHONPATH=src python -m pytest -q --disable-warnings -c /dev/null
+          tests/test_v360_native_lifecycle_admission.py
+          tests/test_v360_frozen_packed_index.py
+      - name: Compile and run subinterpreter rejection harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c11 $(python3-config --cflags) \
+            -Wall -Wextra -Werror -Wconversion -Wshadow -Wpedantic \
+            tools/subinterpreter_v360_native_admission.c \
+            -o /tmp/subinterpreter-v360-native-admission \
+            $(python3-config --embed --ldflags)
+          /tmp/subinterpreter-v360-native-admission
+
+  native-free-threaded-admission-qualification:
+    name: Python ${{ matrix.python-version }} free-threaded native admission
+    needs: source-release-checks
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.13t', '3.14t']
+    env:
+      STAQTAPP_TDS_BUILD_NATIVE: '1'
+      CFLAGS: '-std=c11 -Wall -Wextra -Werror -Wconversion -Wshadow -Wpedantic -Wno-cast-function-type'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Report free-threaded interpreter
+        run: python -VV
+      - name: Build extension for the free-threaded ABI
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python setup.py build_ext --inplace --force
+      - name: Verify explicit compatibility-GIL admission
+        run: python -X gil=0 -S tools/free_threaded_v360_native_admission.py
 
   native-frozen-format-fuzz:
     name: Native frozen-index deterministic fuzz
@@ -233,6 +306,8 @@ jobs:
       - native-extension-qualification
       - native-sanitizer-qualification
       - native-thread-sanitizer-qualification
+      - native-lifecycle-admission-qualification
+      - native-free-threaded-admission-qualification
       - native-frozen-format-fuzz
       - native-frozen-performance-evidence
     runs-on: ubuntu-latest
@@ -267,6 +342,8 @@ jobs:
       - native-extension-qualification
       - native-sanitizer-qualification
       - native-thread-sanitizer-qualification
+      - native-lifecycle-admission-qualification
+      - native-free-threaded-admission-qualification
       - native-frozen-format-fuzz
       - native-frozen-performance-evidence
       - build-distributions
@@ -280,6 +357,8 @@ jobs:
           NATIVE_RESULT: ${{ needs.native-extension-qualification.result }}
           SANITIZER_RESULT: ${{ needs.native-sanitizer-qualification.result }}
           THREAD_SANITIZER_RESULT: ${{ needs.native-thread-sanitizer-qualification.result }}
+          LIFECYCLE_RESULT: ${{ needs.native-lifecycle-admission-qualification.result }}
+          FREE_THREADED_RESULT: ${{ needs.native-free-threaded-admission-qualification.result }}
           FUZZ_RESULT: ${{ needs.native-frozen-format-fuzz.result }}
           PERFORMANCE_RESULT: ${{ needs.native-frozen-performance-evidence.result }}
           DISTRIBUTION_RESULT: ${{ needs.build-distributions.result }}
@@ -294,6 +373,8 @@ jobs:
               "native": os.environ["NATIVE_RESULT"],
               "sanitizer": os.environ["SANITIZER_RESULT"],
               "thread_sanitizer": os.environ["THREAD_SANITIZER_RESULT"],
+              "lifecycle": os.environ["LIFECYCLE_RESULT"],
+              "free_threaded_admission": os.environ["FREE_THREADED_RESULT"],
               "fuzz": os.environ["FUZZ_RESULT"],
               "performance": os.environ["PERFORMANCE_RESULT"],
               "distribution": os.environ["DISTRIBUTION_RESULT"],
