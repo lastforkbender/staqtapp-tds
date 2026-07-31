@@ -11,7 +11,7 @@ import pytest
 
 MODULE_INIT = "multiphase-pep489-v1"
 MULTI_INTERPRETER_POLICY = "reject-subinterpreters-v1"
-GIL_POLICY = "compatibility-gil-required-v1"
+GIL_POLICY = "free-threaded-build-rejected-v1"
 REINITIALIZATION_POLICY = "process-restart-required-v1"
 FROZEN_CONTRACT = "immutable-rehash-copy;lock-free-read-v1"
 PACKED_CONTRACT = (
@@ -27,15 +27,14 @@ def require_native():
     return _native_index
 
 
-def _direct_extension_code(body: str) -> str:
+def _direct_extension_code(body: str, extension_path: Path) -> str:
     return f"""
 import importlib.util
 from pathlib import Path
 
-candidates = sorted(Path('src/staqtapp_tds').glob('_native_index*.so'))
-if len(candidates) != 1:
-    raise RuntimeError(f'expected one native extension, found {{candidates!r}}')
-path = candidates[0]
+path = Path({str(extension_path)!r})
+if not path.is_file():
+    raise RuntimeError(f'native extension does not exist: {{path}}')
 {body}
 """
 
@@ -81,7 +80,7 @@ def test_v360_normal_import_reuses_the_admitted_module() -> None:
 
 
 def test_v360_duplicate_live_native_module_import_fails_closed() -> None:
-    require_native()
+    native = require_native()
     root = Path(__file__).resolve().parents[1]
     code = _direct_extension_code(
         """
@@ -98,7 +97,8 @@ except ImportError as exc:
 else:
     raise AssertionError('duplicate live native module import was accepted')
 assert native.TDS_NATIVE_MODULE_INIT == 'multiphase-pep489-v1'
-"""
+""",
+        Path(native.__file__).resolve(),
     )
     env = dict(os.environ)
     env["PYTHONPATH"] = str(root / "src")
@@ -116,7 +116,7 @@ assert native.TDS_NATIVE_MODULE_INIT == 'multiphase-pep489-v1'
 
 
 def test_v360_module_reinitialization_requires_process_restart() -> None:
-    require_native()
+    native = require_native()
     root = Path(__file__).resolve().parents[1]
     code = _direct_extension_code(
         """
@@ -136,7 +136,8 @@ except ImportError as exc:
         raise
 else:
     raise AssertionError('repeat process initialization was accepted')
-"""
+""",
+        Path(native.__file__).resolve(),
     )
     completed = subprocess.run(
         [sys.executable, "-c", code],
@@ -164,4 +165,6 @@ def test_v360_module_source_declares_guarded_interpreter_and_gil_slots() -> None
     assert "Py_MOD_MULTIPLE_INTERPRETERS_NOT_SUPPORTED" in source
     assert "Py_mod_gil" in source
     assert "Py_MOD_GIL_USED" in source
+    assert "#ifdef Py_GIL_DISABLED" in source
+    assert "rejects free-threaded CPython" in source
     assert "g_native_module_instance_active" in source

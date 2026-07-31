@@ -79,7 +79,7 @@ typedef struct {
 
 #define TDS_NATIVE_MODULE_INIT_CONTRACT "multiphase-pep489-v1"
 #define TDS_NATIVE_MULTI_INTERPRETER_POLICY "reject-subinterpreters-v1"
-#define TDS_NATIVE_GIL_POLICY "compatibility-gil-required-v1"
+#define TDS_NATIVE_GIL_POLICY "free-threaded-build-rejected-v1"
 #define TDS_NATIVE_REINITIALIZATION_POLICY "process-restart-required-v1"
 
 static _Atomic uint64_t g_index_namespace_sequence = 0;
@@ -2904,6 +2904,13 @@ static int native_module_exec(PyObject *module) {
         PyErr_SetString(PyExc_RuntimeError, "native module state is unavailable");
         return -1;
     }
+#ifdef Py_GIL_DISABLED
+    PyErr_SetString(
+        PyExc_ImportError,
+        "native index rejects free-threaded CPython until no-GIL state isolation qualifies"
+    );
+    return -1;
+#endif
     if (!atomic_compare_exchange_strong_explicit(
             &g_native_module_instance_active,
             &expected,

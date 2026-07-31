@@ -17,7 +17,7 @@ unchanged.
 ```text
 TDS_NATIVE_MODULE_INIT = multiphase-pep489-v1
 TDS_NATIVE_MULTI_INTERPRETER_POLICY = reject-subinterpreters-v1
-TDS_NATIVE_GIL_POLICY = compatibility-gil-required-v1
+TDS_NATIVE_GIL_POLICY = free-threaded-build-rejected-v1
 TDS_NATIVE_REINITIALIZATION_POLICY = process-restart-required-v1
 ```
 
@@ -30,10 +30,12 @@ Static extension types and process-scoped observer globals still exist. Module
 deallocation therefore does not reopen admission; process restart is the only
 safe way to initialize another module instance under this interim policy.
 
-On a free-threaded Python 3.13 or later build, `Py_mod_gil = Py_MOD_GIL_USED`
-explicitly requires the compatibility GIL. This prevents an unqualified
-no-GIL execution path. Native loops continue to release the compatibility GIL
-only at boundaries already covered by the native correctness suite.
+On a free-threaded Python 3.13 or later build, the module retains
+`Py_mod_gil = Py_MOD_GIL_USED` as import metadata and additionally rejects
+module execution under `Py_GIL_DISABLED`. This is necessary because an explicit
+`-X gil=0` request overrides automatic compatibility-GIL activation. The native
+bridge therefore fails closed on the entire free-threaded build until its
+process-global state and no-GIL execution paths qualify independently.
 
 ## Preserved request-path contracts
 
@@ -59,8 +61,8 @@ The release matrix adds:
 - a C embedding harness that imports in the main interpreter and requires
   subinterpreter rejection;
 - free-threaded Python 3.13t and 3.14t builds started with `-X gil=0`,
-  followed by explicit compatibility-GIL admission and one frozen packed
-  lookup parity check on each ABI;
+  followed by exact fail-closed import rejection while the GIL remains
+  disabled;
 - Python 3.10 through 3.14 native build, import, lifecycle, and complete-suite
   compatibility on Linux, plus the retained macOS native lane; and
 - the existing ASan, UBSan, TSan, deterministic fuzz, performance,
