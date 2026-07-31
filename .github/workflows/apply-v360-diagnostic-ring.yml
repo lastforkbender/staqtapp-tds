@@ -23,7 +23,9 @@ concurrency:
 
 jobs:
   apply:
-    if: github.event_name == 'push' || github.head_ref == 'agent/v360-diagnostic-ring-truth'
+    if: >-
+      (github.event_name == 'push' || github.head_ref == 'agent/v360-diagnostic-ring-truth')
+      && hashFiles('.github/diagnostic-ring.patch.gz.b64') != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -51,15 +53,19 @@ jobs:
             '/tmp/v360-diagnostic-ring.patch' | sha256sum -c -
           git apply --check /tmp/v360-diagnostic-ring.patch
           git apply --index /tmp/v360-diagnostic-ring.patch
+
+          # The GitHub Actions token cannot update workflow definitions. Keep
+          # release.yml and this one-shot workflow outside the bot commit; the
+          # authenticated repository connector updates/removes them separately.
+          git reset -- .github/workflows/release.yml
+          git checkout -- .github/workflows/release.yml
           git rm .github/diagnostic-ring.patch.gz.b64
-          git rm .github/workflows/apply-v360-diagnostic-ring.yml
+
           python - <<'PY'
           import subprocess
 
           expected = {
               '.github/diagnostic-ring.patch.gz.b64',
-              '.github/workflows/apply-v360-diagnostic-ring.yml',
-              '.github/workflows/release.yml',
               'DEV13_NATIVE_DIAGNOSTIC_RING_STATUS.txt',
               'docs/123_v360_Diagnostic_Ring_Truth.md',
               'src/staqtapp_tds/_native_index.c',
@@ -103,7 +109,7 @@ jobs:
           find . -type d -name __pycache__ -prune -exec rm -rf {} +
           python scripts/check_release.py
           git diff --cached --check
-      - name: Commit qualified source and remove transfer artifacts
+      - name: Commit qualified source
         shell: bash
         run: |
           set -euo pipefail
