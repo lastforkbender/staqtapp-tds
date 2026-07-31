@@ -1,13 +1,36 @@
 #!/usr/bin/env python3
-"""Direct concurrent-read smoke for a thread-sanitized frozen native index."""
+"""Direct concurrent-read smoke for a thread-sanitized frozen native index.
+
+The harness loads the compiled extension directly instead of importing the full
+``staqtapp_tds`` package.  That keeps the ThreadSanitizer lane focused on the C
+extension and its caller-owned packed buffers rather than unrelated optional
+Python dependencies.
+"""
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+import importlib.util
+from pathlib import Path
 from struct import pack, unpack_from
 
 
+def _load_native_index():
+    candidates = sorted(Path("src/staqtapp_tds").glob("_native_index*.so"))
+    if len(candidates) != 1:
+        raise RuntimeError(
+            "expected exactly one built _native_index extension, "
+            f"found {[str(path) for path in candidates]!r}"
+        )
+    spec = importlib.util.spec_from_file_location("_native_index", candidates[0])
+    if spec is None or spec.loader is None:
+        raise RuntimeError("could not create an extension loader for _native_index")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def main() -> int:
-    from staqtapp_tds import _native_index
+    _native_index = _load_native_index()
 
     count = 2048
     mutable = _native_index.NativeHandleIndex(capacity=4096)
