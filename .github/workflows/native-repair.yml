@@ -1,0 +1,199 @@
+name: TDS v3.6 native correctness repair
+
+on:
+  pull_request:
+    paths:
+      - 'setup.py'
+      - 'src/staqtapp_tds/_native_index.c'
+      - 'src/staqtapp_tds/_csv_scan_kernel.c'
+      - 'src/staqtapp_tds/native/**'
+      - 'src/staqtapp_tds/backends/native_index.py'
+      - 'src/staqtapp_tds/csv_layer/native_scan.py'
+      - 'src/staqtapp_tds/csv_layer/native_row_anchor.py'
+      - 'src/staqtapp_tds/diagnostics.py'
+      - 'src/staqtapp_tds/spiral/rank.py'
+      - 'src/staqtapp_tds/tds_filesystem.py'
+      - 'tests/test_v360_native_repair.py'
+      - 'tools/fuzz_v360_native_repair.py'
+      - 'tools/tsan_v360_native_repair.py'
+      - 'tools/benchmark_v360_frozen_index.py'
+      - '.github/workflows/native-repair.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'setup.py'
+      - 'src/staqtapp_tds/_native_index.c'
+      - 'src/staqtapp_tds/_csv_scan_kernel.c'
+      - 'src/staqtapp_tds/native/**'
+      - 'src/staqtapp_tds/backends/native_index.py'
+      - 'src/staqtapp_tds/csv_layer/native_scan.py'
+      - 'src/staqtapp_tds/csv_layer/native_row_anchor.py'
+      - 'src/staqtapp_tds/diagnostics.py'
+      - 'src/staqtapp_tds/spiral/rank.py'
+      - 'src/staqtapp_tds/tds_filesystem.py'
+      - 'tests/test_v360_native_repair.py'
+      - 'tools/fuzz_v360_native_repair.py'
+      - 'tools/tsan_v360_native_repair.py'
+      - 'tools/benchmark_v360_frozen_index.py'
+      - '.github/workflows/native-repair.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  strict-native:
+    name: ${{ matrix.os }} strict ABI-v2 native build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Install focused test dependencies
+        run: python -m pip install pytest
+      - name: Build with strict compiler diagnostics
+        env:
+          STAQTAPP_TDS_BUILD_NATIVE: '1'
+          STAQTAPP_TDS_STRICT_NATIVE: '1'
+        run: python setup.py build_ext --inplace --force
+      - name: Prove ABI admission and native-load identity
+        run: >-
+          python -c "from staqtapp_tds.native.manager import get_native_manager;
+          index, ir = get_native_manager().load_module('index');
+          csv, cr = get_native_manager().load_module('csv_scan');
+          assert index is not None and csv is not None, (ir.as_dict(), cr.as_dict());
+          assert ir.abi_actual == 2 and cr.abi_actual == 2"
+      - name: Run focused native correctness and compatibility tests
+        run: >-
+          python -m pytest -q --disable-warnings
+          tests/test_v360_native_repair.py
+          tests/test_v270_native_diagnostics.py
+          tests/test_v271_transition_ring.py
+          tests/test_v302_native_keypool_safety.py
+          tests/test_v346_csv_native_scan_kernel_prototype.py
+          tests/test_v347_csv_native_row_anchor_kernel.py
+
+  asan-ubsan:
+    name: Linux ASan and UBSan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - run: python -m pip install pytest
+      - name: Build instrumented extensions
+        env:
+          STAQTAPP_TDS_BUILD_NATIVE: '1'
+          STAQTAPP_TDS_STRICT_NATIVE: '1'
+          STAQTAPP_TDS_SANITIZE: all
+        run: python setup.py build_ext --inplace --force
+      - name: Run bounded sanitizer qualification
+        shell: bash
+        run: |
+          export LD_PRELOAD="$(gcc -print-file-name=libasan.so):$(gcc -print-file-name=libubsan.so)"
+          export ASAN_OPTIONS='detect_leaks=0:abort_on_error=1:strict_string_checks=1'
+          export UBSAN_OPTIONS='halt_on_error=1:print_stacktrace=1'
+          python -m pytest -q --disable-warnings \
+            tests/test_v360_native_repair.py \
+            tests/test_v270_native_diagnostics.py \
+            tests/test_v271_transition_ring.py \
+            tests/test_v302_native_keypool_safety.py \
+            tests/test_v346_csv_native_scan_kernel_prototype.py \
+            tests/test_v347_csv_native_row_anchor_kernel.py
+
+  tsan:
+    name: Linux direct ThreadSanitizer harness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Build TSan extensions
+        env:
+          STAQTAPP_TDS_BUILD_NATIVE: '1'
+          STAQTAPP_TDS_STRICT_NATIVE: '1'
+          STAQTAPP_TDS_SANITIZE: thread
+        run: python setup.py build_ext --inplace --force
+      - name: Run extension-only concurrency harness
+        shell: bash
+        run: |
+          export LD_PRELOAD="$(gcc -print-file-name=libtsan.so)"
+          export TSAN_OPTIONS='halt_on_error=1:history_size=7:second_deadlock_stack=1'
+          PYTHONPATH=src python -S tools/tsan_v360_native_repair.py
+
+  deterministic-fuzz:
+    name: Deterministic native format and boundary fuzz
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Build strict native extensions
+        env:
+          STAQTAPP_TDS_BUILD_NATIVE: '1'
+          STAQTAPP_TDS_STRICT_NATIVE: '1'
+        run: python setup.py build_ext --inplace --force
+      - name: Replay bounded deterministic fuzz corpus
+        run: PYTHONPATH=src python tools/fuzz_v360_native_repair.py --seed 864 --cases 5000
+
+  packed-thread-performance:
+    name: Frozen packed lookup no-regression evidence
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Build strict native extensions
+        env:
+          STAQTAPP_TDS_BUILD_NATIVE: '1'
+          STAQTAPP_TDS_STRICT_NATIVE: '1'
+        run: python setup.py build_ext --inplace --force
+      - name: Record separate performance evidence
+        run: >-
+          PYTHONPATH=src python tools/benchmark_v360_frozen_index.py
+          --keys 4096 --rounds 1000 --repeats 5 --threads 2
+          --minimum-threaded-factor 1.70
+
+  native-repair-gates-complete:
+    name: Native repair gates complete
+    if: always()
+    needs:
+      - strict-native
+      - asan-ubsan
+      - tsan
+      - deterministic-fuzz
+      - packed-thread-performance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every native repair lane
+        env:
+          STRICT_RESULT: ${{ needs.strict-native.result }}
+          ASAN_RESULT: ${{ needs.asan-ubsan.result }}
+          TSAN_RESULT: ${{ needs.tsan.result }}
+          FUZZ_RESULT: ${{ needs.deterministic-fuzz.result }}
+          PERF_RESULT: ${{ needs.packed-thread-performance.result }}
+        run: |
+          python - <<'PY'
+          import os
+          results = {
+              'strict': os.environ['STRICT_RESULT'],
+              'asan_ubsan': os.environ['ASAN_RESULT'],
+              'tsan': os.environ['TSAN_RESULT'],
+              'fuzz': os.environ['FUZZ_RESULT'],
+              'performance': os.environ['PERF_RESULT'],
+          }
+          failed = {name: value for name, value in results.items() if value != 'success'}
+          if failed:
+              raise SystemExit(f'native repair gates did not all succeed: {failed}')
+          print('all native repair gates succeeded')
+          PY
