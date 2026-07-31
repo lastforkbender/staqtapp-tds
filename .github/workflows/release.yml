@@ -12,6 +12,9 @@ on:
 permissions:
   contents: read
 
+env:
+  TDS_V360_NATIVE_ARCHITECTURE_ROOT: d2e839477d432cdf9e328982e6e9a245295dd05c80ddac4937232c0b72bc9d09
+
 jobs:
   source-release-checks:
     name: Source release checks
@@ -298,6 +301,96 @@ jobs:
           path: native-frozen-index-performance.json
           if-no-files-found: error
 
+  native-architecture-semantic-evidence:
+    name: Native ${{ matrix.architecture }} semantic evidence
+    needs: source-release-checks
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: x86_64
+            runner: ubuntu-24.04
+          - architecture: aarch64
+            runner: ubuntu-24.04-arm
+    env:
+      STAQTAPP_TDS_BUILD_NATIVE: '1'
+      CFLAGS: '-std=c11 -Wall -Wextra -Werror -Wconversion -Wshadow -Wpedantic -Wno-cast-function-type'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Record native runner identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          uname -a
+          uname -m
+          python -VV
+          getconf LONG_BIT
+          lscpu || true
+      - name: Build strict in-tree native extensions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install setuptools wheel pytest
+          python setup.py build_ext --inplace --force
+      - name: Produce pinned native semantic evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -S tools/architecture_parity_v360_native.py \
+            --expected-architecture '${{ matrix.architecture }}' \
+            --expected-root "$TDS_V360_NATIVE_ARCHITECTURE_ROOT" \
+            --output 'native-architecture-${{ matrix.architecture }}.json'
+          python -m pytest -q --disable-warnings -c /dev/null \
+            tests/test_v360_native_architecture_parity.py
+      - name: Archive architecture evidence even on mismatch
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-architecture-${{ matrix.architecture }}
+          path: native-architecture-${{ matrix.architecture }}.json
+          if-no-files-found: error
+
+  native-architecture-parity-comparison:
+    name: Native x86-64 and AArch64 semantic parity
+    if: always()
+    needs: native-architecture-semantic-evidence
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v8
+        with:
+          name: native-architecture-x86_64
+          path: native-architecture-reports/x86_64
+      - uses: actions/download-artifact@v8
+        with:
+          name: native-architecture-aarch64
+          path: native-architecture-reports/aarch64
+      - name: Require exact native semantic parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -S tools/architecture_parity_v360_native.py \
+            --compare \
+              native-architecture-reports/x86_64/native-architecture-x86_64.json \
+              native-architecture-reports/aarch64/native-architecture-aarch64.json \
+            --expected-root "$TDS_V360_NATIVE_ARCHITECTURE_ROOT" \
+            --output native-architecture-comparison.json
+          cat native-architecture-comparison.json
+      - name: Archive parity comparison evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-architecture-parity-comparison
+          path: native-architecture-comparison.json
+          if-no-files-found: error
+
   build-distributions:
     name: Build and inspect distributions
     needs:
@@ -310,6 +403,7 @@ jobs:
       - native-free-threaded-admission-qualification
       - native-frozen-format-fuzz
       - native-frozen-performance-evidence
+      - native-architecture-parity-comparison
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -346,6 +440,7 @@ jobs:
       - native-free-threaded-admission-qualification
       - native-frozen-format-fuzz
       - native-frozen-performance-evidence
+      - native-architecture-parity-comparison
       - build-distributions
     runs-on: ubuntu-latest
     steps:
@@ -361,6 +456,7 @@ jobs:
           FREE_THREADED_RESULT: ${{ needs.native-free-threaded-admission-qualification.result }}
           FUZZ_RESULT: ${{ needs.native-frozen-format-fuzz.result }}
           PERFORMANCE_RESULT: ${{ needs.native-frozen-performance-evidence.result }}
+          ARCHITECTURE_RESULT: ${{ needs.native-architecture-parity-comparison.result }}
           DISTRIBUTION_RESULT: ${{ needs.build-distributions.result }}
         run: |
           python - <<'PY'
@@ -377,6 +473,7 @@ jobs:
               "free_threaded_admission": os.environ["FREE_THREADED_RESULT"],
               "fuzz": os.environ["FUZZ_RESULT"],
               "performance": os.environ["PERFORMANCE_RESULT"],
+              "architecture_parity": os.environ["ARCHITECTURE_RESULT"],
               "distribution": os.environ["DISTRIBUTION_RESULT"],
           }
           failed = {name: result for name, result in results.items() if result != "success"}
