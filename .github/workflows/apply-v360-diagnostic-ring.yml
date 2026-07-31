@@ -1,0 +1,106 @@
+name: Apply verified v3.6 diagnostic ring repair
+
+on:
+  push:
+    branches:
+      - agent/v360-diagnostic-ring-truth
+    paths:
+      - '.github/diagnostic-ring.patch.gz.b64'
+      - '.github/workflows/apply-v360-diagnostic-ring.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-v360-diagnostic-ring
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/v360-diagnostic-ring-truth
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Verify and stage the exact diagnostic repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^^)" = '0b23507a17b40629485618035b67a93afbe105ef'
+          tr -d '\r\n' < .github/diagnostic-ring.patch.gz.b64 > /tmp/v360-diagnostic-ring.patch.gz.b64
+          printf '%s  %s\n' \
+            '99d9828aa1ba8dabef7f41b9580aebae4c84a90a6013b556db0fbc409b1b8871' \
+            '/tmp/v360-diagnostic-ring.patch.gz.b64' | sha256sum -c -
+          base64 --decode /tmp/v360-diagnostic-ring.patch.gz.b64 \
+            | gzip --decompress \
+            > /tmp/v360-diagnostic-ring.patch
+          printf '%s  %s\n' \
+            'b228569e2e8cf73a11642d2b4643f3b3010f831c3d292a9af1cc2635d409bfb3' \
+            '/tmp/v360-diagnostic-ring.patch' | sha256sum -c -
+          git apply --check /tmp/v360-diagnostic-ring.patch
+          git apply --index /tmp/v360-diagnostic-ring.patch
+          git rm .github/diagnostic-ring.patch.gz.b64
+          git rm .github/workflows/apply-v360-diagnostic-ring.yml
+          python - <<'PY'
+          import subprocess
+
+          expected = {
+              '.github/diagnostic-ring.patch.gz.b64',
+              '.github/workflows/apply-v360-diagnostic-ring.yml',
+              '.github/workflows/release.yml',
+              'DEV13_NATIVE_DIAGNOSTIC_RING_STATUS.txt',
+              'docs/123_v360_Diagnostic_Ring_Truth.md',
+              'src/staqtapp_tds/_native_index.c',
+              'src/staqtapp_tds/diagnostics.py',
+              'src/staqtapp_tds/native/manager.py',
+              'tests/test_v360_diagnostic_ring_truth.py',
+          }
+          staged = set(
+              subprocess.check_output(
+                  ['git', 'diff', '--cached', '--name-only'],
+                  text=True,
+              ).splitlines()
+          )
+          if staged != expected:
+              raise SystemExit(
+                  f'unexpected staged paths: missing={sorted(expected-staged)} '
+                  f'extra={sorted(staged-expected)}'
+              )
+          PY
+          git diff --cached --check
+      - name: Build strict native extensions and qualify the repair
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+          STAQTAPP_TDS_BUILD_NATIVE: '1'
+          CFLAGS: '-std=c11 -Wall -Wextra -Werror -Wconversion -Wshadow -Wpedantic -Wno-cast-function-type'
+        run: |
+          set -euo pipefail
+          python -m pip install pytest numpy PyQt5
+          python setup.py build_ext --inplace --force
+          PYTHONPATH=src python -m pytest -q --disable-warnings -c /dev/null \
+            tests/test_v360_diagnostic_ring_truth.py \
+            tests/test_v270_native_diagnostics.py \
+            tests/test_v271_transition_ring.py \
+            tests/test_v360_checksum_utf8_truth.py \
+            tests/test_v360_native_csv_input_safety.py \
+            tests/test_v346_csv_native_scan_kernel_prototype.py \
+            tests/test_v347_csv_native_row_anchor_kernel.py
+          python scripts/check_release.py
+          rm -rf build
+          find src -maxdepth 3 -type f \( -name '*.so' -o -name '*.pyd' -o -name '*.dll' -o -name '*.dylib' \) -delete
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          git diff --cached --check
+      - name: Commit qualified source and remove transfer artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'staqtapp-release-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git commit -m 'Implement C11 diagnostic ring and bounded observer sampling'
+          git push origin HEAD:agent/v360-diagnostic-ring-truth
