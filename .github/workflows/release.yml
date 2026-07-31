@@ -121,6 +121,7 @@ jobs:
         run: |
           set -euo pipefail
           tests=(
+            tests/test_v360_handle_generation_truth.py
             tests/test_v360_diagnostic_ring_truth.py
             tests/test_v360_checksum_utf8_truth.py
             tests/test_v360_native_csv_input_safety.py

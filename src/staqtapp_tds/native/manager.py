@@ -147,6 +147,14 @@ class NativeEngineManager:
         compatible = int(abi_actual) == self.expected_abi
         capabilities = {
             "has_native_handle_index": hasattr(module, "NativeHandleIndex"),
+            "has_handle_refs": bool(
+                hasattr(module, "NativeHandleIndex")
+                and hasattr(module.NativeHandleIndex, "get_handle_ref")
+                and hasattr(module.NativeHandleIndex, "resolve_handle_ref")
+            ),
+            "handle_ref_contract": str(
+                getattr(module, "TDS_NATIVE_HANDLE_REF_CONTRACT", "")
+            ),
             "has_checksum32": hasattr(module, "checksum32"),
             "has_checksum32_for_algorithm": hasattr(
                 module, "checksum32_for_algorithm"

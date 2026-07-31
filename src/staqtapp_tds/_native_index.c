@@ -15,6 +15,7 @@ typedef struct {
     uint8_t state; /* 0 empty, 1 full, 2 tombstone */
     uint8_t ctrl;  /* Swiss-table style 7-bit hash fingerprint */
     uint64_t hash;
+    uint32_t generation; /* increments whenever this physical slot is reused */
 } Slot;
 
 typedef struct KeyNode {
@@ -36,6 +37,8 @@ typedef struct {
     Py_ssize_t size;
     Py_ssize_t tombstones;
     int64_t next_handle;
+    uint64_t namespace_id;
+    uint64_t index_epoch;
     uint64_t resize_count;
     uint64_t native_put_calls;
     uint64_t native_batch_put_calls;
@@ -52,6 +55,20 @@ typedef struct {
     pthread_rwlock_t lock;
 } NativeHandleIndex;
 
+static _Atomic uint64_t g_index_namespace_sequence = 0;
+
+static int allocate_positive_identity(_Atomic uint64_t *counter, uint64_t *out) {
+    uint64_t current = atomic_load_explicit(counter, memory_order_relaxed);
+    for (;;) {
+        if (current == UINT64_MAX) return -1;
+        if (atomic_compare_exchange_weak_explicit(
+                counter, &current, current + 1ULL,
+                memory_order_acq_rel, memory_order_relaxed)) {
+            *out = current + 1ULL;
+            return 0;
+        }
+    }
+}
 
 /* =============================================================================
  * v2.7.1 Native Diagnostic Engine transition ring
@@ -1145,10 +1162,14 @@ static void utf8_raise_decode_error(const TDSStableInput *input, const UTF8Error
     }
 }
 
-static Py_ssize_t round_pow2(Py_ssize_t n) {
+static int round_pow2_checked(Py_ssize_t n, Py_ssize_t *out) {
     Py_ssize_t p = 16;
-    while (p < n) p <<= 1;
-    return p;
+    while (p < n) {
+        if (p > PY_SSIZE_T_MAX / 2) return -1;
+        p *= 2;
+    }
+    *out = p;
+    return 0;
 }
 
 static inline uint8_t ctrl_from_hash(uint64_t hash) {
@@ -1272,7 +1293,11 @@ static void free_slots(NativeHandleIndex *self, Slot *slots, Py_ssize_t cap) {
 }
 
 static int resize_index(NativeHandleIndex *self, Py_ssize_t newcap) {
-    newcap = round_pow2(newcap);
+    Py_ssize_t rounded_capacity;
+    if (self->index_epoch == UINT64_MAX) return -8;
+    if (round_pow2_checked(newcap, &rounded_capacity) < 0) return -10;
+    newcap = rounded_capacity;
+    if ((size_t)newcap > SIZE_MAX / sizeof(Slot)) return -10;
     Slot *newslots = (Slot*)calloc((size_t)newcap, sizeof(Slot));
     if (!newslots) return -1;
     for (Py_ssize_t i = 0; i < self->capacity; ++i) {
@@ -1289,6 +1314,7 @@ static int resize_index(NativeHandleIndex *self, Py_ssize_t newcap) {
     self->slots = newslots;
     self->capacity = newcap;
     self->tombstones = 0;
+    self->index_epoch++;
     self->resize_count++;
     diag_count_transition(DIAG_EVENT_INDEX_RESIZED);
     diag_emit_transition(DIAG_EVENT_INDEX_RESIZED, 3, 0, (uint64_t)newcap, self->resize_count, 0);
@@ -1296,41 +1322,100 @@ static int resize_index(NativeHandleIndex *self, Py_ssize_t newcap) {
 }
 
 static int maybe_resize(NativeHandleIndex *self) {
-    if ((self->size + self->tombstones) * 10 >= self->capacity * 7) {
-        return resize_index(self, self->capacity * 2);
+    Py_ssize_t occupied = self->size + self->tombstones;
+    Py_ssize_t threshold = (self->capacity / 10) * 7
+        + (((self->capacity % 10) * 7 + 9) / 10);
+    if (occupied >= threshold) {
+        int result;
+        if (self->capacity > PY_SSIZE_T_MAX / 2) return -10;
+        result = resize_index(self, self->capacity * 2);
+        return result < 0 ? result : 1;
     }
     return 0;
 }
 
+static int handle_in_use_locked(
+    NativeHandleIndex *self,
+    int64_t handle,
+    Py_ssize_t except_index
+) {
+    for (Py_ssize_t i = 0; i < self->capacity; ++i) {
+        if (i != except_index
+                && self->slots[i].state == 1
+                && self->slots[i].handle == handle) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int allocate_monotonic_handle_locked(
+    NativeHandleIndex *self,
+    int64_t *out_handle
+) {
+    int64_t handle = self->next_handle;
+    if (handle <= 0) return -5;
+    if (handle_in_use_locked(self, handle, -1)) return -4;
+    *out_handle = handle;
+    self->next_handle = handle == INT64_MAX ? 0 : handle + 1;
+    return 0;
+}
+
 static int put_handle_locked(NativeHandleIndex *self, const char *key, Py_ssize_t len, int64_t requested_handle, int64_t *out_handle) {
-    if (maybe_resize(self) < 0) return -1;
-    uint64_t hash = fnv1a64(key, len);
+    uint64_t hash;
     int found = 0;
-    Py_ssize_t idx = find_slot(self->slots, self->capacity, key, len, hash, &found);
-    if (idx < 0) return -2;
+    Py_ssize_t idx;
+    int resize_result;
     int64_t handle = requested_handle;
+    Slot *slot;
+
+    if (requested_handle < 0) return -3;
+    hash = fnv1a64(key, len);
+    idx = find_slot(self->slots, self->capacity, key, len, hash, &found);
+    if (idx < 0) return -2;
+    slot = &self->slots[idx];
     if (found) {
-        if (handle > 0) self->slots[idx].handle = handle;
-        *out_handle = self->slots[idx].handle;
+        if (handle > 0 && handle != slot->handle) return -6;
+        *out_handle = slot->handle;
         diag_count_transition(DIAG_EVENT_SLOT_UPDATED);
         diag_emit_transition(DIAG_EVENT_SLOT_UPDATED, 2, (uint32_t)(idx & 0xffffffffU), (uint64_t)*out_handle, (uint64_t)len, 0);
         return 0;
     }
+
+    resize_result = maybe_resize(self);
+    if (resize_result < 0) return resize_result;
+    if (resize_result > 0) {
+        found = 0;
+        idx = find_slot(self->slots, self->capacity, key, len, hash, &found);
+        if (idx < 0 || found) return -2;
+        slot = &self->slots[idx];
+    }
+    if (slot->generation == UINT32_MAX) return -7;
+
+    if (handle > 0) {
+        if (self->next_handle <= 0) return -5;
+        if (handle_in_use_locked(self, handle, -1)) return -4;
+        if (handle < self->next_handle) return -9;
+        self->next_handle = handle == INT64_MAX ? 0 : handle + 1;
+    } else {
+        int allocation = allocate_monotonic_handle_locked(self, &handle);
+        if (allocation < 0) return allocation;
+    }
     char *copy = key_alloc(self, len);
     if (!copy) return -1;
     memcpy(copy, key, (size_t)len);
-    if (handle <= 0) handle = self->next_handle++;
-    self->slots[idx].key = copy;
-    self->slots[idx].len = len;
-    self->slots[idx].handle = handle;
-    self->slots[idx].hash = hash;
-    self->slots[idx].ctrl = ctrl_from_hash(hash);
-    if (self->slots[idx].state == 2) self->tombstones--;
-    self->slots[idx].state = 1;
+    slot->key = copy;
+    slot->len = len;
+    slot->handle = handle;
+    slot->hash = hash;
+    slot->ctrl = ctrl_from_hash(hash);
+    slot->generation += 1U;
+    if (slot->state == 2) self->tombstones--;
+    slot->state = 1;
     self->size++;
     *out_handle = handle;
     diag_count_transition(DIAG_EVENT_SLOT_ALLOCATED);
-    diag_emit_transition(DIAG_EVENT_SLOT_ALLOCATED, 2, (uint32_t)(idx & 0xffffffffU), (uint64_t)handle, (uint64_t)len, 0);
+    diag_emit_transition(DIAG_EVENT_SLOT_ALLOCATED, 2, (uint32_t)(idx & 0xffffffffU), (uint64_t)handle, (uint64_t)slot->generation, 0);
     diag_count_transition(DIAG_EVENT_SLOT_WRITTEN);
     diag_emit_transition(DIAG_EVENT_SLOT_WRITTEN, 2, (uint32_t)(idx & 0xffffffffU), (uint64_t)handle, (uint64_t)self->size, 0);
     diag_count_transition(DIAG_EVENT_SLOT_VISIBLE);
@@ -1431,7 +1516,24 @@ static int NativeHandleIndex_init(NativeHandleIndex *self, PyObject *args, PyObj
     Py_ssize_t capacity = 1024;
     static char *kwlist[] = {"capacity", NULL};
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "|n", kwlist, &capacity)) return -1;
-    self->capacity = round_pow2(capacity);
+    if (self->slots != NULL) {
+        PyErr_SetString(PyExc_RuntimeError, "native index is already initialized");
+        return -1;
+    }
+    if (capacity <= 0) {
+        PyErr_SetString(PyExc_ValueError, "capacity must be positive");
+        return -1;
+    }
+    if (allocate_positive_identity(&g_index_namespace_sequence, &self->namespace_id) < 0) {
+        PyErr_SetString(PyExc_OverflowError, "native index namespace allocator exhausted");
+        return -1;
+    }
+    self->index_epoch = 1ULL;
+    if (round_pow2_checked(capacity, &self->capacity) < 0
+            || (size_t)self->capacity > SIZE_MAX / sizeof(Slot)) {
+        PyErr_SetString(PyExc_OverflowError, "native index capacity exceeds addressable bounds");
+        return -1;
+    }
     self->slots = (Slot*)calloc((size_t)self->capacity, sizeof(Slot));
     if (!self->slots) { PyErr_NoMemory(); return -1; }
     return 0;
@@ -1458,6 +1560,14 @@ static PyObject *NativeHandleIndex_put(NativeHandleIndex *self, PyObject *args) 
     Py_END_ALLOW_THREADS
     if (rc == -1) { PyErr_NoMemory(); return NULL; }
     if (rc == -2) { PyErr_SetString(PyExc_RuntimeError, "native index is full"); return NULL; }
+    if (rc == -3) { PyErr_SetString(PyExc_ValueError, "requested handle must be zero or positive"); return NULL; }
+    if (rc == -4) { PyErr_SetString(PyExc_ValueError, "requested handle is already assigned"); return NULL; }
+    if (rc == -5) { PyErr_SetString(PyExc_OverflowError, "native handle allocator exhausted"); return NULL; }
+    if (rc == -6) { PyErr_SetString(PyExc_ValueError, "existing key handle is immutable"); return NULL; }
+    if (rc == -7) { PyErr_SetString(PyExc_OverflowError, "native slot generation exhausted"); return NULL; }
+    if (rc == -8) { PyErr_SetString(PyExc_OverflowError, "native index epoch exhausted"); return NULL; }
+    if (rc == -9) { PyErr_SetString(PyExc_ValueError, "requested handle is below the monotonic high-water mark"); return NULL; }
+    if (rc == -10) { PyErr_SetString(PyExc_OverflowError, "native index capacity exhausted"); return NULL; }
     return PyLong_FromLongLong(out_handle);
 }
 
@@ -1465,9 +1575,13 @@ static int extract_key_sequence(PyObject *seq, PyObject **fast_out, const char *
     PyObject *fast = PySequence_Fast(seq, "expected a sequence of bytes/str keys");
     if (!fast) return -1;
     Py_ssize_t n = PySequence_Fast_GET_SIZE(fast);
-    const char **keys = (const char**)calloc((size_t)n, sizeof(char*));
-    Py_ssize_t *lens = (Py_ssize_t*)calloc((size_t)n, sizeof(Py_ssize_t));
-    if (!keys || !lens) { free(keys); free(lens); Py_DECREF(fast); PyErr_NoMemory(); return -1; }
+    const char **keys = NULL;
+    Py_ssize_t *lens = NULL;
+    if (n > 0) {
+        keys = (const char**)calloc((size_t)n, sizeof(char*));
+        lens = (Py_ssize_t*)calloc((size_t)n, sizeof(Py_ssize_t));
+        if (!keys || !lens) { free(keys); free(lens); Py_DECREF(fast); PyErr_NoMemory(); return -1; }
+    }
     for (Py_ssize_t i = 0; i < n; ++i) {
         PyObject *item = PySequence_Fast_GET_ITEM(fast, i);
         if (PyBytes_Check(item)) {
@@ -1501,6 +1615,10 @@ static PyObject *NativeHandleIndex_put_many(NativeHandleIndex *self, PyObject *a
     if (!PyArg_ParseTuple(args, "O", &seq)) return NULL;
     PyObject *fast = NULL; const char **keys = NULL; Py_ssize_t *lens = NULL; Py_ssize_t n = 0;
     if (extract_key_sequence(seq, &fast, &keys, &lens, &n) < 0) return NULL;
+    if (n == 0) {
+        free((void*)keys); free(lens); Py_DECREF(fast);
+        return PyList_New(0);
+    }
     int64_t *out = (int64_t*)calloc((size_t)n, sizeof(int64_t));
     if (!out) { free((void*)keys); free(lens); Py_DECREF(fast); PyErr_NoMemory(); return NULL; }
     int rc;
@@ -1511,6 +1629,12 @@ static PyObject *NativeHandleIndex_put_many(NativeHandleIndex *self, PyObject *a
     free((void*)keys); free(lens); Py_DECREF(fast);
     if (rc == -1) { free(out); PyErr_NoMemory(); return NULL; }
     if (rc == -2) { free(out); PyErr_SetString(PyExc_RuntimeError, "native index is full"); return NULL; }
+    if (rc == -4) { free(out); PyErr_SetString(PyExc_ValueError, "native handle collision"); return NULL; }
+    if (rc == -5) { free(out); PyErr_SetString(PyExc_OverflowError, "native handle allocator exhausted"); return NULL; }
+    if (rc == -7) { free(out); PyErr_SetString(PyExc_OverflowError, "native slot generation exhausted"); return NULL; }
+    if (rc == -8) { free(out); PyErr_SetString(PyExc_OverflowError, "native index epoch exhausted"); return NULL; }
+    if (rc == -9) { free(out); PyErr_SetString(PyExc_ValueError, "requested handle is below the monotonic high-water mark"); return NULL; }
+    if (rc == -10) { free(out); PyErr_SetString(PyExc_OverflowError, "native index capacity exhausted"); return NULL; }
     PyObject *list = int64_list_from_array(out, n);
     free(out);
     return list;
@@ -1555,6 +1679,10 @@ static PyObject *NativeHandleIndex_get_handles(NativeHandleIndex *self, PyObject
     if (!PyArg_ParseTuple(args, "O", &seq)) return NULL;
     PyObject *fast = NULL; const char **keys = NULL; Py_ssize_t *lens = NULL; Py_ssize_t n = 0;
     if (extract_key_sequence(seq, &fast, &keys, &lens, &n) < 0) return NULL;
+    if (n == 0) {
+        free((void*)keys); free(lens); Py_DECREF(fast);
+        return PyList_New(0);
+    }
     int64_t *out = (int64_t*)calloc((size_t)n, sizeof(int64_t));
     if (!out) { free((void*)keys); free(lens); Py_DECREF(fast); PyErr_NoMemory(); return NULL; }
     diag_note_gil_released(DIAG_COUNTER_NATIVE_BATCH_LOOKUP_CALLS); bump_u64(&self->python_native_transitions); bump_u64(&self->gil_released_calls); bump_u64(&self->native_batch_lookup_calls);
@@ -1571,6 +1699,10 @@ static PyObject *NativeHandleIndex_pop_many(NativeHandleIndex *self, PyObject *a
     if (!PyArg_ParseTuple(args, "O", &seq)) return NULL;
     PyObject *fast = NULL; const char **keys = NULL; Py_ssize_t *lens = NULL; Py_ssize_t n = 0;
     if (extract_key_sequence(seq, &fast, &keys, &lens, &n) < 0) return NULL;
+    if (n == 0) {
+        free((void*)keys); free(lens); Py_DECREF(fast);
+        return PyList_New(0);
+    }
     int64_t *out = (int64_t*)calloc((size_t)n, sizeof(int64_t));
     if (!out) { free((void*)keys); free(lens); Py_DECREF(fast); PyErr_NoMemory(); return NULL; }
     diag_note_gil_released(DIAG_COUNTER_NATIVE_BATCH_POP_CALLS); bump_u64(&self->python_native_transitions); bump_u64(&self->gil_released_calls); bump_u64(&self->native_batch_pop_calls);
@@ -1580,6 +1712,66 @@ static PyObject *NativeHandleIndex_pop_many(NativeHandleIndex *self, PyObject *a
     PyObject *list = int64_list_from_array(out, n);
     free((void*)keys); free(lens); free(out); Py_DECREF(fast);
     return list;
+}
+
+static PyObject *NativeHandleIndex_identity(NativeHandleIndex *self, PyObject *Py_UNUSED(ignored)) {
+    uint64_t namespace_id;
+    uint64_t index_epoch;
+    pthread_rwlock_rdlock(&self->lock);
+    namespace_id = self->namespace_id;
+    index_epoch = self->index_epoch;
+    pthread_rwlock_unlock(&self->lock);
+    return Py_BuildValue("(KK)", (unsigned long long)namespace_id, (unsigned long long)index_epoch);
+}
+
+static PyObject *NativeHandleIndex_get_handle_ref(NativeHandleIndex *self, PyObject *args) {
+    const char *key; Py_ssize_t len;
+    uint64_t hash; int found = 0; Py_ssize_t idx;
+    uint64_t namespace_id; uint64_t epoch; uint32_t generation; int64_t handle;
+    if (!PyArg_ParseTuple(args, "s#", &key, &len)) return NULL;
+    pthread_rwlock_rdlock(&self->lock);
+    hash = fnv1a64(key, len);
+    idx = find_slot(self->slots, self->capacity, key, len, hash, &found);
+    if (idx < 0 || !found) {
+        pthread_rwlock_unlock(&self->lock);
+        Py_RETURN_NONE;
+    }
+    namespace_id = self->namespace_id;
+    epoch = self->index_epoch;
+    generation = self->slots[idx].generation;
+    handle = self->slots[idx].handle;
+    pthread_rwlock_unlock(&self->lock);
+    return Py_BuildValue(
+        "(KKKIL)",
+        (unsigned long long)namespace_id,
+        (unsigned long long)epoch,
+        (unsigned long long)idx,
+        (unsigned int)generation,
+        (long long)handle
+    );
+}
+
+static PyObject *NativeHandleIndex_resolve_handle_ref(NativeHandleIndex *self, PyObject *args) {
+    unsigned long long namespace_id;
+    unsigned long long epoch;
+    unsigned long long slot_index;
+    unsigned int generation;
+    long long handle;
+    int64_t result = -1;
+    if (!PyArg_ParseTuple(args, "KKKIL", &namespace_id, &epoch, &slot_index, &generation, &handle)) return NULL;
+    pthread_rwlock_rdlock(&self->lock);
+    if ((uint64_t)namespace_id == self->namespace_id
+            && (uint64_t)epoch == self->index_epoch
+            && slot_index < (unsigned long long)self->capacity) {
+        Slot *slot = &self->slots[(Py_ssize_t)slot_index];
+        if (slot->state == 1
+                && slot->generation == (uint32_t)generation
+                && slot->handle == (int64_t)handle) {
+            result = slot->handle;
+        }
+    }
+    pthread_rwlock_unlock(&self->lock);
+    return PyLong_FromLongLong(result);
 }
 
 static PyObject *NativeHandleIndex_size(NativeHandleIndex *self, PyObject *Py_UNUSED(ignored)) {
@@ -1592,9 +1784,11 @@ static PyObject *NativeHandleIndex_size(NativeHandleIndex *self, PyObject *Py_UN
 
 static void stats_scan_nogil(NativeHandleIndex *self, Py_ssize_t *size, Py_ssize_t *capacity,
                              Py_ssize_t *tombstones, int64_t *next_handle,
+                             uint64_t *namespace_id, uint64_t *index_epoch,
                              Py_ssize_t *max_probe, double *avg_probe) {
     pthread_rwlock_rdlock(&self->lock);
     *size = self->size; *capacity = self->capacity; *tombstones = self->tombstones; *next_handle = self->next_handle;
+    *namespace_id = self->namespace_id; *index_epoch = self->index_epoch;
     *max_probe = 0; *avg_probe = 0.0;
     for (Py_ssize_t i = 0; i < self->capacity; ++i) {
         if (self->slots[i].state == 1) {
@@ -1610,10 +1804,11 @@ static void stats_scan_nogil(NativeHandleIndex *self, Py_ssize_t *size, Py_ssize
 static PyObject *NativeHandleIndex_stats(NativeHandleIndex *self, PyObject *Py_UNUSED(ignored)) {
     Py_ssize_t size = 0, capacity = 0, tombstones = 0, max_probe = 0;
     int64_t next_handle = 0;
+    uint64_t namespace_id = 0, index_epoch = 0;
     double avg_probe = 0.0;
     diag_note_gil_released(DIAG_COUNTER_NATIVE_STATS_CALLS); bump_u64(&self->python_native_transitions); bump_u64(&self->gil_released_calls); bump_u64(&self->native_stats_calls);
     Py_BEGIN_ALLOW_THREADS
-    stats_scan_nogil(self, &size, &capacity, &tombstones, &next_handle, &max_probe, &avg_probe);
+    stats_scan_nogil(self, &size, &capacity, &tombstones, &next_handle, &namespace_id, &index_epoch, &max_probe, &avg_probe);
     Py_END_ALLOW_THREADS
     PyObject *d = PyDict_New(); if (!d) return NULL;
 #define SETOBJ(name, obj) do { PyObject *_o = (obj); if (!_o || PyDict_SetItemString(d, (name), _o) < 0) { Py_XDECREF(_o); Py_DECREF(d); return NULL; } Py_DECREF(_o); } while(0)
@@ -1625,6 +1820,9 @@ static PyObject *NativeHandleIndex_stats(NativeHandleIndex *self, PyObject *Py_U
     SETOBJ("max_probe", PyLong_FromSsize_t(max_probe));
     SETOBJ("avg_probe", PyFloat_FromDouble(avg_probe));
     SETOBJ("next_handle", PyLong_FromLongLong(next_handle));
+    SETOBJ("namespace_id", PyLong_FromUnsignedLongLong(namespace_id));
+    SETOBJ("index_epoch", PyLong_FromUnsignedLongLong(index_epoch));
+    SETOBJ("handle_ref_contract", PyUnicode_FromString("namespace-epoch-slot-generation-handle-v1"));
     SETOBJ("resize_count", PyLong_FromUnsignedLongLong(self->resize_count));
     Py_INCREF(Py_True); PyDict_SetItemString(d, "gil_released_get_handle", Py_True); Py_DECREF(Py_True);
     Py_INCREF(Py_True); PyDict_SetItemString(d, "gil_released_get_handles", Py_True); Py_DECREF(Py_True);
@@ -1978,6 +2176,9 @@ static PyMethodDef NativeHandleIndex_methods[] = {
     {"contains", (PyCFunction)NativeHandleIndex_contains, METH_VARARGS, "Return whether key exists."},
     {"pop", (PyCFunction)NativeHandleIndex_pop, METH_VARARGS, "Remove key and return its handle or -1."},
     {"pop_many", (PyCFunction)NativeHandleIndex_pop_many, METH_VARARGS, "Remove keys in one GIL-released native batch."},
+    {"identity", (PyCFunction)NativeHandleIndex_identity, METH_NOARGS, "Return namespace and current index epoch."},
+    {"get_handle_ref", (PyCFunction)NativeHandleIndex_get_handle_ref, METH_VARARGS, "Return a validated namespace/epoch/slot/generation handle reference."},
+    {"resolve_handle_ref", (PyCFunction)NativeHandleIndex_resolve_handle_ref, METH_VARARGS, "Resolve a fixed handle reference or return -1."},
     {"size", (PyCFunction)NativeHandleIndex_size, METH_NOARGS, "Return size."},
     {"stats", (PyCFunction)NativeHandleIndex_stats, METH_NOARGS, "Return native index stats."},
     {NULL}
@@ -2038,7 +2239,7 @@ PyMODINIT_FUNC PyInit__native_index(void) {
         Py_DECREF(m);
         return NULL;
     }
-    if (PyModule_AddStringConstant(m, "TDS_NATIVE_CAPABILITIES", "index,checksum32,checksum_registry,spiral_rank,utf8_chunks,utf8_strict,diagnostics,diagnostics_c11_ring,diagnostics_sampling") < 0) {
+    if (PyModule_AddStringConstant(m, "TDS_NATIVE_CAPABILITIES", "index,checksum32,checksum_registry,spiral_rank,utf8_chunks,utf8_strict,diagnostics,diagnostics_c11_ring,diagnostics_sampling,handle_refs_v1") < 0) {
         Py_DECREF(m);
         return NULL;
     }
@@ -2047,6 +2248,10 @@ PyMODINIT_FUNC PyInit__native_index(void) {
         return NULL;
     }
     if (PyModule_AddStringConstant(m, "TDS_NATIVE_UTF8_CHUNK_CONTRACT", "strict-rfc3629-complete-codepoints-v1") < 0) {
+        Py_DECREF(m);
+        return NULL;
+    }
+    if (PyModule_AddStringConstant(m, "TDS_NATIVE_HANDLE_REF_CONTRACT", "namespace-epoch-slot-generation-handle-v1") < 0) {
         Py_DECREF(m);
         return NULL;
     }

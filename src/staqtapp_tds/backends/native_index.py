@@ -8,6 +8,9 @@ from typing import Any, Dict, List, Optional, Tuple
 from staqtapp_tds.backends.python_index import EntryIndexStats
 
 
+NativeHandleRef = Tuple[int, int, int, int, int]
+
+
 class NativeEntryIndexBackend:
     """EntryIndex backend using a C Swiss-table-inspired bytes->int64 handle map.
 
@@ -52,6 +55,28 @@ class NativeEntryIndexBackend:
     def get_handles(self, keys: List[str]) -> List[int]:
         encoded = [k.encode("utf-8") for k in keys]
         return [int(h) for h in self._index.get_handles(encoded)]
+
+    def identity(self) -> Tuple[int, int]:
+        namespace_id, index_epoch = self._index.identity()
+        return int(namespace_id), int(index_epoch)
+
+    def get_handle_ref(self, key: str) -> Optional[NativeHandleRef]:
+        ref = self._index.get_handle_ref(key.encode("utf-8"))
+        if ref is None:
+            return None
+        namespace_id, index_epoch, slot, generation, handle = ref
+        return (
+            int(namespace_id),
+            int(index_epoch),
+            int(slot),
+            int(generation),
+            int(handle),
+        )
+
+    def resolve_handle_ref(self, ref: NativeHandleRef) -> int:
+        if len(ref) != 5:
+            raise ValueError("native handle reference must contain five integers")
+        return int(self._index.resolve_handle_ref(*tuple(int(part) for part in ref)))
 
     def contains(self, key: str) -> bool:
         return bool(self._index.contains(key.encode("utf-8")))
@@ -122,6 +147,9 @@ class NativeEntryIndexBackend:
         s = self._index.stats()
         return {
             "backend": str(s.get("backend", self.backend_name)),
+            "namespace_id": int(s.get("namespace_id", 0)),
+            "index_epoch": int(s.get("index_epoch", 0)),
+            "handle_ref_contract": str(s.get("handle_ref_contract", "")),
             "gil_released_put": bool(s.get("gil_released_put", False)),
             "gil_released_get_handle": bool(s.get("gil_released_get_handle", False)),
             "gil_released_get_handles": bool(s.get("gil_released_get_handles", False)),

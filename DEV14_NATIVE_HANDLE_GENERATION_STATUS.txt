@@ -1,0 +1,1 @@
+v3.6.0 candidate: monotonic native handles plus namespace/epoch/slot-generation validation; no learned serving, immutable generation activation, or release version bump.
