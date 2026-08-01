@@ -39,6 +39,34 @@ from .admission import (
     EaglegateRuntimeHealth,
     evaluate_admission,
 )
+from .capture_attestation import (
+    EAGLEGATE_CAPTURE_ATTESTATION_AUTHORITY,
+    EAGLEGATE_CAPTURE_ATTESTATION_CONTRACT_ID,
+    EAGLEGATE_CAPTURE_ATTESTATION_FORMAT_VERSION,
+    EAGLEGATE_CAPTURE_ATTESTATION_MIN_WITNESSES,
+    CaptureAttestationAuthorityBoundary,
+    CaptureAttestationBundle,
+    CaptureAttestationDecision,
+    CaptureObservationReceipt,
+    CaptureObservationState,
+    CaptureReadOnlyStatusSnapshot,
+    CaptureWitnessObservation,
+    canonicalize_observations,
+    compare_capture_status,
+    initial_observation_receipt,
+    next_observation_receipt,
+    record_attestation_bundle,
+    validate_observation_chain,
+)
+from .capture_attestation_suite import (
+    EAGLEGATE_CAPTURE_ATTESTATION_SUITE_ID,
+    CaptureAttestationCheck,
+    CaptureAttestationReport,
+    reference_capture_attestation_bundle,
+    reference_capture_observations,
+    reference_capture_status,
+    run_reference_capture_attestation_suite,
+)
 from .config import (
     EAGLEGATE_CONFIG_FILENAME,
     EAGLEGATE_LOCK_FILENAME,
@@ -149,6 +177,7 @@ from .vllm_shadow_suite import (
 )
 
 __all__ = [name for name in globals() if name.startswith("Eaglegate")]
+__all__ += [name for name in globals() if name.startswith("Capture")]
 __all__ += [name for name in globals() if name.startswith("Offline")]
 __all__ += [name for name in globals() if name.startswith("Vllm")]
 __all__ += [
@@ -170,6 +199,11 @@ __all__ += [
     "EAGLEGATE_ADAPTER_SUITE_ID",
     "EAGLEGATE_AUTHORITY",
     "EAGLEGATE_CAPABILITY_SNAPSHOT_ID",
+    "EAGLEGATE_CAPTURE_ATTESTATION_AUTHORITY",
+    "EAGLEGATE_CAPTURE_ATTESTATION_CONTRACT_ID",
+    "EAGLEGATE_CAPTURE_ATTESTATION_FORMAT_VERSION",
+    "EAGLEGATE_CAPTURE_ATTESTATION_MIN_WITNESSES",
+    "EAGLEGATE_CAPTURE_ATTESTATION_SUITE_ID",
     "EAGLEGATE_CONFIG_FILENAME",
     "EAGLEGATE_CONTRACT_ID",
     "EAGLEGATE_EXACTNESS_CONTRACT_ID",
@@ -198,23 +232,31 @@ __all__ += [
     "ScriptedProposer",
     "VerificationDecision",
     "authority_snapshot",
+    "canonicalize_observations",
     "capture_bundle_to_mapping",
     "capture_envelope_to_mapping",
     "committed_state_root",
+    "compare_capture_status",
     "compile_project",
     "epoch_diff",
     "evaluate_admission",
     "evaluate_vllm_shadow",
+    "initial_observation_receipt",
     "initialize_project",
     "load_configuration",
     "load_lock",
     "load_project",
+    "next_observation_receipt",
     "profile_configuration",
     "prove_lossless_one_step_distribution",
     "provider_snapshot_payload_root",
+    "record_attestation_bundle",
     "reference_adapter_identity",
     "reference_adapter_limits",
     "reference_adapter_request",
+    "reference_capture_attestation_bundle",
+    "reference_capture_observations",
+    "reference_capture_status",
     "reference_epoch_root",
     "reference_offline_capture_bundle",
     "reference_vllm_eagle_snapshot",
@@ -223,6 +265,7 @@ __all__ += [
     "resolve_lock_from_snapshot",
     "run_adapter_conformance_reference",
     "run_reference_adapter_conformance_suite",
+    "run_reference_capture_attestation_suite",
     "run_reference_exactness_suite",
     "run_reference_offline_capture_suite",
     "run_reference_vllm_shadow_suite",
@@ -231,6 +274,7 @@ __all__ += [
     "snapshot_to_mapping",
     "token_sequence_root",
     "validate_epoch_transition",
+    "validate_observation_chain",
     "validate_offline_capability_capture",
     "validate_qualification_for_epoch",
 ]

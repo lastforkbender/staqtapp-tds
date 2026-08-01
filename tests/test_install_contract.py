@@ -36,6 +36,12 @@ def test_standard_install_includes_main_telemetry_ui_launcher():
     assert project["scripts"]["staqtapp-tds-eaglegate-capture-lab"] == (
         "staqtapp_tds.eaglegate.offline_capture_suite:main"
     )
+    assert project["scripts"]["staqtapp-tds-eaglegate-capture-witness"] == (
+        "staqtapp_tds.eaglegate.capture_attestation:main"
+    )
+    assert project["scripts"]["staqtapp-tds-eaglegate-capture-witness-lab"] == (
+        "staqtapp_tds.eaglegate.capture_attestation_suite:main"
+    )
     assert metadata["tool"]["setuptools"]["package-data"]["staqtapp_tds.admin"] == [
         "templates/*.html",
         "static/css/*.css",
