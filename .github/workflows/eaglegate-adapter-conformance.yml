@@ -1,0 +1,120 @@
+name: Staqtapp-TDS Eaglegate adapter conformance
+
+on:
+  pull_request:
+    branches:
+      - agent/eaglegate-exactness-laboratory
+  push:
+    branches:
+      - agent/eaglegate-adapter-conformance
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eaglegate-adapter-conformance-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  adapter-contract:
+    name: Adapter contract (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            python: '3.10'
+          - os: ubuntu-24.04
+            python: '3.13'
+          - os: macos-14
+            python: '3.13'
+          - os: windows-2022
+            python: '3.13'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install focused test dependencies
+        run: python -m pip install -e .[test]
+      - name: Compile the complete Eaglegate package
+        run: python -m compileall -q src/staqtapp_tds/eaglegate
+      - name: Run foundation, exactness, adapter, workflow, and install contracts
+        run: >-
+          python -m pytest -q
+          tests/test_v380_eaglegate_lossless_foundation.py
+          tests/test_v380_eaglegate_workflow_contract.py
+          tests/test_v380_eaglegate_exactness_laboratory.py
+          tests/test_v380_eaglegate_exactness_workflow_contract.py
+          tests/test_v380_eaglegate_adapter_conformance.py
+          tests/test_v380_eaglegate_adapter_workflow_contract.py
+          tests/test_install_contract.py
+      - name: Generate deterministic content-free adapter evidence twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m staqtapp_tds.eaglegate.adapter --json > adapter-a.json
+          python -m staqtapp_tds.eaglegate.adapter --json > adapter-b.json
+          cmp adapter-a.json adapter-b.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("adapter-a.json").read_text(encoding="utf-8"))
+          if report.get("passed") is not True:
+              raise SystemExit("adapter conformance report did not pass")
+          if report.get("check_count") != 10:
+              raise SystemExit("adapter conformance catalog changed unexpectedly")
+          if report.get("activation_authority") is not False:
+              raise SystemExit("adapter evidence widened activation authority")
+          if report.get("adapter_execution_authority") is not False:
+              raise SystemExit("adapter evidence claimed execution authority")
+          if report.get("real_runtime_qualified") is not False:
+              raise SystemExit("fake adapter qualified a real runtime")
+          if report.get("adapter_abi_version") != 1:
+              raise SystemExit("adapter ABI version changed unexpectedly")
+          forbidden = {
+              "prompt", "prompt_text", "tokens", "token_sequence", "logits",
+              "logits_payload", "hidden_states", "kv_tensor", "kv_tensors",
+          }
+
+          def keys(value):
+              if isinstance(value, dict):
+                  for key, item in value.items():
+                      yield key
+                      yield from keys(item)
+              elif isinstance(value, list):
+                  for item in value:
+                      yield from keys(item)
+
+          leaked = sorted(forbidden.intersection(keys(report)))
+          if leaked:
+              raise SystemExit(f"content-bearing evidence keys present: {leaked}")
+          print(report["report_root"])
+          PY
+      - name: Archive adapter conformance evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: eaglegate-adapter-${{ matrix.os }}-py${{ matrix.python }}
+          path: |
+            adapter-a.json
+            adapter-b.json
+          if-no-files-found: warn
+
+  adapter-gates-complete:
+    name: Eaglegate adapter conformance gates complete
+    if: always()
+    needs:
+      - adapter-contract
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require every adapter conformance lane
+        env:
+          ADAPTER_RESULT: ${{ needs.adapter-contract.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$ADAPTER_RESULT" = "success"
