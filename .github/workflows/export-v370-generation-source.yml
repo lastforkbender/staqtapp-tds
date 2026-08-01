@@ -1,6 +1,9 @@
 name: Export v3.7 generation convergence source
 
 on:
+  pull_request:
+    branches:
+      - agent/v370-atomic-csv-reference
   push:
     branches:
       - agent/v370-source-export
