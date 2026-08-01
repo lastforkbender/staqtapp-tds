@@ -1,0 +1,38 @@
+TDS v3.7 ATOMIC GENERATION CONVERGENCE
+
+STATUS: CLEAN IMPLEMENTATION BRANCH ACTIVE; REMOTE QUALIFICATION REQUIRED
+
+Branch: agent/v370-atomic-generation-convergence
+Base: canonical main
+Published package at branch creation: 3.5.3.post2
+Intended future release: 3.7.0
+
+Implemented:
+- immutable atomic CSV generation contract
+- deterministic stateful streaming reference store
+- exact original-byte reconstruction
+- content-addressed chunks
+- canonical packed row offsets and row anchors
+- rooted closure evidence
+- append-only generation receipts
+- atomic CURRENT publication
+- generation-pinned read leases
+- cross-process publication lock
+- CAS checked under the process lock
+- durable publication intent and commit records
+- interrupted-publication recovery
+- deterministic rollback to prior committed generations
+- non-destructive retirement of inactive unpinned generations
+- additive English/Japanese README current-status update
+- exact preservation contract for all 19 screenshots and existing links
+
+Deliberately absent:
+- destructive object collection
+- native C generation builder
+- learned serving
+- random-forest sentinels
+- C-driven agent pool
+- Eaglegate execution
+- production speculative decoding
+- model, semantic, Browser, Studio, policy, or activation authority
+- 3.7.0 tag or PyPI publication
