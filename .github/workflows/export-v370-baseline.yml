@@ -1,6 +1,9 @@
 name: Export v3.7 clean baseline
 
 on:
+  pull_request:
+    branches:
+      - agent/v360-foundation-closure-clean
   push:
     branches:
       - agent/v370-generation-convergence
