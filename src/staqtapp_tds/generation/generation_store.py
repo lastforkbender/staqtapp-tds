@@ -260,7 +260,11 @@ class AtomicGenerationStore:
         flags: int,
         mode: int = 0o600,
     ) -> int:
-        open_flags = flags
+        # ``os.open`` descriptors inherit the Windows CRT text mode unless
+        # O_BINARY is explicit.  Text-mode ``os.write`` turns the canonical LF
+        # record separator into CRLF, while the byte-exact reader correctly
+        # rejects the trailing CR as noncanonical JSON.
+        open_flags = flags | getattr(os, "O_BINARY", 0)
         if hasattr(os, "O_CLOEXEC"):
             open_flags |= os.O_CLOEXEC
         if hasattr(os, "O_NOFOLLOW"):

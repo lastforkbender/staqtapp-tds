@@ -9,6 +9,8 @@ keeping production activation and package publication separate.
 - Published composite Eaglegate ServingEpoch candidates only through the v3.7
   Generation Authority, binding storage, policy plus ordered plans,
   target/runtime identity, exactness, adapter conformance, and receipt lineage.
+- Forced raw Generation Authority descriptors into Windows binary mode so the
+  canonical LF-delimited publication log remains byte-identical across OSes.
 - Hard-rejected canary and active configuration/publication; local project
   files remain candidate intent and the console remains target-only.
 - Added a real executable vLLM `0.26.0` EAGLE (not EAGLE-3) shadow adapter pinned

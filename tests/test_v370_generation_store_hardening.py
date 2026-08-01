@@ -64,6 +64,43 @@ def _hold_cross_process_pin(
     lease.close()
 
 
+def test_generation_descriptors_request_binary_mode_for_canonical_records(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    platform_binary_flag = getattr(os, "O_BINARY", 0)
+    sentinel = 1 << 29
+    real_open = os.open
+    regular_calls: list[tuple[str, int]] = []
+
+    def tracked_open(path, flags, mode=0o777, *, dir_fd=None):
+        path_text = os.fspath(path)
+        if not flags & getattr(os, "O_DIRECTORY", 0):
+            regular_calls.append((path_text, flags))
+        clean_flags = (flags & ~sentinel) | platform_binary_flag
+        if dir_fd is None:
+            return real_open(path, clean_flags, mode)
+        return real_open(path, clean_flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(os, "O_BINARY", sentinel, raising=False)
+    monkeypatch.setattr(os, "open", tracked_open)
+
+    store = AtomicGenerationStore(tmp_path / "authority")
+    published = _publish_first(store, "dataset:binary-records")
+    assert store.current_head("dataset:binary-records") == published.head
+
+    generation_calls = [
+        flags
+        for path, flags in regular_calls
+        if path.endswith(("LOCK", "publication.jsonl"))
+    ]
+    assert generation_calls
+    assert all(flags & sentinel for flags in generation_calls)
+    raw_log = store._publication_log_path("dataset:binary-records").read_bytes()
+    assert raw_log.endswith(b"\n")
+    assert b"\r\n" not in raw_log
+
+
 def test_namespace_lock_is_persistent_but_crash_released(tmp_path: Path) -> None:
     namespace = "dataset:crash-lock"
     context = multiprocessing.get_context("spawn")
