@@ -45,11 +45,16 @@ jobs:
               "README_ja.md",
               "docs/readme_targets_v370.json",
           }
-          observed = set(
-              subprocess.check_output(
-                  ["git", "diff", "--name-only"], text=True
-              ).splitlines()
+          status = subprocess.check_output(
+              ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+              text=True,
           )
+          observed = set()
+          for line in status.splitlines():
+              path = line[3:]
+              if " -> " in path:
+                  path = path.rsplit(" -> ", 1)[1]
+              observed.add(path)
           unexpected = observed - allowed
           required = {"README.md", "README_ja.md", "docs/readme_targets_v370.json"}
           if unexpected:
