@@ -1,0 +1,436 @@
+name: Materialize v3.7 Atomic Generation convergence
+
+on:
+  push:
+    branches:
+      - agent/v370-atomic-generation-convergence
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-v370-atomic-generation
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: agent/v370-atomic-generation-convergence
+
+      - name: Converge on the exact clean v3.6 Foundation head
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            agent/v360-foundation-closure:refs/remotes/origin/agent/v360-foundation-closure
+          git reset --hard origin/agent/v360-foundation-closure
+          test -f src/staqtapp_tds/native/foundation.py
+          grep -q '3.6.0' src/staqtapp_tds/version.py
+
+      - name: Port the clean Atomic Generation contract and reference store
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            agent/v370-atomic-csv-reference:refs/remotes/origin/agent/v370-atomic-csv-reference
+
+          for path in \
+            docs/122_v370_Atomic_CSV_Generation_Contract.md \
+            src/staqtapp_tds/csv_layer/generation_contract.py \
+            src/staqtapp_tds/csv_layer/generation_store.py \
+            tests/test_v370_csv_generation_contract.py \
+            tests/test_v370_csv_generation_store.py
+          do
+            mkdir -p "$(dirname "$path")"
+            git show "origin/agent/v370-atomic-csv-reference:$path" > "$path"
+          done
+
+          rm -f .github/v370-atomic-generation-convergence.trigger
+          rm -f .github/v370-placeholder
+          rm -f .github/v370-branch-request
+          rm -f .github/STOP
+          rm -f .github/workflows/cleanup-v360-*.yml
+          rm -f .github/workflows/materialize-v370-atomic-generation.yml
+
+      - name: Add the generic TDS Generation Authority namespace
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p src/staqtapp_tds/generation
+          cat > src/staqtapp_tds/generation/__init__.py <<'PY'
+          """Canonical immutable-generation authority for Staqtapp-TDS.
+
+          v3.7 converges the qualified CSV generation contract and reference
+          store onto the hardened v3.6 Foundation. CSV is the first consumer;
+          the durable identities, publication receipts, reader pinning, CAS,
+          recovery, retirement, and rollback rules are TDS-wide primitives.
+          """
+
+          from staqtapp_tds.csv_layer.generation_contract import *  # noqa: F401,F403
+          from staqtapp_tds.csv_layer.generation_store import *  # noqa: F401,F403
+          PY
+
+          cat > docs/130_v370_Atomic_Generation_Convergence.md <<'MD'
+          # v3.7 Atomic Generation convergence
+
+          ## Status
+
+          This candidate is reconstructed directly on the clean v3.6 Foundation
+          line. It does not merge the stale native-repair ancestry of the earlier
+          experimental branches.
+
+          ## Authority model
+
+          One immutable generation is the unit of validation, replay, reader
+          pinning, publication, rollback, and retirement. Original source bytes
+          remain authoritative. Derived offsets, anchors, closures, and future
+          evidence products must bind one exact generation identity.
+
+          ```text
+          construct immutable generation
+                    ↓
+          seal complete payload and manifest
+                    ↓
+          verify all roots and limits
+                    ↓
+          compare-and-swap current head
+                    ↓
+          pin readers to an immutable generation
+                    ↓
+          retire only through explicit receipts
+          ```
+
+          The Generation Authority may publish a verified immutable generation.
+          It may not rank, infer semantics, train, activate a model, weaken
+          verification, accept learned writes, or grant Browser/Studio authority.
+
+          ## Converged implementation
+
+          - `staqtapp_tds.csv_layer.generation_contract`
+          - `staqtapp_tds.csv_layer.generation_store`
+          - `staqtapp_tds.generation` as the TDS-wide import namespace
+          - deterministic contract, store, recovery, CAS, and corruption tests
+
+          CSV is the first concrete consumer. Eaglegate epochs and other future
+          immutable control-plane artifacts may consume the same authority only
+          after their own qualification and without changing its storage rules.
+
+          ## Deliberately absent
+
+          This candidate contains no Eaglegate execution, speculative token
+          acceptance, random-forest sentinel, C-driven agent pool, online
+          training, semantic commitment, model authority, or Browser activation
+          authority.
+          MD
+
+          cat > DEV20_V370_ATOMIC_GENERATION_CONVERGENCE_STATUS.txt <<'TXT'
+          TDS v3.7.0 ATOMIC GENERATION CONVERGENCE
+
+          STATUS: SOURCE CANDIDATE IMPLEMENTED; REMOTE QUALIFICATION REQUIRED
+
+          Base: clean v3.6 Foundation Closure
+          Contract: immutable generation identity and append-only lifecycle
+          Store: deterministic reference publication, CAS, pinning, recovery, retirement
+          Source truth: original bytes remain authoritative
+          Browser/Studio: observer-only
+          Eaglegate: not included in this tranche
+          Learned serving: not included
+          Release identity: remains 3.6.0 until the v3.7 release exit gate passes
+          TXT
+
+      - name: Update English and Japanese READMEs without removing media or links
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          def targets(text: str):
+              images = tuple(re.findall(r'<img\b[^>]*?\bsrc="([^"]+)"', text, flags=re.I))
+              links = tuple(re.findall(r'(?<!!)\[[^]]+\]\(([^)\s]+)', text))
+              return images, links
+
+          root = Path('.')
+          en_path = root / 'README.md'
+          ja_path = root / 'README_ja.md'
+          en = en_path.read_text(encoding='utf-8')
+          ja = ja_path.read_text(encoding='utf-8')
+          en_images, en_links = targets(en)
+          ja_images, ja_links = targets(ja)
+          assert len(en_images) == 19, len(en_images)
+          assert len(ja_images) == 19, len(ja_images)
+
+          en_banner = '''\
+          > **v3.7 Atomic Generation convergence candidate**
+          >
+          > The current hardened Foundation identity is **v3.6.0**. This branch
+          > adds the immutable Atomic Generation contract and deterministic
+          > reference store on that Foundation: complete generation identity,
+          > append-only lifecycle receipts, compare-and-swap publication, reader
+          > pinning, recovery, retirement, and rollback. It does not activate
+          > Eaglegate, learned serving, semantic authority, or model authority.
+          >
+          > All 19 Browser screenshots and the existing programmer, API,
+          > changelog, license, and language links below are retained unchanged.
+
+          '''
+          ja_banner = '''\
+          > **v3.7 Atomic Generation convergence candidate**
+          >
+          > 現在の hardened Foundation identity は **v3.6.0** です。この branch は
+          > immutable Atomic Generation contract と deterministic reference store を
+          > v3.6.0 Foundation 上へ追加します。Generation identity、append-only
+          > lifecycle receipt、compare-and-swap publication、reader pinning、recovery、
+          > retirement、rollback を含みます。Eaglegate execution、learned serving、
+          > semantic authority、model authority は有効化しません。
+          >
+          > 以下の Browser screenshot 19 枚と既存の programmer / API / changelog /
+          > license / language link は変更せず保持します。
+
+          '''
+
+          if 'v3.7 Atomic Generation convergence candidate' not in en:
+              first_end = en.find('\n') + 1
+              en = en[:first_end] + '\n' + en_banner + en[first_end:]
+          if 'v3.7 Atomic Generation convergence candidate' not in ja:
+              first_end = ja.find('\n') + 1
+              ja = ja[:first_end] + '\n' + ja_banner + ja[first_end:]
+
+          en_section = '''\
+          ## v3.7 Atomic Generation status
+
+          The v3.7 candidate introduces a canonical immutable-generation unit
+          above the v3.6 native Foundation. A generation binds original bytes,
+          ordered chunks, parser/dialect identity, offsets, row anchors, closure,
+          limits, parent identity, qualification evidence, and publication
+          receipts. Publication is compare-and-swap; readers remain pinned to
+          their original generation while a later generation becomes current.
+          Partial, mixed, corrupt, stale, or over-limit generations fail closed.
+
+          CSV is the first concrete consumer. The same authority is intentionally
+          suitable for later Eaglegate policy and qualification epochs, but no
+          Eaglegate runtime is included in this tranche.
+
+          '''
+          ja_section = '''\
+          ## v3.7 Atomic Generation status
+
+          v3.7 candidate は v3.6 native Foundation の上に canonical immutable
+          generation unit を追加します。Generation は original bytes、ordered
+          chunk、parser / dialect identity、offset、row anchor、closure、limit、
+          parent identity、qualification evidence、publication receipt を 1 つの
+          identity に結合します。Publication は compare-and-swap で行われ、reader
+          は後続 generation の publication 中も元の generation に pin されます。
+          Partial、mixed、corrupt、stale、over-limit generation は fail closed です。
+
+          CSV が最初の concrete consumer です。将来の Eaglegate policy / qualification
+          epoch も同じ authority を利用できますが、この tranche に Eaglegate runtime
+          は含まれません。
+
+          '''
+          if '## v3.7 Atomic Generation status' not in en:
+              marker = '## Centralized Browser'
+              en = en.replace(marker, en_section + marker, 1)
+          if '## v3.7 Atomic Generation status' not in ja:
+              marker = '## Centralized Browser'
+              ja = ja.replace(marker, ja_section + marker, 1)
+
+          en_path.write_text(en, encoding='utf-8', newline='\n')
+          ja_path.write_text(ja, encoding='utf-8', newline='\n')
+
+          new_en_images, new_en_links = targets(en)
+          new_ja_images, new_ja_links = targets(ja)
+          assert new_en_images == en_images
+          assert new_ja_images == ja_images
+          assert set(en_links).issubset(new_en_links)
+          assert set(ja_links).issubset(new_ja_links)
+          PY
+
+      - name: Add README preservation and convergence contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > tests/test_v370_readme_current_status.py <<'PY'
+          from pathlib import Path
+          import re
+
+          ROOT = Path(__file__).resolve().parents[1]
+
+          def image_targets(text: str) -> tuple[str, ...]:
+              return tuple(re.findall(r'<img\b[^>]*?\bsrc="([^"]+)"', text, flags=re.I))
+
+          def markdown_targets(text: str) -> tuple[str, ...]:
+              return tuple(re.findall(r'(?<!!)\[[^]]+\]\(([^)\s]+)', text))
+
+          def test_readmes_report_v370_candidate_and_v360_foundation() -> None:
+              english = (ROOT / 'README.md').read_text(encoding='utf-8')
+              japanese = (ROOT / 'README_ja.md').read_text(encoding='utf-8')
+              for text in (english, japanese):
+                  assert 'v3.7 Atomic Generation convergence candidate' in text
+                  assert 'v3.6.0' in text
+                  assert '## v3.7 Atomic Generation status' in text
+
+          def test_all_browser_screenshots_remain_present() -> None:
+              english = (ROOT / 'README.md').read_text(encoding='utf-8')
+              japanese = (ROOT / 'README_ja.md').read_text(encoding='utf-8')
+              en = image_targets(english)
+              ja = image_targets(japanese)
+              assert len(en) == 19
+              assert len(ja) == 19
+              for index, slug in enumerate((
+                  'dashboard', 'engine-health', 'real-time-metrics',
+                  'transition-timeline', 'event-ring-monitor',
+                  'pressure-diagnostics', 'csv-interpole', 'snapshot-explorer',
+                  'lock-contention', 'workload-analytics', 'spiral-rank',
+                  'index-analytics', 'storage-analytics', 'comparative-views',
+                  'recovery-planner', 'policy-proposals', 'alerts-events',
+                  'security', 'settings',
+              ), start=1):
+                  filename = f'{index:02d}-{slug}-1280x800.png'
+                  assert any(target.endswith(filename) for target in en)
+                  assert any(target.endswith(filename) for target in ja)
+
+          def test_important_links_remain_present() -> None:
+              english = (ROOT / 'README.md').read_text(encoding='utf-8')
+              japanese = (ROOT / 'README_ja.md').read_text(encoding='utf-8')
+              en = '\n'.join(markdown_targets(english))
+              ja = '\n'.join(markdown_targets(japanese))
+              for required in (
+                  'README_ja.md', 'CHANGELOG.md', 'LICENSE',
+                  'Staqtapp_TDS_API_Surface_Reference.pdf',
+                  'Staqtapp_TDS_Programmer_Core_API_Guide.pdf',
+                  'Programmers_API_Reference.md',
+              ):
+                  assert required in en
+              for required in (
+                  'README.md', 'CHANGELOG.md', 'LICENSE',
+                  'Staqtapp_TDS_API_Surface_Reference.pdf',
+                  'Staqtapp_TDS_Programmer_Core_API_Guide.pdf',
+              ):
+                  assert required in ja
+
+          def test_generic_generation_namespace_is_available() -> None:
+              import staqtapp_tds.generation as generation
+              assert generation.__doc__
+          PY
+
+          cat > .github/workflows/v370-atomic-generation.yml <<'YML'
+          name: Staqtapp-TDS v3.7 Atomic Generation
+
+          on:
+            pull_request:
+              branches: [main]
+            push:
+              branches:
+                - agent/v370-atomic-generation-convergence
+            workflow_dispatch:
+
+          permissions:
+            contents: read
+
+          concurrency:
+            group: v370-atomic-generation-${{ github.ref }}
+            cancel-in-progress: false
+
+          jobs:
+            atomic-generation-contract:
+              name: Atomic Generation (${{ matrix.os }}, Python ${{ matrix.python }})
+              runs-on: ${{ matrix.os }}
+              strategy:
+                fail-fast: false
+                matrix:
+                  include:
+                    - os: ubuntu-24.04
+                      python: '3.10'
+                    - os: ubuntu-24.04
+                      python: '3.13'
+                    - os: macos-14
+                      python: '3.13'
+                    - os: windows-2022
+                      python: '3.13'
+              steps:
+                - uses: actions/checkout@v7
+                - uses: actions/setup-python@v6
+                  with:
+                    python-version: ${{ matrix.python }}
+                - name: Install test dependencies
+                  run: python -m pip install -e .[test]
+                - name: Compile generation packages
+                  run: python -m compileall -q src/staqtapp_tds/generation src/staqtapp_tds/csv_layer
+                - name: Run Atomic Generation and README contracts
+                  run: >-
+                    python -m pytest -q
+                    tests/test_v370_csv_generation_contract.py
+                    tests/test_v370_csv_generation_store.py
+                    tests/test_v370_readme_current_status.py
+                    tests/test_release_version_policy.py
+                    tests/test_v301_release_pipeline.py
+                    tests/test_v353_release_qualification.py
+
+            atomic-generation-gates-complete:
+              name: TDS v3.7 Atomic Generation gates complete
+              if: always()
+              needs: atomic-generation-contract
+              runs-on: ubuntu-24.04
+              steps:
+                - name: Require every matrix lane
+                  env:
+                    RESULT: ${{ needs.atomic-generation-contract.result }}
+                  run: test "$RESULT" = success
+          YML
+
+      - name: Update changelog and versioning status
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          changelog = Path('CHANGELOG.md')
+          text = changelog.read_text(encoding='utf-8')
+          entry = '''# v3.7.0 candidate — Atomic Generation convergence\n\nConverges the immutable generation contract and deterministic reference store\nonto the hardened v3.6 Foundation without admitting Eaglegate or learned\nserving. Adds generation identity, append-only lifecycle receipts, CAS\npublication, reader pinning, recovery, retirement, rollback, and current-status\nREADME coverage while preserving all existing Browser screenshots and links.\n\n'''
+          if not text.startswith('# v3.7.0 candidate'):
+              changelog.write_text(entry + text, encoding='utf-8', newline='\n')
+
+          policy = Path('docs/VERSIONING.md')
+          ptext = policy.read_text(encoding='utf-8')
+          marker = '## Upgrade sequence\n'
+          status = '''## Current development status\n\n`3.6.0` is the Foundation identity. The active next candidate is `3.7.0`,\nthe Atomic Generation Plane. Candidate branches do not become a public release\nuntil their complete exit gates pass.\n\n'''
+          if '## Current development status' not in ptext:
+              ptext = ptext.replace(marker, status + marker, 1)
+              policy.write_text(ptext, encoding='utf-8', newline='\n')
+          PY
+
+      - name: Validate the converged candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          python -m compileall -q \
+            src/staqtapp_tds/generation \
+            src/staqtapp_tds/csv_layer/generation_contract.py \
+            src/staqtapp_tds/csv_layer/generation_store.py
+          python -m pytest -q \
+            tests/test_v370_csv_generation_contract.py \
+            tests/test_v370_csv_generation_store.py \
+            tests/test_v370_readme_current_status.py \
+            tests/test_release_version_policy.py \
+            tests/test_v301_release_pipeline.py \
+            tests/test_v353_release_qualification.py
+          python scripts/check_release.py
+
+      - name: Commit the clean v3.7 convergence candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Converge v3.7 Atomic Generation Plane'
+          git push --force-with-lease origin HEAD:agent/v370-atomic-generation-convergence
