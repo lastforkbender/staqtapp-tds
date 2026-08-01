@@ -37,7 +37,7 @@ v3.6.0 adds no Atomic Generation Plane, Eaglegate runtime, graph planner,
 learned sentinel, random forest, agent pool, request-path training, model
 authority, or activation authority.
 
-## Process-global native-state ledger
+## Process-global native-state closure
 
 The native-index extension retains a deliberately closed set of process-scoped
 state. Every mutable symbol uses the `g_` prefix and belongs to one of five
@@ -60,7 +60,7 @@ an immutable input snapshot before releasing the GIL. Its single-phase module
 shape is retained only because the module is stateless; adding process-global
 mutable state requires a new lifecycle contract and qualification.
 
-The machine-checkable registry and source audit live in:
+The machine-checkable mutable-state registry and source audit live in:
 
 ```text
 staqtapp_tds.native.foundation
@@ -69,15 +69,38 @@ staqtapp_tds.native.foundation
 A new, missing, or renamed process-global `g_` symbol fails the Foundation
 Closure audit until it is explicitly classified and reviewed.
 
+The complete static-duration inventory required by Phase 1 lives in:
+
+```text
+docs/130_v360_Process_Global_Native_State_Audit.md
+```
+
+That audit applies the five required dispositions exactly to all 29 native C
+objects with static storage duration, including immutable CPython descriptors
+and function-local immutable tables:
+
+```text
+immutable after initialization  16
+atomic observer state            10
+guarded lifecycle state           1
+compatibility-only state          2
+must be migrated                  0
+```
+
+The machine registry and the complete inventory are complementary. The registry
+prevents silent mutable-state expansion; the inventory closes the exact Phase 1
+classification boundary. Neither grants runtime or release authority.
+
 ## Performance claim boundary
 
 v3.6.0 deliberately makes the narrow claim supported by the evidence:
 
 ```text
-shared-runner aggregate no-regression floor: 1.00x
-x86-64/AArch64 covered semantic parity:      qualified
-named-reference-CPU scaling claim:           false
-universal scaling claim:                     false
+deterministic native correctness:             qualified
+shared-runner aggregate no-regression floor:  1.00x
+x86-64/AArch64 covered semantic parity:       qualified
+named-reference-CPU scaling claim:            false
+universal scaling claim:                      false
 ```
 
 The hosted measurements remain useful evidence, including the independently
@@ -102,7 +125,7 @@ The canonical report binds:
 
 - exact release identity;
 - native-index and CSV-sidecar source SHA-256 identities;
-- the complete process-state registry root;
+- the complete mutable process-state registry root;
 - declared, missing, and unexpected process-global symbols;
 - required lifecycle, diagnostic, immutable-index, and input-ownership markers;
 - the narrowed performance-claim root; and
@@ -118,8 +141,9 @@ head:
 
 1. The Foundation Closure report passes and is byte-identical across repeated
    execution.
-2. Every process-global native symbol is present in the closed ledger and no
-   unclassified symbol exists.
+2. Every mutable process-global native symbol is present in the closed registry,
+   no unclassified symbol exists, all 29 static-duration objects are present in
+   the complete audit, and the `must be migrated` count is zero.
 3. Native lifecycle, subinterpreter, and free-threaded policies remain
    fail-closed as declared.
 4. Python 3.10 through 3.14, Windows, macOS, Linux native, sanitizer,
@@ -127,7 +151,9 @@ head:
    gates pass.
 5. The source, installed metadata, and imported package identity all equal
    `3.6.0`.
-6. No Atomic Generation, Eaglegate, learned-serving, or activation path is
+6. Temporary transfer/materialization/fixer workflows and premature v3.7 tag,
+   release, or publication artifacts are absent.
+7. No Atomic Generation, Eaglegate, learned-serving, or activation path is
    admitted by this release.
 
 A production tag and PyPI publication remain separate release-controller
