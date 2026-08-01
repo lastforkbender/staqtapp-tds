@@ -325,21 +325,6 @@ class AdapterExecution:
     trace: EaglegateAdapterTrace
 
 
-@dataclass
-class DeterministicOperationClock:
-    deadline_ticks: int
-
-    def __post_init__(self) -> None:
-        require_int("deadline_ticks", self.deadline_ticks, 1)
-        self.ticks = 0
-
-    def consume(self) -> bool:
-        if self.ticks + 1 > self.deadline_ticks:
-            return False
-        self.ticks += 1
-        return True
-
-
 def _consume_or_fallback(clock: DeterministicOperationClock) -> bool:
     return clock.consume()
 
