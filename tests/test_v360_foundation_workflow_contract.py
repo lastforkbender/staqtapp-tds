@@ -12,6 +12,22 @@ def test_foundation_has_one_permanent_closure_workflow() -> None:
     assert "TDS v3.6 Foundation Closure gates complete" in source
 
 
+def test_native_lane_uses_isolated_audit_and_only_core_runtime_dependency() -> None:
+    source = (
+        ROOT / ".github" / "workflows" / "foundation-closure.yml"
+    ).read_text(encoding="utf-8")
+    native = source.split("  native-source-contract:", 1)[1].split(
+        "\n  foundation-gates-complete:", 1
+    )[0]
+    assert "python -m pip install setuptools wheel pytest numpy" in native
+    assert (
+        "python tools/foundation_closure_v360.py --root . --json "
+        "> foundation-native.json"
+    ) in native
+    assert "python -m staqtapp_tds.native.foundation" not in native
+    assert "PyQt5" not in native
+
+
 def test_foundation_clean_tree_has_no_transfer_or_materialization_artifacts() -> None:
     forbidden = (
         ".github/v360-foundation-closure.patch.gz.b64",
