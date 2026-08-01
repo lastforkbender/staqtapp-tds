@@ -1,0 +1,725 @@
+name: Materialize v3.7 Atomic Generation convergence
+
+on:
+  push:
+    branches:
+      - agent/v370-generation-convergence
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-v370-generation-convergence
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: agent/v370-generation-convergence
+      - name: Port only the qualified Atomic Generation sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin agent/v370-atomic-csv-reference:refs/remotes/origin/agent/v370-atomic-csv-reference
+          source_ref=refs/remotes/origin/agent/v370-atomic-csv-reference
+          files=(
+            docs/122_v370_Atomic_CSV_Generation_Contract.md
+            src/staqtapp_tds/csv_layer/generation_contract.py
+            src/staqtapp_tds/csv_layer/generation_store.py
+            tests/test_v370_csv_generation_contract.py
+            tests/test_v370_csv_generation_store.py
+          )
+          for path in "${files[@]}"; do
+            mkdir -p "$(dirname "$path")"
+            git show "$source_ref:$path" > "$path"
+          done
+          test ! -e .github/native-repair-patch.part-00
+          test ! -e .github/workflows/apply-v360-native-repair.yml
+          test ! -e .github/workflows/native-repair.yml
+      - name: Add the generic Generation Authority facade
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p src/staqtapp_tds/generation
+          cat > src/staqtapp_tds/generation/authority.py <<'PY'
+          """Generic authority boundary for TDS immutable generations.
+
+          The v3.7 CSV implementation is the first reference consumer.  This
+          module exposes the cross-domain authority contract without granting
+          semantic, ranking, model, policy, Browser, or Eaglegate authority.
+          """
+          from __future__ import annotations
+
+          from dataclasses import asdict, dataclass
+          import hashlib
+          import importlib
+          import json
+          from typing import Any
+
+          GENERATION_AUTHORITY_CONTRACT_ID = "tds.v370.atomic-generation-authority.v1"
+          GENERATION_AUTHORITY_FORMAT_VERSION = 1
+          GENERATION_REFERENCE_CONTRACT_MODULE = (
+              "staqtapp_tds.csv_layer.generation_contract"
+          )
+          GENERATION_REFERENCE_STORE_MODULE = "staqtapp_tds.csv_layer.generation_store"
+
+
+          def _canonical_root(domain: str, payload: dict[str, Any]) -> str:
+              encoded = json.dumps(
+                  payload,
+                  sort_keys=True,
+                  separators=(",", ":"),
+                  ensure_ascii=True,
+              ).encode("ascii")
+              digest = hashlib.sha256(
+                  b"tds-generation-authority\x00"
+                  + domain.encode("ascii")
+                  + b"\x00"
+                  + encoded
+              ).hexdigest()
+              return f"sha256:{digest}"
+
+
+          @dataclass(frozen=True, slots=True)
+          class GenerationAuthorityBoundary:
+              immutable_generation_construction: bool = True
+              verified_publication_receipts: bool = True
+              compare_and_swap_current_head: bool = True
+              reader_generation_pinning: bool = True
+              deterministic_recovery: bool = True
+              generation_retirement: bool = True
+              original_bytes_authoritative: bool = True
+              semantic_authority: bool = False
+              ranking_authority: bool = False
+              model_authority: bool = False
+              training_authority: bool = False
+              policy_authority: bool = False
+              browser_publication_authority: bool = False
+              studio_publication_authority: bool = False
+              eaglegate_activation_authority: bool = False
+
+              def canonical_dict(self) -> dict[str, Any]:
+                  return {
+                      "contract_id": GENERATION_AUTHORITY_CONTRACT_ID,
+                      "format_version": GENERATION_AUTHORITY_FORMAT_VERSION,
+                      **asdict(self),
+                  }
+
+              @property
+              def authority_root(self) -> str:
+                  return _canonical_root("authority-boundary", self.canonical_dict())
+
+
+          GENERATION_AUTHORITY = GenerationAuthorityBoundary()
+
+
+          def reference_modules() -> tuple[Any, Any]:
+              """Load the first qualified CSV contract/store reference lazily."""
+              return (
+                  importlib.import_module(GENERATION_REFERENCE_CONTRACT_MODULE),
+                  importlib.import_module(GENERATION_REFERENCE_STORE_MODULE),
+              )
+
+
+          def generation_authority_snapshot() -> dict[str, Any]:
+              contract, store = reference_modules()
+              contract_names = tuple(
+                  sorted(name for name in vars(contract) if not name.startswith("_"))
+              )
+              store_names = tuple(
+                  sorted(name for name in vars(store) if not name.startswith("_"))
+              )
+              payload = {
+                  **GENERATION_AUTHORITY.canonical_dict(),
+                  "authority_root": GENERATION_AUTHORITY.authority_root,
+                  "reference_contract_module": GENERATION_REFERENCE_CONTRACT_MODULE,
+                  "reference_store_module": GENERATION_REFERENCE_STORE_MODULE,
+                  "reference_contract_surface_root": _canonical_root(
+                      "reference-contract-surface", {"names": contract_names}
+                  ),
+                  "reference_store_surface_root": _canonical_root(
+                      "reference-store-surface", {"names": store_names}
+                  ),
+                  "csv_is_first_reference_consumer": True,
+                  "atomic_generation_plane_present": True,
+                  "eaglegate_present": False,
+                  "activation_authority": False,
+              }
+              payload["snapshot_root"] = _canonical_root(
+                  "authority-snapshot", payload
+              )
+              return payload
+
+
+          __all__ = [
+              "GENERATION_AUTHORITY",
+              "GENERATION_AUTHORITY_CONTRACT_ID",
+              "GENERATION_AUTHORITY_FORMAT_VERSION",
+              "GENERATION_REFERENCE_CONTRACT_MODULE",
+              "GENERATION_REFERENCE_STORE_MODULE",
+              "GenerationAuthorityBoundary",
+              "generation_authority_snapshot",
+              "reference_modules",
+          ]
+          PY
+          cat > src/staqtapp_tds/generation/__init__.py <<'PY'
+          """TDS Atomic Generation Authority.
+
+          The CSV generation modules are the v3.7 reference implementation;
+          this package is the stable domain-neutral authority surface.
+          """
+          from .authority import (
+              GENERATION_AUTHORITY,
+              GENERATION_AUTHORITY_CONTRACT_ID,
+              GENERATION_AUTHORITY_FORMAT_VERSION,
+              GENERATION_REFERENCE_CONTRACT_MODULE,
+              GENERATION_REFERENCE_STORE_MODULE,
+              GenerationAuthorityBoundary,
+              generation_authority_snapshot,
+              reference_modules,
+          )
+
+          __all__ = [
+              "GENERATION_AUTHORITY",
+              "GENERATION_AUTHORITY_CONTRACT_ID",
+              "GENERATION_AUTHORITY_FORMAT_VERSION",
+              "GENERATION_REFERENCE_CONTRACT_MODULE",
+              "GENERATION_REFERENCE_STORE_MODULE",
+              "GenerationAuthorityBoundary",
+              "generation_authority_snapshot",
+              "reference_modules",
+          ]
+          PY
+          cat > src/staqtapp_tds/generation/console.py <<'PY'
+          """Read-only engineer console for the v3.7 Generation Authority."""
+          from __future__ import annotations
+
+          import argparse
+          import json
+          from typing import Sequence
+
+          from .authority import generation_authority_snapshot
+
+
+          def main(argv: Sequence[str] | None = None) -> int:
+              parser = argparse.ArgumentParser(prog="staqtapp-tds-generation")
+              parser.add_argument(
+                  "command",
+                  nargs="?",
+                  choices=("status",),
+                  default="status",
+              )
+              parser.add_argument("--json", action="store_true")
+              args = parser.parse_args(argv)
+              snapshot = generation_authority_snapshot()
+              if args.json:
+                  print(json.dumps(snapshot, sort_keys=True, separators=(",", ":")))
+              else:
+                  print("TDS Atomic Generation Authority")
+                  print(f"contract: {snapshot['contract_id']}")
+                  print(f"root: {snapshot['snapshot_root']}")
+                  print("CSV reference: available")
+                  print("semantic authority: false")
+                  print("model authority: false")
+                  print("Eaglegate activation authority: false")
+              return 0
+
+
+          if __name__ == "__main__":
+              raise SystemExit(main())
+          PY
+          cat > src/staqtapp_tds/generation/__main__.py <<'PY'
+          from .console import main
+
+          raise SystemExit(main())
+          PY
+      - name: Update README status while preserving every image and link
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import json
+          from pathlib import Path
+          import re
+
+          root = Path('.')
+
+          def assets(text: str) -> dict[str, list[str]]:
+              return {
+                  "images": re.findall(
+                      r'<img\b[^>]*?\bsrc="([^"]+)"', text, flags=re.IGNORECASE
+                  ),
+                  "links": re.findall(r'(?<!!)\[[^]]+\]\(([^)\s]+)', text),
+              }
+
+          paths = (root / 'README.md', root / 'README_ja.md')
+          before = {
+              path.name: assets(path.read_text(encoding='utf-8')) for path in paths
+          }
+          assert len(before['README.md']['images']) == 19
+          assert len(before['README_ja.md']['images']) == 19
+
+          contract = {
+              "contract": "tds.v370.readme-assets.v1",
+              "readmes": before,
+          }
+          canonical = json.dumps(
+              contract, sort_keys=True, separators=(',', ':'), ensure_ascii=False
+          ).encode('utf-8')
+          contract['contract_root'] = 'sha256:' + hashlib.sha256(canonical).hexdigest()
+          (root / 'docs' / 'README_ASSET_CONTRACT_V370.json').write_text(
+              json.dumps(contract, sort_keys=True, indent=2, ensure_ascii=False) + '\n',
+              encoding='utf-8',
+              newline='\n',
+          )
+
+          readme_path = root / 'README.md'
+          readme = readme_path.read_text(encoding='utf-8')
+          marker = '> **v3.7.0 Atomic Generation Authority candidate**'
+          if marker not in readme:
+              readme = (
+                  marker
+                  + '\n>\n> TDS now includes the contract-first Atomic Generation Plane: original bytes remain authoritative, complete immutable generations are content-addressed, publication uses verified append-only receipts and compare-and-swap current-head replacement, readers pin one generation, and recovery remains deterministic. This source line retains the `3.6.0` package identity until the v3.7 release gate closes. Eaglegate execution, learned serving, semantic authority, and Browser publication authority remain absent.\n\n'
+                  + readme
+              )
+          capability_row = (
+              '| Atomic Generation Authority | Complete immutable generation identity, verified publication receipts, compare-and-swap current-head replacement, reader pinning, deterministic reconstruction, retirement, and rollback; CSV is the first reference consumer. |'
+          )
+          if capability_row not in readme:
+              table_marker = '| `.tds` persistence |'
+              line_start = readme.index(table_marker)
+              line_end = readme.index('\n', line_start)
+              readme = readme[:line_end + 1] + capability_row + '\n' + readme[line_end + 1:]
+          section = '''\n## Atomic Generation Authority\n\nThe v3.7 source line adds one authoritative unit for validation, publication, replay, recovery, reader pinning, retirement, and rollback: a complete immutable generation. Original bytes remain authoritative; decoded, indexed, graph, ranking, and future Eaglegate products are derived and must bind the exact generation root they consumed. Publication is explicit compare-and-swap over a verified published receipt, so concurrent writers cannot silently replace one another. Browser and Studio remain read-only observers.\n\n```bash\nstaqtapp-tds-generation status\nstaqtapp-tds-generation status --json\n```\n\nThe command reports contracts and roots only. It cannot approve semantics, rank evidence, train a model, activate Eaglegate, or bypass the generation publication controller.\n'''
+          if '## Atomic Generation Authority\n' not in readme:
+              insert_at = readme.index('\n## Centralized Browser')
+              readme = readme[:insert_at] + section + readme[insert_at:]
+          validation = (
+              'The v3.7 Atomic Generation candidate is implemented above the closed v3.6 Foundation: the CSV contract and deterministic reference store are converged onto current `main`; temporary native-repair transfer files are excluded; the domain-neutral `staqtapp_tds.generation` authority surface is available; and README screenshot/link preservation is machine-checked by `docs/README_ASSET_CONTRACT_V370.json`. The package remains `3.6.0` until the v3.7 release gate, tag, and publication complete.\n\n'
+          )
+          if validation not in readme:
+              heading = '## Validation status\n\n'
+              readme = readme.replace(heading, heading + validation, 1)
+          readme_path.write_text(readme, encoding='utf-8', newline='\n')
+
+          ja_path = root / 'README_ja.md'
+          ja = ja_path.read_text(encoding='utf-8')
+          ja_marker = '> **v3.7.0 Atomic Generation Authority candidate:**'
+          if ja_marker not in ja:
+              heading_end = ja.index('\n', ja.index('# Staqtapp-TDS')) + 1
+              block = (
+                  '\n' + ja_marker
+                  + ' original bytes を authoritative に保持し、complete immutable generation、verified append-only receipt、compare-and-swap publication、reader pinning、deterministic recovery、retirement / rollback を追加します。Current package identity は v3.7 release gate が閉じるまで `3.6.0` のままです。Eaglegate execution、learned serving、semantic authority、Browser publication authority は含みません。\n'
+              )
+              ja = ja[:heading_end] + block + ja[heading_end:]
+          ja_section = '''\n## Atomic Generation Authority\n\nv3.7 source line では、validation、publication、replay、recovery、reader pinning、retirement、rollback の単位を complete immutable generation に統一します。Original bytes が authoritative であり、decoded / indexed / graph / ranking / future Eaglegate product は消費した generation root に厳密に bind されます。Concurrent publisher は verified receipt に対する compare-and-swap を使用し、silent overwrite はできません。Browser と Studio は read-only observer のままです。\n\n```bash\nstaqtapp-tds-generation status\nstaqtapp-tds-generation status --json\n```\n'''
+          if '## Atomic Generation Authority\n' not in ja:
+              insert_at = ja.index('\n## Centralized Browser')
+              ja = ja[:insert_at] + ja_section + ja[insert_at:]
+          ja_validation = (
+              'v3.7 Atomic Generation candidate は closed v3.6 Foundation 上に実装されています。CSV contract / deterministic reference store を current `main` に convergence し、domain-neutral `staqtapp_tds.generation` authority surface と README asset-preservation contract を追加しました。Package identity は release gate が閉じるまで `3.6.0` です。\n\n'
+          )
+          if ja_validation not in ja:
+              ja = ja.replace('## Validation status\n\n', '## Validation status\n\n' + ja_validation, 1)
+          ja_path.write_text(ja, encoding='utf-8', newline='\n')
+
+          after = {
+              path.name: assets(path.read_text(encoding='utf-8')) for path in paths
+          }
+          assert after == before, 'README image/link target set or order changed'
+          PY
+      - name: Add convergence documentation, status, tests, and workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > DEV20_V370_ATOMIC_GENERATION_STATUS.txt <<'EOF'
+          TDS v3.7.0 ATOMIC GENERATION AUTHORITY
+
+          STATUS: CONVERGENCE CANDIDATE IMPLEMENTED; REMOTE RELEASE GATES REQUIRED
+          Package identity during candidate qualification: 3.6.0
+          Target release identity: 3.7.0
+
+          Implemented:
+          - immutable complete-generation contract and deterministic reference store
+          - original-byte authority and exact ordered content-addressed chunks
+          - parser/dialect/offset/anchor/closure/source/parent binding
+          - append-only lifecycle receipts
+          - verified publication and compare-and-swap current-head replacement
+          - reader generation pinning, deterministic reconstruction, recovery, retirement, rollback
+          - domain-neutral staqtapp_tds.generation authority facade
+          - README status refresh with exact preservation of every screenshot and important link
+
+          Deliberately absent:
+          - Eaglegate execution or speculative decoding
+          - learned rankers, random forests, C-driven agent pools, online training
+          - semantic, model, Browser, Studio, or policy authority
+          - silent concurrent publication replacement
+          - v3.7 tag or PyPI publication before complete qualification
+          EOF
+          cat > docs/130_v370_Atomic_Generation_Convergence.md <<'EOF'
+          # v3.7 Atomic Generation Authority convergence
+
+          ## Position
+
+          This tranche reconstructs the qualified Atomic CSV Generation contract and deterministic reference store directly on the closed v3.6 Foundation. It does not merge the obsolete native-repair ancestry from the original development branches.
+
+          ## Canonical rule
+
+          ```text
+          original bytes
+              -> immutable complete generation
+              -> sealed and verified receipt
+              -> explicit compare-and-swap publication
+              -> pinned readers
+              -> deterministic recovery / retirement / rollback
+          ```
+
+          A generation is the indivisible validation, replay, publication, recovery, and rollback unit. Mixed source, offset, anchor, closure, or derived-product roots fail before consumption.
+
+          ## Authority
+
+          The Generation Authority may construct, verify, publish, pin, retire, and recover immutable generations. It cannot approve semantics, rank evidence, train or activate a model, weaken policy, or grant Browser, Studio, or Eaglegate publication authority.
+
+          ## First reference consumer
+
+          CSV is the first complete reference implementation. The domain-neutral `staqtapp_tds.generation` package exposes the permanent authority boundary while preserving the mature CSV implementation modules.
+
+          ## README preservation
+
+          `docs/README_ASSET_CONTRACT_V370.json` records the ordered image and important-link targets from both README files before the status update. Tests require exact equality afterward. No Browser screenshot or important link may disappear during the v3.7 documentation refresh.
+
+          ## Release boundary
+
+          The candidate retains package identity `3.6.0` while qualification runs. A separate release-closing commit advances the identity to `3.7.0` only after the complete generation, repository, distribution, and README-preservation gates pass.
+          EOF
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('docs/122_v370_Atomic_CSV_Generation_Contract.md')
+          text = path.read_text(encoding='utf-8')
+          note = (
+              '> **Convergence status:** This contract is now reconstructed on the closed v3.6 Foundation through `docs/130_v370_Atomic_Generation_Convergence.md`. The old native-repair branch ancestry is not part of the candidate.\n\n'
+          )
+          if note not in text:
+              text = note + text
+          path.write_text(text, encoding='utf-8', newline='\n')
+
+          changelog = Path('CHANGELOG.md')
+          text = changelog.read_text(encoding='utf-8')
+          section = '''# v3.7.0 — Atomic Generation Authority (candidate)\n\n- Converged the immutable generation contract and deterministic reference store onto the closed v3.6 Foundation.\n- Made complete generations the unit of publication, reader pinning, recovery, retirement, replay, and rollback.\n- Preserved original bytes as authoritative and rejected mixed-generation derived evidence.\n- Added verified append-only receipts and compare-and-swap current-head publication.\n- Added the domain-neutral `staqtapp_tds.generation` authority facade and read-only engineer status command.\n- Updated both README files to current v3.7 candidate status while preserving every screenshot and important link exactly.\n- Kept Eaglegate execution, learned serving, semantic authority, and Browser/Studio publication authority absent.\n\n'''
+          if not text.startswith('# v3.7.0 — Atomic Generation Authority (candidate)'):
+              changelog.write_text(section + text, encoding='utf-8', newline='\n')
+
+          versioning = Path('docs/VERSIONING.md')
+          text = versioning.read_text(encoding='utf-8')
+          note = (
+              '\n## Current development line\n\nThe closed Foundation source is `3.6.0`. The active candidate is **v3.7.0 Atomic Generation Authority**; its package identity remains `3.6.0` until release closure.\n'
+          )
+          if '## Current development line' not in text:
+              text += note
+          versioning.write_text(text, encoding='utf-8', newline='\n')
+          PY
+          cat > tests/test_v370_generation_convergence.py <<'PY'
+          from __future__ import annotations
+
+          import json
+          from pathlib import Path
+          import re
+
+          from staqtapp_tds.generation import (
+              GENERATION_AUTHORITY,
+              GENERATION_AUTHORITY_CONTRACT_ID,
+              generation_authority_snapshot,
+              reference_modules,
+          )
+          from staqtapp_tds.version import __version__
+
+          ROOT = Path(__file__).resolve().parents[1]
+
+
+          def _assets(text: str) -> dict[str, list[str]]:
+              return {
+                  "images": re.findall(
+                      r'<img\b[^>]*?\bsrc="([^"]+)"', text, flags=re.IGNORECASE
+                  ),
+                  "links": re.findall(r'(?<!!)\[[^]]+\]\(([^)\s]+)', text),
+              }
+
+
+          def test_generation_authority_is_domain_neutral_and_non_semantic() -> None:
+              assert __version__ == "3.6.0"
+              assert GENERATION_AUTHORITY_CONTRACT_ID == (
+                  "tds.v370.atomic-generation-authority.v1"
+              )
+              assert GENERATION_AUTHORITY.immutable_generation_construction is True
+              assert GENERATION_AUTHORITY.compare_and_swap_current_head is True
+              assert GENERATION_AUTHORITY.reader_generation_pinning is True
+              assert GENERATION_AUTHORITY.semantic_authority is False
+              assert GENERATION_AUTHORITY.ranking_authority is False
+              assert GENERATION_AUTHORITY.model_authority is False
+              assert GENERATION_AUTHORITY.eaglegate_activation_authority is False
+
+
+          def test_csv_contract_and_store_are_the_first_reference_modules() -> None:
+              contract, store = reference_modules()
+              assert contract.__name__.endswith("generation_contract")
+              assert store.__name__.endswith("generation_store")
+              snapshot = generation_authority_snapshot()
+              assert snapshot["atomic_generation_plane_present"] is True
+              assert snapshot["csv_is_first_reference_consumer"] is True
+              assert snapshot["eaglegate_present"] is False
+              assert snapshot["activation_authority"] is False
+              assert snapshot["snapshot_root"].startswith("sha256:")
+
+
+          def test_readme_screenshots_and_important_links_are_exactly_preserved() -> None:
+              contract = json.loads(
+                  (ROOT / "docs" / "README_ASSET_CONTRACT_V370.json").read_text(
+                      encoding="utf-8"
+                  )
+              )
+              assert contract["contract"] == "tds.v370.readme-assets.v1"
+              for filename in ("README.md", "README_ja.md"):
+                  actual = _assets((ROOT / filename).read_text(encoding="utf-8"))
+                  assert actual == contract["readmes"][filename]
+                  assert len(actual["images"]) == 19
+              assert "v3.7.0 Atomic Generation Authority candidate" in (
+                  ROOT / "README.md"
+              ).read_text(encoding="utf-8")
+
+
+          def test_candidate_contains_no_stale_transfer_or_eaglegate_surface() -> None:
+              forbidden = (
+                  ".github/native-repair-patch.part-00",
+                  ".github/workflows/apply-v360-native-repair.yml",
+                  ".github/workflows/native-repair.yml",
+                  ".github/workflows/materialize-v370-generation-convergence.yml",
+                  ".github/v370-generation-convergence.trigger",
+              )
+              for relative in forbidden:
+                  assert not (ROOT / relative).exists()
+              assert not (ROOT / "src" / "staqtapp_tds" / "eaglegate").exists()
+              assert (ROOT / "DEV20_V370_ATOMIC_GENERATION_STATUS.txt").is_file()
+              assert (ROOT / "docs" / "130_v370_Atomic_Generation_Convergence.md").is_file()
+          PY
+          cat > tests/test_v370_readme_asset_workflow_contract.py <<'PY'
+          from pathlib import Path
+
+          ROOT = Path(__file__).resolve().parents[1]
+
+
+          def test_readme_asset_contract_is_part_of_release_hygiene() -> None:
+              checker = (ROOT / "scripts" / "check_release.py").read_text(
+                  encoding="utf-8"
+              )
+              assert "README_ASSET_CONTRACT_V370.json" in checker
+              assert "tds.v370.readme-assets.v1" in checker
+
+
+          def test_atomic_generation_workflow_has_cross_platform_gates() -> None:
+              workflow = (
+                  ROOT / ".github" / "workflows" / "atomic-generation.yml"
+              ).read_text(encoding="utf-8")
+              for required in (
+                  "ubuntu-24.04",
+                  "macos-14",
+                  "windows-2022",
+                  "Python 3.10",
+                  "Python 3.13",
+                  "Atomic Generation gates complete",
+              ):
+                  assert required in workflow
+          PY
+          cat > .github/workflows/atomic-generation.yml <<'YAML'
+          name: Staqtapp-TDS v3.7 Atomic Generation
+
+          on:
+            pull_request:
+              branches: [main]
+            push:
+              branches: [main, agent/v370-generation-convergence]
+            workflow_dispatch:
+
+          permissions:
+            contents: read
+
+          concurrency:
+            group: v370-atomic-generation-${{ github.ref }}
+            cancel-in-progress: false
+
+          jobs:
+            generation-contract:
+              name: Atomic Generation contract (${{ matrix.os }}, Python ${{ matrix.python }})
+              runs-on: ${{ matrix.os }}
+              strategy:
+                fail-fast: false
+                matrix:
+                  include:
+                    - os: ubuntu-24.04
+                      python: '3.10'
+                    - os: ubuntu-24.04
+                      python: '3.13'
+                    - os: macos-14
+                      python: '3.13'
+                    - os: windows-2022
+                      python: '3.13'
+              steps:
+                - uses: actions/checkout@v7
+                - uses: actions/setup-python@v6
+                  with:
+                    python-version: ${{ matrix.python }}
+                - name: Install focused dependencies
+                  run: python -m pip install -e ".[test]"
+                - name: Compile generation packages
+                  run: python -m compileall -q src/staqtapp_tds/generation src/staqtapp_tds/csv_layer
+                - name: Run Atomic Generation and README preservation contracts
+                  run: >-
+                    python -m pytest -q
+                    tests/test_v370_csv_generation_contract.py
+                    tests/test_v370_csv_generation_store.py
+                    tests/test_v370_generation_convergence.py
+                    tests/test_v370_readme_asset_workflow_contract.py
+                    tests/test_install_contract.py
+                - name: Generate deterministic authority evidence twice
+                  shell: bash
+                  run: |
+                    python -m staqtapp_tds.generation --json > generation-a.json
+                    python -m staqtapp_tds.generation --json > generation-b.json
+                    cmp generation-a.json generation-b.json
+                - name: Archive generation evidence
+                  uses: actions/upload-artifact@v7
+                  with:
+                    name: v370-generation-${{ matrix.os }}-py${{ matrix.python }}
+                    path: generation-a.json
+                    if-no-files-found: error
+
+            generation-gates-complete:
+              name: Atomic Generation gates complete
+              if: always()
+              needs: generation-contract
+              runs-on: ubuntu-24.04
+              steps:
+                - name: Require every generation lane
+                  env:
+                    RESULT: ${{ needs.generation-contract.result }}
+                  run: |
+                    test "$RESULT" = success
+          YAML
+      - name: Bind the new command and release hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          pyproject = Path('pyproject.toml')
+          text = pyproject.read_text(encoding='utf-8')
+          entry = 'staqtapp-tds-generation = "staqtapp_tds.generation.console:main"\n'
+          if entry not in text:
+              marker = 'staqtapp-tds-admin = "staqtapp_tds.admin.console:main"\n'
+              if marker not in text:
+                  raise SystemExit('project script insertion marker missing')
+              text = text.replace(marker, marker + entry, 1)
+          pyproject.write_text(text, encoding='utf-8', newline='\n')
+
+          checker = Path('scripts/check_release.py')
+          text = checker.read_text(encoding='utf-8')
+          required_marker = 'ROOT / "docs" / "119_v353_dev11_Release_Qualification.md",\n'
+          additions = (
+              '        ROOT / "DEV20_V370_ATOMIC_GENERATION_STATUS.txt",\n'
+              '        ROOT / "docs" / "130_v370_Atomic_Generation_Convergence.md",\n'
+              '        ROOT / "docs" / "README_ASSET_CONTRACT_V370.json",\n'
+          )
+          if 'README_ASSET_CONTRACT_V370.json' not in text:
+              if required_marker not in text:
+                  raise SystemExit('release evidence insertion marker missing')
+              text = text.replace(required_marker, required_marker + additions, 1)
+              insertion_marker = '    capture_digests: set[str] = set()\n'
+              block = '''    asset_contract = json.loads(\n        (ROOT / "docs" / "README_ASSET_CONTRACT_V370.json").read_text(encoding="utf-8")\n    )\n    if asset_contract.get("contract") != "tds.v370.readme-assets.v1":\n        return fail("README asset contract identity mismatch")\n    for readme_name in ("README.md", "README_ja.md"):\n        source = (ROOT / readme_name).read_text(encoding="utf-8")\n        actual = {\n            "images": re.findall(r'<img\\b[^>]*?\\bsrc="([^"]+)"', source, flags=re.IGNORECASE),\n            "links": re.findall(r'(?<!!)\\[[^]]+\\]\\(([^)\\s]+)', source),\n        }\n        if actual != asset_contract.get("readmes", {}).get(readme_name):\n            return fail(f"{readme_name} screenshots or important links changed")\n\n'''
+              if insertion_marker not in text:
+                  raise SystemExit('README asset validation insertion marker missing')
+              text = text.replace(insertion_marker, block + insertion_marker, 1)
+          checker.write_text(text, encoding='utf-8', newline='\n')
+          PY
+      - name: Integrate Atomic Generation into the aggregate release gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/release.yml')
+          text = path.read_text(encoding='utf-8')
+          if '  atomic-generation-qualification:\n' not in text:
+              marker = '  build-distributions:\n'
+              job = '''  atomic-generation-qualification:\n    name: Atomic Generation Authority qualification\n    needs: source-release-checks\n    runs-on: ubuntu-24.04\n    steps:\n      - uses: actions/checkout@v7\n      - uses: actions/setup-python@v6\n        with:\n          python-version: '3.13'\n      - name: Install package for generation qualification\n        run: python -m pip install -e ".[test]"\n      - name: Run generation, publication, recovery, and README contracts\n        run: >-\n          python -m pytest -q\n          tests/test_v370_csv_generation_contract.py\n          tests/test_v370_csv_generation_store.py\n          tests/test_v370_generation_convergence.py\n          tests/test_v370_readme_asset_workflow_contract.py\n      - name: Require deterministic authority evidence\n        shell: bash\n        run: |\n          python -m staqtapp_tds.generation --json > generation-a.json\n          python -m staqtapp_tds.generation --json > generation-b.json\n          cmp generation-a.json generation-b.json\n\n'''
+              if marker not in text:
+                  raise SystemExit('release build job marker missing')
+              text = text.replace(marker, job + marker, 1)
+
+              dependency = '      - native-architecture-parity-comparison\n'
+              count = text.count(dependency)
+              if count != 2:
+                  raise SystemExit(f'unexpected release dependency count: {count}')
+              text = text.replace(
+                  dependency,
+                  dependency + '      - atomic-generation-qualification\n',
+              )
+              env_marker = '          ARCHITECTURE_RESULT: ${{ needs.native-architecture-parity-comparison.result }}\n'
+              if env_marker not in text:
+                  raise SystemExit('release aggregate env marker missing')
+              text = text.replace(
+                  env_marker,
+                  env_marker + '          GENERATION_RESULT: ${{ needs.atomic-generation-qualification.result }}\n',
+                  1,
+              )
+              result_marker = '              "architecture_parity": os.environ["ARCHITECTURE_RESULT"],\n'
+              if result_marker not in text:
+                  raise SystemExit('release aggregate result marker missing')
+              text = text.replace(
+                  result_marker,
+                  result_marker + '              "atomic_generation": os.environ["GENERATION_RESULT"],\n',
+                  1,
+              )
+          path.write_text(text, encoding='utf-8', newline='\n')
+          PY
+      - name: Remove materialization machinery and qualify the candidate
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+          NUMBA_DISABLE_JIT: '1'
+        run: |
+          set -euo pipefail
+          rm -f .github/v370-generation-convergence.trigger
+          rm -f .github/workflows/materialize-v370-generation-convergence.yml
+          git diff --check
+          python -m pip install -e ".[test]"
+          python -m compileall -q src/staqtapp_tds/generation src/staqtapp_tds/csv_layer
+          python -m pytest -q \
+            tests/test_v370_csv_generation_contract.py \
+            tests/test_v370_csv_generation_store.py \
+            tests/test_v370_generation_convergence.py \
+            tests/test_v370_readme_asset_workflow_contract.py \
+            tests/test_install_contract.py \
+            tests/test_release_version_policy.py \
+            tests/test_v360_foundation_closure.py
+          python -m staqtapp_tds.generation --json > /tmp/generation-a.json
+          python -m staqtapp_tds.generation --json > /tmp/generation-b.json
+          cmp /tmp/generation-a.json /tmp/generation-b.json
+          python scripts/check_release.py
+      - name: Commit the clean v3.7 convergence candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Converge v3.7 Atomic Generation Authority'
+          git push origin HEAD:agent/v370-generation-convergence
