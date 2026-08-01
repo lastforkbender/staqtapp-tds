@@ -95,6 +95,27 @@ from .exactness import (
     run_target_only,
     token_sequence_root,
 )
+from .offline_capture import (
+    EAGLEGATE_OFFLINE_CAPTURE_AUTHORITY,
+    EAGLEGATE_OFFLINE_CAPTURE_BUNDLE_ID,
+    EAGLEGATE_OFFLINE_CAPTURE_CONTRACT_ID,
+    EAGLEGATE_VLLM_EAGLE_PROVIDER_ID,
+    OfflineCapabilityCaptureEnvelope,
+    OfflineCaptureAuthorityBoundary,
+    OfflineCaptureDecision,
+    OfflineCaptureFault,
+    capture_envelope_to_mapping,
+    provider_snapshot_payload_root,
+    validate_offline_capability_capture,
+)
+from .offline_capture_suite import (
+    EAGLEGATE_OFFLINE_CAPTURE_SUITE_ID,
+    OfflineCaptureCheck,
+    OfflineCaptureReport,
+    capture_bundle_to_mapping,
+    reference_offline_capture_bundle,
+    run_reference_offline_capture_suite,
+)
 from .plans import (
     EaglegateAdmissionPolicy,
     EaglegatePlan,
@@ -128,6 +149,7 @@ from .vllm_shadow_suite import (
 )
 
 __all__ = [name for name in globals() if name.startswith("Eaglegate")]
+__all__ += [name for name in globals() if name.startswith("Offline")]
 __all__ += [name for name in globals() if name.startswith("Vllm")]
 __all__ += [
     "ADAPTER_ALLOWED_TRANSITIONS",
@@ -154,10 +176,15 @@ __all__ += [
     "EAGLEGATE_EXACTNESS_SUITE_ID",
     "EAGLEGATE_FORMAT_VERSION",
     "EAGLEGATE_LOCK_FILENAME",
+    "EAGLEGATE_OFFLINE_CAPTURE_AUTHORITY",
+    "EAGLEGATE_OFFLINE_CAPTURE_BUNDLE_ID",
+    "EAGLEGATE_OFFLINE_CAPTURE_CONTRACT_ID",
+    "EAGLEGATE_OFFLINE_CAPTURE_SUITE_ID",
     "EAGLEGATE_PROPOSER_FAMILY",
     "EAGLEGATE_SELECTION_CONTRACT_ID",
     "EAGLEGATE_TARGET_COMMIT_AUTHORITY",
     "EAGLEGATE_VLLM_DRAFT_TENSOR_PARALLEL_SIZE",
+    "EAGLEGATE_VLLM_EAGLE_PROVIDER_ID",
     "EAGLEGATE_VLLM_METHOD",
     "EAGLEGATE_VLLM_RUNTIME_NAME",
     "EAGLEGATE_VLLM_SHADOW_AUTHORITY",
@@ -171,6 +198,8 @@ __all__ += [
     "ScriptedProposer",
     "VerificationDecision",
     "authority_snapshot",
+    "capture_bundle_to_mapping",
+    "capture_envelope_to_mapping",
     "committed_state_root",
     "compile_project",
     "epoch_diff",
@@ -182,10 +211,12 @@ __all__ += [
     "load_project",
     "profile_configuration",
     "prove_lossless_one_step_distribution",
+    "provider_snapshot_payload_root",
     "reference_adapter_identity",
     "reference_adapter_limits",
     "reference_adapter_request",
     "reference_epoch_root",
+    "reference_offline_capture_bundle",
     "reference_vllm_eagle_snapshot",
     "reference_vllm_shadow_requirement",
     "requirement_to_mapping",
@@ -193,11 +224,13 @@ __all__ += [
     "run_adapter_conformance_reference",
     "run_reference_adapter_conformance_suite",
     "run_reference_exactness_suite",
+    "run_reference_offline_capture_suite",
     "run_reference_vllm_shadow_suite",
     "run_speculative_reference",
     "run_target_only",
     "snapshot_to_mapping",
     "token_sequence_root",
     "validate_epoch_transition",
+    "validate_offline_capability_capture",
     "validate_qualification_for_epoch",
 ]
