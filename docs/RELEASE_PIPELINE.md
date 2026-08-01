@@ -1,14 +1,21 @@
 # Automated Release Pipeline
 
-Staqtapp-TDS v3.0.1 introduces release automation scaffolding for professional source and future binary releases.
+Staqtapp-TDS release automation began in v3.0.1. The current v3.8.0 pipeline
+builds and validates a source distribution and a universal Python wheel, then
+publishes only from the exact version tag through PyPI Trusted Publishing.
 
 ## Current release target
 
-The current archive is a clean source distribution. It intentionally excludes compiled platform binaries such as `.so`, `.pyd`, `.dll`, `.dylib`, `.pyc`, `__pycache__`, and `.pytest_cache`.
+The release contains a clean source distribution and a universal wheel. Source
+hygiene excludes compiled platform binaries such as `.so`, `.pyd`, `.dll`,
+`.dylib`, `.pyc`, `__pycache__`, and `.pytest_cache`. Optional native modules
+remain an explicit source-build choice; the published wheel retains the
+deterministic Python paths.
 
-## Future binary release target
+## Future platform wheel target
 
-When TDS is ready for platform binary distribution, the same pipeline structure can build wheels for main operating systems:
+If TDS later publishes compiled wheels, the same pipeline structure can build
+artifacts for the main operating systems:
 
 - Linux x86_64 / aarch64
 - Windows AMD64 / ARM64
@@ -20,10 +27,22 @@ The Native Engine Manager remains required even when wheels are used, because it
 
 `scripts/check_release.py` verifies:
 
-- package version consistency
-- no stale version references in key metadata
-- no compiled binaries in source releases
-- no `__pycache__` / `.pytest_cache`
-- result-code documentation can be regenerated from the registry
+- source, package, and exact-tag version consistency;
+- current English and Japanese release status and installation pins;
+- the 19 preserved Browser captures and PyPI-safe absolute targets;
+- no compiled binaries or generated cache/build artifacts in source;
+- required release evidence and versioned documentation; and
+- deterministic Foundation Closure and result-code documentation.
 
-The GitHub Actions workflow is stored in `.github/workflows/release.yml` and is intentionally ready for wheel-building expansion when binary releases begin.
+`scripts/check_pypi_readme.py` independently binds the exact ordered screenshot
+URLs to the 19 local 1280×800 PNGs. Before upload, it fetches each immutable URL
+and requires byte-identical PNG content, then inspects the built wheel's
+`METADATA` description to prove those URLs survived packaging.
+
+The GitHub Actions workflow in `.github/workflows/release.yml` gates the build
+behind the complete Python, platform, native, sanitizer, fuzz, performance, and
+architecture matrix. `twine check`, wheel installation, metadata inspection,
+and screenshot verification must succeed before the tag-only Trusted Publisher
+job can upload. The separate production PyPI smoke workflow installs the exact
+published wheel on Linux, macOS, and Windows and verifies the live description
+and public presentation targets.

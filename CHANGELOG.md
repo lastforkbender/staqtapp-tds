@@ -1,3 +1,58 @@
+# v3.8.0 — Eaglegate Core, real vLLM shadow, and packed waypoint graph
+
+Released the Phase 1–4 convergence line while keeping Eaglegate production
+activation outside the package authority boundary.
+
+- Added the non-widenable Eaglegate lossless constitution, deterministic
+  admission, exactness laboratory, adversarial adapter ABI, and content-free
+  evidence contracts.
+- Published composite Eaglegate ServingEpoch candidates only through the v3.7
+  Generation Authority, binding storage, policy plus ordered plans,
+  target/runtime identity, exactness, adapter conformance, and receipt lineage.
+- Forced raw Generation Authority descriptors into Windows binary mode so the
+  canonical LF-delimited publication log remains byte-identical across OSes.
+- Added process-reentrant shared generation pins and explicit Windows
+  symlink/reparse rejection without weakening cross-process retirement locks.
+- Hard-rejected canary and active configuration/publication; local project
+  files remain candidate intent and the console remains target-only.
+- Added a real executable vLLM `0.26.0` EAGLE (not EAGLE-3) shadow adapter pinned
+  to exact target/draft revisions, H100 SM90 BF16, standard rejection sampling,
+  batch size one, explicit seeds, and 1/2/3-token plans.
+- Added off-path greedy, sampled-distribution, public continuation/KV-semantic,
+  cancellation/shutdown, runtime-attestation, cleanup, and content-free
+  Generation Authority evidence gates. The real H100 lane remains a manual
+  credentialed workflow and is not claimed as locally executed.
+- Added the Phase-4 Trace Rank ABI v2 packed waypoint/CSR graph: fixed-width
+  generation, provenance, Q15 feature, waypoint, offset, and edge records with
+  checked bounds, canonical rebuild, exact source spans, SHA-256, and CRC32.
+- Preserved target token/KV authority and deferred Dijkstra, learned search,
+  production routing, canarying, promotion, and activation.
+- Added a pre-publication PyPI presentation gate that validates the built
+  wheel's long description and requires all 19 immutable Browser screenshot
+  URLs to return PNG bytes identical to the preserved local captures.
+
+# v3.7.0 — Atomic Generation Authority
+
+Introduced one generic, crash-safe authority for immutable generation identity,
+publication, recovery, reader pinning, rollback, and retirement. CSV is its
+first complete consumer; Eaglegate and other subsystems consume the same
+mechanical authority rather than inventing parallel durable `CURRENT` state.
+
+- Added canonical domain-separated manifests, payload and qualification roots,
+  lifecycle receipts, append-only publication records, and head-identity CAS.
+- Added bounded, no-symlink verification and deterministic recovery across
+  every declared write, `fsync`, manifest-publication, head-CAS, and recovery
+  fault boundary.
+- Added crash-released OS advisory namespace locks and cross-process reader
+  leases that block retirement while a generation is live.
+- Added a full CSV consumer binding authoritative source bytes, row offsets,
+  anchors, chunks, closure, parser/dialect identity, and evidence to one root.
+- Kept Browser, Studio, semantic, ranking, model, policy, training, and
+  activation authority explicitly outside the Generation Authority.
+- Preserved the complete v3.6 Foundation Closure audit as an inherited fixed
+  substrate instead of tying that historical closure identity to the current
+  package version.
+
 # v3.6.0 — Frontier Foundation Closure
 
 Closed the first Frontier Evidence Fabric foundation release without admitting

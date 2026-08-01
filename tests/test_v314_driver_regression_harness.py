@@ -113,7 +113,7 @@ def _passing_cases():
 
 
 def test_v314_version():
-    assert __version__ == "3.6.0"
+    assert __version__ == "3.8.0"
 
 
 def test_regression_harness_capability_matrix_denies_trust_authority_and_storage_writes():

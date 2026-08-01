@@ -59,6 +59,9 @@ PYPI_README_REQUIRED_LINKS = (
     "https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf",
     "https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf",
 )
+CURRENT_PRODUCTION_VERSION = "3.8.0"
+SOURCE_CANDIDATE_MARKER = "source candidate under review, not a published package"
+V370_JAPANESE_CANDIDATE_MARKER = "published package ではありません"
 
 
 def fail(message: str) -> int:
@@ -91,7 +94,8 @@ def main() -> int:
     if any("lastforkbender/staqtapp-tds" not in str(url) for url in urls.values()):
         return fail("project URLs do not target the release repository")
 
-    if os.environ.get("GITHUB_REF_TYPE") == "tag":
+    is_tag = os.environ.get("GITHUB_REF_TYPE") == "tag"
+    if is_tag:
         ref_name = os.environ.get("GITHUB_REF_NAME", "")
         try:
             validate_tag(ref_name, source_version=expected_version)
@@ -113,6 +117,15 @@ def main() -> int:
         ROOT / "docs" / "119_v353_dev11_Release_Qualification.md",
         ROOT / "DEV19_V360_FOUNDATION_CLOSURE_STATUS.txt",
         ROOT / "docs" / "129_v360_Foundation_Closure.md",
+        ROOT / "docs" / "130_v360_Process_Global_Native_State_Audit.md",
+        ROOT / "docs" / "130_v370_Atomic_Generation_Authority.md",
+        ROOT / "docs" / "126_v380_Eaglegate_Generation_Authority.md",
+        ROOT / "docs" / "131_v380_Eaglegate_Real_vLLM_Shadow.md",
+        ROOT / "docs" / "132_v380_Packed_Waypoint_CSR_Graph.md",
+        ROOT / "src" / "staqtapp_tds" / "eaglegate" / "vllm_shadow.py",
+        ROOT / "src" / "staqtapp_tds" / "trace_rank" / "graph.py",
+        ROOT / ".github" / "workflows" / "eaglegate-vllm-shadow-real.yml",
+        ROOT / ".github" / "workflows" / "packed-waypoint-graph.yml",
     )
     missing_evidence = [str(path.relative_to(ROOT)) for path in required_evidence if not path.is_file()]
     if missing_evidence:
@@ -161,21 +174,52 @@ def main() -> int:
     missing_links = [target for target in PYPI_README_REQUIRED_LINKS if target not in readme]
     if missing_links:
         return fail("PyPI README is missing absolute document targets: " + ", ".join(missing_links))
+
     expected_heading = f"# Staqtapp-TDS v{expected_version}"
     expected_install = f"python -m pip install staqtapp-tds=={expected_version}"
-    if expected_heading not in readme:
-        return fail(f"PyPI README is missing current heading {expected_heading!r}")
-    if expected_install not in readme:
-        return fail(f"PyPI README is missing current install pin {expected_install!r}")
+    production_install = (
+        f"python -m pip install staqtapp-tds=={CURRENT_PRODUCTION_VERSION}"
+    )
+    candidate_status = SOURCE_CANDIDATE_MARKER in readme
+    candidate_heading = (
+        f"# Staqtapp-TDS v{expected_version} Phase 1–4 convergence candidate"
+    )
+    if candidate_status:
+        if is_tag:
+            return fail("a production tag cannot publish a source-candidate README")
+        if candidate_heading not in readme:
+            return fail("PyPI README is missing the current candidate heading")
+        if production_install not in readme:
+            return fail("PyPI README is missing the current production install pin")
+        if expected_install in readme and expected_version != CURRENT_PRODUCTION_VERSION:
+            return fail("PyPI README advertises an unpublished source-version pin")
+    else:
+        if expected_heading not in readme:
+            return fail(f"PyPI README is missing current heading {expected_heading!r}")
+        if expected_install not in readme:
+            return fail(f"PyPI README is missing current install pin {expected_install!r}")
+
     if "tag remains prohibited" in readme or "REMOTE REVIEW GATES REQUIRED" in readme:
         return fail("PyPI README contains obsolete pre-publication status wording")
     japanese_readme = (ROOT / "README_ja.md").read_text(encoding="utf-8")
     if "tag を作成できません" in japanese_readme:
         return fail("Japanese README contains obsolete pre-publication status wording")
-    if f"# Staqtapp-TDS v{expected_version}" not in japanese_readme:
-        return fail("Japanese README is missing the current release heading")
-    if f"python -m pip install staqtapp-tds=={expected_version}" not in japanese_readme:
-        return fail("Japanese README is missing the current install pin")
+    japanese_candidate = V370_JAPANESE_CANDIDATE_MARKER in japanese_readme
+    if japanese_candidate != candidate_status:
+        return fail("English and Japanese README candidate status is inconsistent")
+    if candidate_status:
+        if candidate_heading not in japanese_readme:
+            return fail("Japanese README is missing the current candidate heading")
+        if production_install not in japanese_readme:
+            return fail("Japanese README is missing the current production install pin")
+        if expected_install in japanese_readme and expected_version != CURRENT_PRODUCTION_VERSION:
+            return fail("Japanese README advertises an unpublished source-version pin")
+    else:
+        if f"# Staqtapp-TDS v{expected_version}" not in japanese_readme:
+            return fail("Japanese README is missing the current release heading")
+        if expected_install not in japanese_readme:
+            return fail("Japanese README is missing the current install pin")
+
     capture_digests: set[str] = set()
     for filename in BROWSER_CAPTURES:
         path = capture_root / filename
@@ -232,8 +276,10 @@ def main() -> int:
         return fail("v3.6 Foundation Closure audit did not emit valid JSON")
     if closure_report.get("passed") is not True:
         return fail("v3.6 Foundation Closure report did not pass")
-    if closure_report.get("release_identity") != expected_version:
+    if closure_report.get("release_identity") != "3.6.0":
         return fail("v3.6 Foundation Closure release identity mismatch")
+    if closure_report.get("source_version") != expected_version:
+        return fail("v3.6 Foundation Closure source version mismatch")
     subprocess.run([sys.executable, "tools/generate_result_code_docs.py"], cwd=ROOT, check=True, env=env)
     return 0
 

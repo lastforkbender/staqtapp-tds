@@ -1,5 +1,22 @@
 # TDS Release Notes
 
+## v3.8.0 — Phase 1–4 Convergence
+
+This release combines the v3.6 Foundation, v3.7 Generation Authority, and
+v3.8 packed waypoint/CSR graph and Eaglegate qualification work under one clean
+package identity.
+
+- Eaglegate remains qualification-only, shadow/target-only, and outside the
+  production request, canary, promotion, activation, token-acceptance, and
+  KV-commit authority paths.
+- The manual credentialed H100 workflow has not been executed and remains
+  required before any hardware-evidence claim.
+- The PyPI-facing README preserves all 19 Browser screenshots and their
+  immutable absolute URLs without changing the captures or important links.
+- Before trusted publishing, release CI compares every remote screenshot byte
+  with its local 1280×800 PNG and verifies the exact ordered URLs embedded in
+  the built wheel's long-description metadata.
+
 ## v3.5.3.post1 — PyPI Presentation Correction
 
 This corrective post-release retains the qualified v3.5.3 storage behavior and

@@ -1,18 +1,25 @@
-> **v3.6.0 Foundation Closure source candidate**
+> **v3.8.0 Phase 1–4 convergence release**
 >
-> This source candidate closes the native correctness and Frontier authority substrate:
-> fail-closed ABI/lifecycle admission, strict checksum and UTF-8 truth,
-> generation-bound handles, bounded C11 diagnostics, immutable packed reads,
-> and exact x86-64/AArch64 semantics. It adds no Atomic Generation Plane,
-> Eaglegate execution, learned serving, or activation authority.
+> Phase 1 closes the v3.6 Foundation; Phase 2 adds the v3.7 Generation
+> Authority and exact CSV consumer; Phase 3 binds the lossless Eaglegate Core
+> to that sole authority; Phase 4 adds the canonical packed waypoint/CSR graph
+> and an executable, exactly pinned vLLM EAGLE shadow qualification path.
+> Eaglegate remains off the production request path with no canary, promotion,
+> activation, token-acceptance, or KV-commit authority.
 
-> **v3.6.0 release security contract**
+> **v3.6.0 Foundation substrate**
+>
+> The source line retains fail-closed native ABI/lifecycle admission, strict
+> checksum and UTF-8 truth, generation-bound handles, bounded C11 diagnostics,
+> immutable packed reads, and exact x86-64/AArch64 semantics.
+
+> **Current security contract**
 >
 > At-rest encryption is not implemented. Requests using `DirFlags.ENCRYPTED` fail closed instead of storing plaintext. New v2 persistence files require their integrity sidecar. `.tds` input should be treated as trusted until explicit resource-budget hardening is complete. Native extensions are optional and are built only when `STAQTAPP_TDS_BUILD_NATIVE=1` is set.
 
-# Staqtapp-TDS v3.6.0
+# Staqtapp-TDS v3.8.0
 
-> **Repository status:** `3.6.0` is the qualified Foundation source candidate. The current production PyPI release remains `3.5.3.post2` until the exact merged and tagged release matrix passes and publication completes.
+> **Release status:** v3.8.0 is the current production PyPI release. Publication is permitted only from the exact `v3.8.0` tag after the complete aggregate release gate succeeds. The v3.6 Foundation, v3.7 Generation Authority, and v3.8 Eaglegate/packed-graph transitions are included. The manual credentialed H100 workflow has not been executed and remains required for hardware evidence; Eaglegate remains shadow/target-only and has no production activation authority.
 
 **Temporal Directory System - native-indexed `.tds` storage, controlled variables, trace ranking, CSV evidence operations, semantic review, and centralized observability for AI systems.**
 
@@ -20,7 +27,7 @@
 
 ## Browser Operations Console — all 19 pages
 
-These are 19 separate 1280×800 viewport captures from the packaged, localhost-only TDS Browser. Each capture was made after selecting the corresponding navigation control against a real release-qualification observer snapshot. Page 07 is the actual CSV Interpole Monitor in its `Monitor Ready` state. The images are shown vertically in Browser navigation order; they are not a stitched Dashboard image or a UI mock.
+These are 19 separate 1280×800 viewport captures from the packaged, localhost-only TDS Browser. Each capture was made after selecting the corresponding navigation control against a real release-qualification observer snapshot. Page 07 is the actual CSV Interpole Monitor in its `Monitor Ready` state. The images are shown vertically in Browser navigation order; they are not a stitched Dashboard image or a UI mock. For reliable PyPI rendering, the unchanged captures use immutable absolute HTTPS URLs; release CI verifies every remote PNG byte-for-byte and checks that all 19 URLs survive in the built wheel metadata before publication.
 
 <p align="center"><strong>01 — Dashboard</strong><br>
   <img src="https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/01-dashboard-1280x800.png" alt="Staqtapp-TDS Browser page 01, Dashboard, selected in the navigation" width="100%">
@@ -98,6 +105,9 @@ TDS is designed around a narrow storage hot path. Native indexing, lookup, persi
 | Native-indexed storage | Optional compiled index and checksum paths with deterministic Python fallbacks and explicit native capability reporting. |
 | Trace ranking | Deterministic Spiral-compatible trace ranking with confidence, depth, age, top-N limiting, statistics, and native/Python parity. |
 | CSV Suite | Original-byte preservation, dialect evidence, logical row offsets, row anchors, scan parity, artifact transactions, storage binding, native scan evidence, Interpole telemetry, Semantic IR candidates, lifecycle transitions, and atomic batch review. |
+| Generation Authority | Immutable content-addressed generations, publication head-root CAS, cross-process reader pins, crash recovery, rollback, retirement, and an exact CSV consumer with an executable content-free audit. |
+| Packed waypoint graph | Trace Rank ABI v2 fixed-width generation, provenance, Q15 feature, waypoint, CSR, and edge records with checked bounds, exact source spans, canonical rebuild, SHA-256, and CRC32. |
+| Eaglegate | Lossless authority contracts, exactness and adapter labs, Generation-backed ServingEpochs, and a real pinned vLLM EAGLE H100 shadow qualification path that cannot activate production serving. |
 | Evidence-bound semantics | TDS records explicit caller declarations and authorized review transitions; it does not silently infer or commit semantic truth. |
 | Driver platform | TDDL validation, deterministic bytecode, bounded Driver VM execution, Foundry proposal/test flows, regression evidence, review bundles, and read-only Studio integration. |
 | Centralized Browser | One local Browser surface for engine health, pressure, event rings, CSV Interpole, Spiral Rank, snapshots, indexes, storage, recovery, alerts, security, and settings. |
@@ -107,16 +117,13 @@ TDS is designed around a narrow storage hot path. Native indexing, lookup, persi
 
 ```bash
 # Current production PyPI release; includes both UIs
-python -m pip install staqtapp-tds==3.5.3.post2
-
-# Candidate package identity; use this command only after 3.6.0 publication
-python -m pip install staqtapp-tds==3.6.0
+python -m pip install staqtapp-tds==3.8.0
 
 # Launch the main TDS telemetry UI
 staqtapp-tds
 
-# Source checkout; includes both UIs
-python -m pip install .
+# Exercise real publication, pinning, CAS, rollback, retirement, and recovery
+staqtapp-tds-generation-audit
 ```
 
 Python 3.10 or newer, NumPy, and PyQt5 are required by the standard installation. Driver Studio is installed automatically, while `staqtapp-tds` launches the main HTML/CSS/JS telemetry Browser. The C extensions remain optional; supported operations retain deterministic Python fallback paths unless a caller explicitly forces native-only execution.
@@ -254,7 +261,7 @@ The [Programmer Core API Guide](https://github.com/lastforkbender/staqtapp-tds/b
 - Semantic IR candidates, lifecycle transitions, and atomic batches;
 - Driver Foundry, VM, Runtime Manager, regression, review, evidence, Browser, and Driver Studio calls.
 
-Use the current [v3.5.3 Guaranteed Storage API reference](https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/docs/reference/Programmers_API_Reference.md) for the new storage calls. The separate [API Surface Reference PDF](https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf) is retained as a historical v3.1.23 Driver/Studio reference; it is not an exhaustive v3.5.3 inventory.
+Use the preserved [v3.5.3 Guaranteed Storage API reference](https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/docs/reference/Programmers_API_Reference.md) for those storage calls. The separate [API Surface Reference PDF](https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf) is retained as a historical v3.1.23 Driver/Studio reference; it is not an exhaustive v3.5.3 inventory.
 
 ## Safety and authority boundaries
 
@@ -267,6 +274,26 @@ TDS intentionally distinguishes preparation, evidence, review, and authority:
 - Browser telemetry is snapshot-based and is not a storage control loop.
 
 ## Validation status
+
+The v3.8.0 release completes four explicit boundaries. The v3.7
+Generation Authority publishes exact CSV and composite Eaglegate generations
+with head-root CAS, cross-process pins, deterministic recovery, rollback, and
+retirement. Eaglegate adds a non-widenable target-verification constitution,
+candidate-bound exactness/adapter evidence, and a single Generation-backed
+ServingEpoch lineage. CANARY and ACTIVE publication are rejected.
+
+Phase 4 also provides `tds-packed-waypoint-csr-v1`, a bounded Trace Rank ABI v2
+binary graph with exact immutable source/row bindings and byte-identical
+decode/re-encode. The named-runtime adapter dynamically constructs real vLLM
+`0.26.0` target-only and EAGLE engines for exact pinned target/draft revisions,
+H100 SM90 BF16, standard rejection sampling, batch size one, fixed seeds, and
+1/2/3-token plans. Local injected-runtime gates pass; the manual credentialed
+H100 run remains required for hardware evidence. No production traffic,
+activation, direct KV-tensor equivalence, or in-flight cancellation claim is
+made. See `docs/130_v370_Atomic_Generation_Authority.md`,
+`docs/126_v380_Eaglegate_Generation_Authority.md`,
+`docs/131_v380_Eaglegate_Real_vLLM_Shadow.md`, and
+`docs/132_v380_Packed_Waypoint_CSR_Graph.md`.
 
 The v3.6.0 Foundation source closes the native and authority repair train with
 a machine-checkable process-state ledger, a deterministic closure report, exact
@@ -297,14 +324,22 @@ distribution can be built.
 
 Version `3.5.3.post2` installs the main telemetry Browser and PyQt5 Driver
 Studio with every standard installation. The `staqtapp-tds` command launches
-the telemetry Browser; native C extensions remain opt-in. Publication is
+the telemetry Browser; native C extensions remain opt-in. Its publication was
 restricted to the exact annotated `v3.5.3.post2` tag after the complete
-aggregate release gate succeeds.
+aggregate release gate succeeded.
+
+Version `3.8.0` carries the Phase 1–4 convergence while keeping Eaglegate's
+production boundary unchanged. Its release path additionally validates the
+PyPI long description from the built wheel and fetches every immutable Browser
+screenshot URL to require the expected PNG bytes before trusted publication.
 
 ## Repository map
 
 ```text
 src/staqtapp_tds/          core storage, persistence, telemetry, native management
+src/staqtapp_tds/generation/ generic immutable generations, CAS, pinning, recovery
+src/staqtapp_tds/eaglegate/ lossless core, ServingEpoch authority, real shadow adapter
+src/staqtapp_tds/trace_rank/ ABI v2 contracts and packed waypoint/CSR graph
 src/staqtapp_tds/csv_layer CSV evidence, transactions, Interpole, Semantic IR
 src/staqtapp_tds/drivers/  TDDL, bytecode, VM, Foundry, review and evidence
 src/staqtapp_tds/studio_pyqt5/ Driver Studio cockpit

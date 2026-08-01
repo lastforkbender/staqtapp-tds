@@ -12,7 +12,7 @@ Staqtapp-TDS release uses exactly three numeric components:
 MAJOR.MINOR.PATCH
 ```
 
-The current Foundation release is **v3.6.0**. Corrective releases increment the patch number:
+The completed Foundation source identity is **v3.6.0**. Corrective releases increment the patch number:
 
 ```text
 v3.6.0 -> v3.6.1 -> v3.6.2
@@ -20,7 +20,11 @@ v3.6.0 -> v3.6.1 -> v3.6.2
 
 Staqtapp-TDS will not publish another `.postN` release.
 
-The next architecture line is **v3.7.0**, the Atomic Generation Plane.
+The current published architecture line is **v3.8.0**, the packed Waypoint
+Graph Foundation and qualification-only Eaglegate convergence. The current
+production PyPI identity is `3.8.0`. The credentialed H100 workflow has not
+been executed; publication grants no Eaglegate canary, promotion, or activation
+authority.
 
 ## Operational rules
 
@@ -40,7 +44,7 @@ The next architecture line is **v3.7.0**, the Atomic Generation Plane.
 The architecture labels in the Frontier Evidence Fabric proposal map to clean
 release identities:
 
-| Architecture label | Published release identity |
+| Architecture label | Clean release identity |
 |---|---|
 | v3.6 Foundation Repair | `3.6.0` |
 | corrective Foundation Repair | `3.6.1`, `3.6.2`, ... |

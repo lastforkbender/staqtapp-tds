@@ -1,0 +1,121 @@
+name: Staqtapp-TDS v3.7 Atomic Generation Authority
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+      - agent/v380-phase1-phase4-convergence
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v370-generation-authority-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generation-contract:
+    name: Generation Authority (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            python: '3.10'
+          - os: ubuntu-24.04
+            python: '3.13'
+          - os: macos-14
+            python: '3.13'
+          - os: windows-2022
+            python: '3.13'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install focused test dependencies
+        run: python -m pip install -e ".[test]"
+      - name: Compile generic generation package
+        run: python -m compileall -q src/staqtapp_tds/generation
+      - name: Run contract, crash, recovery, process-CAS, README, workflow, and install gates
+        run: >-
+          python -m pytest -q
+          tests/test_v370_generation_contract.py
+          tests/test_v370_generation_store.py
+          tests/test_v370_generation_store_hardening.py
+          tests/test_v370_generation_process_cas.py
+          tests/test_v370_csv_generation.py
+          tests/test_v370_generation_audit.py
+          tests/test_v370_readme_current_status.py
+          tests/test_v370_generation_workflow_contract.py
+          tests/test_install_contract.py
+      - name: Run the installed deterministic Generation Authority audit
+        run: staqtapp-tds-generation-audit
+      - name: Prove the generation layer has no forbidden authority imports
+        shell: bash
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          forbidden = {
+              "staqtapp_tds.admin",
+              "staqtapp_tds.studio_pyqt5",
+              "staqtapp_tds.spiral",
+              "staqtapp_tds.trace_rank",
+              "staqtapp_tds.eaglegate",
+              "torch",
+              "vllm",
+          }
+          for path in sorted(Path("src/staqtapp_tds/generation").glob("*.py")):
+              tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+              imports = set()
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      imports.update(alias.name for alias in node.names)
+                  elif isinstance(node, ast.ImportFrom) and node.module:
+                      imports.add(node.module)
+              offenders = sorted(
+                  name for name in imports
+                  if any(name == item or name.startswith(item + ".") for item in forbidden)
+              )
+              if offenders:
+                  raise SystemExit(f"forbidden imports in {path}: {offenders}")
+          PY
+      - name: Prove v3.8 release status remains qualification-only
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          english = Path("README.md").read_text(encoding="utf-8")
+          japanese = Path("README_ja.md").read_text(encoding="utf-8")
+          normalized_english = " ".join(english.split())
+          normalized_japanese = " ".join(japanese.split())
+          assert "source candidate under review, not a published package" not in english
+          assert "published package ではありません" not in japanese
+          assert "staqtapp-tds==3.8.0" in english
+          assert "staqtapp-tds==3.8.0" in japanese
+          assert "CANARY and ACTIVE publication are rejected" in normalized_english
+          assert "manual credentialed H100 run remains required" in normalized_english
+          assert "CANARY / ACTIVE publication を拒否" in normalized_japanese
+          assert "manual credentialed H100 run が必要" in normalized_japanese
+          PY
+
+  generation-gates-complete:
+    name: TDS v3.7 Generation Authority gates complete
+    if: always()
+    needs:
+      - generation-contract
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require every platform lane
+        env:
+          RESULT: ${{ needs.generation-contract.result }}
+        run: |
+          test "$RESULT" = "success"

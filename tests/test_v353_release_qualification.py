@@ -16,8 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_v360_identity_preserves_v353_phase_evidence() -> None:
-    assert __version__ == "3.6.0"
-    assert VERSION_INFO == (3, 6, 0)
+    assert __version__ == "3.8.0"
+    assert VERSION_INFO == (3, 8, 0)
     assert StorageMode.LEGACY.value == "legacy"
     assert StorageMode.GUARANTEED_SEGMENTED.value == "guaranteed-segmented"
     assert ControlledStorage.ACTIVATE_ACKNOWLEDGEMENT == "activate-guaranteed-segmented"
@@ -113,6 +113,11 @@ def test_release_workflow_makes_publication_depend_on_every_gate() -> None:
     assert "staqtapp-tds-distributions" in workflow
     assert "id-token: write" in workflow
     assert not (ROOT / ".github" / "workflows" / "publish.yml").exists()
+    assert "python scripts/check_pypi_readme.py" in workflow
+    assert (
+        "python scripts/check_pypi_readme.py --network --wheel dist/*.whl"
+        in workflow
+    )
 
 
 def test_production_pypi_smoke_covers_every_supported_os() -> None:

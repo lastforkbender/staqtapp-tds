@@ -24,7 +24,7 @@ def _runtime():
 
 
 def test_v3120_version():
-    assert __version__ == "3.6.0"
+    assert __version__ == "3.8.0"
 
 
 def test_export_integrity_workflow_capability_matrix_is_verify_only():
