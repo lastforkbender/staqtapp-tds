@@ -17,6 +17,9 @@ def test_standard_install_includes_main_telemetry_ui_launcher():
     assert project["optional-dependencies"]["gui"] == []
     assert project["scripts"]["staqtapp-tds"] == "staqtapp_tds.admin.app:main"
     assert project["scripts"]["staqtapp-tds-admin"] == "staqtapp_tds.admin.console:main"
+    assert project["scripts"]["staqtapp-tds-generation"] == (
+        "staqtapp_tds.generation:main"
+    )
     assert metadata["tool"]["setuptools"]["package-data"]["staqtapp_tds.admin"] == [
         "templates/*.html",
         "static/css/*.css",
