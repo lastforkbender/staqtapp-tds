@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - agent/v360-foundation-closure-clean
   push:
     branches:
       - agent/v370-generation-convergence
