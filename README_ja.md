@@ -1,12 +1,10 @@
-# Staqtapp-TDS v3.6.0
+# Staqtapp-TDS v3.7.0 Atomic Generation Authority candidate
 
-> **Repository status:** `3.6.0` は qualified Foundation source candidate です。Exact merged/tagged release matrix と publication が完了するまで、production PyPI release は `3.5.3.post2` のままです。
+> **Repository status:** v3.7.0 は review 中の source candidate であり、published package ではありません。Current production PyPI release は `3.5.3.post2` のままです。v3.6 Foundation と v3.7 Generation Authority は canonical merge、tag-bound qualification、publication 完了後にのみ production package として扱われます。
 
-> **v3.6.0 Foundation Closure source candidate:** fail-closed native ABI / lifecycle、strict
-> checksum / UTF-8 truth、generation-bound handle、bounded C11 diagnostics、
-> immutable packed read、x86-64 / AArch64 semantic parity を閉じます。
-> Atomic Generation Plane、Eaglegate execution、learned serving、activation
-> authority はこの release に含まれません。
+> **v3.7.0 Atomic Generation Authority source candidate:** canonical manifest、content-addressed payload、append-only lifecycle / publication receipt、atomic `CURRENT` CAS、pinned reader、deterministic recovery、rollback、retirementを generic primitive として追加します。CSV は最初の qualification fixture ですが、architecture の上限ではありません。Eaglegate execution、learned serving、model authority、activation authority は含まれません。
+
+> **v3.6.0 Foundation substrate:** fail-closed native ABI / lifecycle、strict checksum / UTF-8 truth、generation-bound handle、bounded C11 diagnostics、immutable packed read、x86-64 / AArch64 semantic parity を保持します。
 
 **Temporal Directory System - AI システム向けの native-indexed `.tds` ストレージ、変数制御、トレース順位付け、CSV evidence 操作、semantic review、集中型 observability。**
 
@@ -103,13 +101,11 @@ TDS は storage hot path を狭く保つ設計です。Native index、lookup、p
 # Current production PyPI release（両方の UI を含む）
 python -m pip install staqtapp-tds==3.5.3.post2
 
-# Candidate package identity（3.6.0 publication 完了後に使用）
-python -m pip install staqtapp-tds==3.6.0
-
 # main TDS telemetry UI を起動
 staqtapp-tds
 
-# Source checkout（両方の UI を含む）
+# v3.7 source candidate checkout（両方の UI を含む）
+git checkout agent/v370-generation-convergence
 python -m pip install .
 ```
 
@@ -260,6 +256,16 @@ TDS は preparation、evidence、review、authority を明確に分離します�
 
 ## Validation status
 
+v3.7.0 Atomic Generation Authority source candidate は storage generation と
+future Eaglegate epoch のための generic immutable publication primitive を
+追加します。Focused qualification は deterministic identity、authoritative
+byte round trip、lifecycle adjacency、全 crash boundary、CURRENT CAS、
+concurrent publication conflict、pinned reader、restart access、corruption
+rejection、deterministic recovery、rollback、retirement、namespace isolation
+を対象とします。Semantic、ranking、model、Browser、Studio、activation
+authority は付与しません。詳細は
+`docs/130_v370_Atomic_Generation_Authority.md` を参照してください。
+
 v3.6.0 Foundation source は process-state ledger、deterministic closure
 report、x86-64 / AArch64 semantic parity、fail-closed lifecycle、sanitizer、
 fuzz、shared-runner no-regression evidence を閉じます。Named-reference-CPU
@@ -285,6 +291,7 @@ v3.5.3.post2 は standard installation に main telemetry Browser と PyQt5 Driv
 
 ```text
 src/staqtapp_tds/          core storage, persistence, telemetry, native management
+src/staqtapp_tds/generation/ generic immutable generations, CAS, pinning, recovery
 src/staqtapp_tds/csv_layer CSV evidence, transactions, Interpole, Semantic IR
 src/staqtapp_tds/drivers/  TDDL, bytecode, VM, Foundry, review and evidence
 src/staqtapp_tds/studio_pyqt5/ Driver Studio cockpit
