@@ -158,8 +158,18 @@ class VLLMReadOnlyStatusSnapshot:
         ):
             require_root(name, getattr(self, name))
         require_int("num_speculative_tokens", self.num_speculative_tokens, 1, 64)
-        require_int("draft_tensor_parallel_size", self.draft_tensor_parallel_size, 1, 1024)
-        require_int("target_tensor_parallel_size", self.target_tensor_parallel_size, 1, 1024)
+        require_int(
+            "draft_tensor_parallel_size",
+            self.draft_tensor_parallel_size,
+            1,
+            1024,
+        )
+        require_int(
+            "target_tensor_parallel_size",
+            self.target_tensor_parallel_size,
+            1,
+            1024,
+        )
         require_int("max_model_len", self.max_model_len, 1, UINT32_MAX)
         require_int("snapshot_generation", self.snapshot_generation, 0, UINT32_MAX)
         if not isinstance(self.parallel_drafting, bool):
@@ -218,6 +228,9 @@ class CapabilityWitnessObservation:
     metadata_root: str
     shadow_report_root: str
     status_snapshot_root: str
+    service_instance_root: str
+    status_exporter_root: str
+    snapshot_generation: int
     matched: bool
     mismatch_fields: tuple[str, ...]
 
@@ -228,8 +241,11 @@ class CapabilityWitnessObservation:
             "metadata_root",
             "shadow_report_root",
             "status_snapshot_root",
+            "service_instance_root",
+            "status_exporter_root",
         ):
             require_root(name, getattr(self, name))
+        require_int("snapshot_generation", self.snapshot_generation, 0, UINT32_MAX)
         if not isinstance(self.matched, bool):
             raise EaglegateExactnessError("matched must be boolean")
         if not isinstance(self.mismatch_fields, tuple):
@@ -255,12 +271,16 @@ class CapabilityWitnessObservation:
             "metadata_root": self.metadata_root,
             "shadow_report_root": self.shadow_report_root,
             "status_snapshot_root": self.status_snapshot_root,
+            "service_instance_root": self.service_instance_root,
+            "status_exporter_root": self.status_exporter_root,
+            "snapshot_generation": self.snapshot_generation,
             "matched": self.matched,
             "mismatch_fields": list(self.mismatch_fields),
             "runtime_imported_by_tds": False,
             "network_connection_created_by_tds": False,
             "cryptographic_signature_verified": False,
             "witness_independence_proven": False,
+            "snapshot_freshness_proven": False,
         }
 
     @property
@@ -306,6 +326,16 @@ class CapabilityAttestationBundle:
                 raise EaglegateExactnessError("witness metadata root mismatch")
             if observation.shadow_report_root != self.shadow_report_root:
                 raise EaglegateExactnessError("witness shadow root mismatch")
+        service_roots = {
+            observation.service_instance_root for observation in self.observations
+        }
+        generations = {
+            observation.snapshot_generation for observation in self.observations
+        }
+        if len(service_roots) != 1:
+            raise EaglegateExactnessError("witness service instance mismatch")
+        if len(generations) != 1:
+            raise EaglegateExactnessError("witness snapshot generation mismatch")
 
     @property
     def decision(self) -> AttestationDecision:
@@ -315,12 +345,22 @@ class CapabilityAttestationBundle:
             else AttestationDecision.TARGET_ONLY
         )
 
+    @property
+    def service_instance_root(self) -> str:
+        return self.observations[0].service_instance_root
+
+    @property
+    def snapshot_generation(self) -> int:
+        return self.observations[0].snapshot_generation
+
     def canonical_dict(self) -> dict[str, Any]:
         return {
             "attestation_contract_id": EAGLEGATE_ATTESTATION_CONTRACT_ID,
             "attestation_format_version": EAGLEGATE_ATTESTATION_FORMAT_VERSION,
             "metadata_root": self.metadata_root,
             "shadow_report_root": self.shadow_report_root,
+            "service_instance_root": self.service_instance_root,
+            "snapshot_generation": self.snapshot_generation,
             "required_witnesses": self.required_witnesses,
             "witness_count": len(self.observations),
             "decision": self.decision.value,
@@ -330,6 +370,7 @@ class CapabilityAttestationBundle:
             "authority_root": EAGLEGATE_ATTESTATION_AUTHORITY.authority_root,
             "cryptographic_signature_verified": False,
             "witness_independence_proven": False,
+            "snapshot_freshness_proven": False,
             "metadata_truth_claimed": False,
             "real_runtime_qualified": False,
             "activation_authority": False,
