@@ -1,0 +1,45 @@
+name: Materialize v3.6 README candidate status
+
+on:
+  push:
+    branches:
+      - agent/v360-foundation-closure-clean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-v360-readme-status
+  cancel-in-progress: false
+
+env:
+  PYTHONDONTWRITEBYTECODE: '1'
+
+jobs:
+  update-readmes:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/v360-foundation-closure-clean
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Update status and prove media/link preservation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -S tools/update_v360_readme_status.py
+          python scripts/check_release.py
+          git diff --check
+      - name: Commit README status only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add README.md README_ja.md
+          git commit -m 'Clarify v3.6 candidate and production README status'
+          git push origin HEAD:agent/v360-foundation-closure-clean
