@@ -1,0 +1,65 @@
+name: Apply v3.6 Foundation Closure candidate
+
+on:
+  push:
+    branches:
+      - agent/v360-foundation-closure
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-v360-foundation-closure
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Reconstruct, verify, and apply exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/v360-foundation-closure.patch.part-* > /tmp/closure.b64
+          base64 --decode /tmp/closure.b64 > /tmp/closure.patch
+          test "$(wc -c < /tmp/closure.patch)" = "103151"
+          printf '%s  %s\n' \
+            'b323dba47485b4b9a0d61b9a62c9953430ec0081c0ad8cac510f370c82f21b86' \
+            /tmp/closure.patch | sha256sum -c -
+          git apply --check /tmp/closure.patch
+          git apply /tmp/closure.patch
+          rm -f .github/v360-foundation-closure.patch.part-*
+          rm -f .github/workflows/apply-v360-foundation-closure.yml
+          python -S tools/foundation_closure_v360.py --root . --json > /tmp/foundation.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path('/tmp/foundation.json').read_text(encoding='utf-8'))
+          if report.get('passed') is not True:
+              raise SystemExit('Foundation Closure report did not pass')
+          if report.get('release_identity') != '3.6.0':
+              raise SystemExit('Foundation Closure report did not bind 3.6.0')
+          if report.get('eaglegate_included') is not False:
+              raise SystemExit('Foundation Closure improperly admitted Eaglegate')
+          if report.get('atomic_generation_plane_included') is not False:
+              raise SystemExit('Foundation Closure improperly admitted Atomic Generations')
+          print(report['report_root'])
+          PY
+          python scripts/check_release.py
+      - name: Commit the clean Foundation Closure candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Close v3.6 Foundation Repair'
+          git push origin HEAD:agent/v360-foundation-closure
