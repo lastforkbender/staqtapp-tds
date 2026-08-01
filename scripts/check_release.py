@@ -59,7 +59,7 @@ PYPI_README_REQUIRED_LINKS = (
     "https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf",
     "https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf",
 )
-CURRENT_PRODUCTION_VERSION = "3.5.3.post2"
+CURRENT_PRODUCTION_VERSION = "3.8.0"
 SOURCE_CANDIDATE_MARKER = "source candidate under review, not a published package"
 V370_JAPANESE_CANDIDATE_MARKER = "published package ではありません"
 

@@ -1,7 +1,7 @@
 # v3.8.0 — Eaglegate Core, real vLLM shadow, and packed waypoint graph
 
-Completed the source implementation for the Phase 3/4 convergence line while
-keeping production activation and package publication separate.
+Released the Phase 1–4 convergence line while keeping Eaglegate production
+activation outside the package authority boundary.
 
 - Added the non-widenable Eaglegate lossless constitution, deterministic
   admission, exactness laboratory, adversarial adapter ABI, and content-free
@@ -27,6 +27,9 @@ keeping production activation and package publication separate.
   checked bounds, canonical rebuild, exact source spans, SHA-256, and CRC32.
 - Preserved target token/KV authority and deferred Dijkstra, learned search,
   production routing, canarying, promotion, and activation.
+- Added a pre-publication PyPI presentation gate that validates the built
+  wheel's long description and requires all 19 immutable Browser screenshot
+  URLs to return PNG bytes identical to the preserved local captures.
 
 # v3.7.0 — Atomic Generation Authority
 

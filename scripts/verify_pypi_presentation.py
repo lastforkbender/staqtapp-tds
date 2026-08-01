@@ -29,9 +29,11 @@ REQUIRED_TARGETS = (
 STALE_WORDING = (
     "tag remains prohibited",
     "REMOTE REVIEW GATES REQUIRED",
+    "source candidate under review, not a published package",
+    "published package ではありません",
 )
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
-USER_AGENT = "staqtapp-tds-release-verifier/3.5.3.post1"
+USER_AGENT = "staqtapp-tds-release-verifier/3.8.0"
 
 
 def presentation_targets(description: str) -> tuple[list[str], list[str]]:
@@ -43,8 +45,22 @@ def presentation_targets(description: str) -> tuple[list[str], list[str]]:
     return images, links
 
 
-def validate_description(description: str) -> tuple[list[str], list[str]]:
+def validate_description(
+    description: str, *, version: str
+) -> tuple[list[str], list[str]]:
     """Validate the exact guarantees required for the public PyPI page."""
+    required_release_text = (
+        f"# Staqtapp-TDS v{version}",
+        f"python -m pip install staqtapp-tds=={version}",
+    )
+    missing_release_text = [
+        text for text in required_release_text if text not in description
+    ]
+    if missing_release_text:
+        raise ValueError(
+            "published description is missing exact release identity: "
+            + ", ".join(repr(text) for text in missing_release_text)
+        )
     images, links = presentation_targets(description)
     targets = [*images, *links]
     relative = [
@@ -125,7 +141,7 @@ def main() -> int:
 
     try:
         description = load_pypi_description(version)
-        images, links = validate_description(description)
+        images, links = validate_description(description, version=version)
         for image_url in images:
             if fetch_bytes(image_url, len(PNG_SIGNATURE)) != PNG_SIGNATURE:
                 raise RuntimeError(f"published image target is not a PNG: {image_url}")

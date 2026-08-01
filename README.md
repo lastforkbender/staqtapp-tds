@@ -1,4 +1,4 @@
-> **v3.8.0 Phase 1–4 convergence source candidate**
+> **v3.8.0 Phase 1–4 convergence release**
 >
 > Phase 1 closes the v3.6 Foundation; Phase 2 adds the v3.7 Generation
 > Authority and exact CSV consumer; Phase 3 binds the lossless Eaglegate Core
@@ -17,9 +17,9 @@
 >
 > At-rest encryption is not implemented. Requests using `DirFlags.ENCRYPTED` fail closed instead of storing plaintext. New v2 persistence files require their integrity sidecar. `.tds` input should be treated as trusted until explicit resource-budget hardening is complete. Native extensions are optional and are built only when `STAQTAPP_TDS_BUILD_NATIVE=1` is set.
 
-# Staqtapp-TDS v3.8.0 Phase 1–4 convergence candidate
+# Staqtapp-TDS v3.8.0
 
-> **Repository status:** v3.8.0 is a source candidate under review, not a published package. The current production PyPI release remains `3.5.3.post2`. The v3.6 Foundation, v3.7 Generation Authority, and v3.8 Eaglegate/packed-graph source transitions are implemented on this branch; canonical merge, tag-bound qualification, and publication are still required before `3.8.0` is presented as a production package. The credentialed real H100 workflow is provided but was not executable in this local CPU environment.
+> **Release status:** v3.8.0 is the current production PyPI release. Publication is permitted only from the exact `v3.8.0` tag after the complete aggregate release gate succeeds. The v3.6 Foundation, v3.7 Generation Authority, and v3.8 Eaglegate/packed-graph transitions are included. The manual credentialed H100 workflow has not been executed and remains required for hardware evidence; Eaglegate remains shadow/target-only and has no production activation authority.
 
 **Temporal Directory System - native-indexed `.tds` storage, controlled variables, trace ranking, CSV evidence operations, semantic review, and centralized observability for AI systems.**
 
@@ -27,7 +27,7 @@
 
 ## Browser Operations Console — all 19 pages
 
-These are 19 separate 1280×800 viewport captures from the packaged, localhost-only TDS Browser. Each capture was made after selecting the corresponding navigation control against a real release-qualification observer snapshot. Page 07 is the actual CSV Interpole Monitor in its `Monitor Ready` state. The images are shown vertically in Browser navigation order; they are not a stitched Dashboard image or a UI mock.
+These are 19 separate 1280×800 viewport captures from the packaged, localhost-only TDS Browser. Each capture was made after selecting the corresponding navigation control against a real release-qualification observer snapshot. Page 07 is the actual CSV Interpole Monitor in its `Monitor Ready` state. The images are shown vertically in Browser navigation order; they are not a stitched Dashboard image or a UI mock. For reliable PyPI rendering, the unchanged captures use immutable absolute HTTPS URLs; release CI verifies every remote PNG byte-for-byte and checks that all 19 URLs survive in the built wheel metadata before publication.
 
 <p align="center"><strong>01 — Dashboard</strong><br>
   <img src="https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/01-dashboard-1280x800.png" alt="Staqtapp-TDS Browser page 01, Dashboard, selected in the navigation" width="100%">
@@ -117,14 +117,10 @@ TDS is designed around a narrow storage hot path. Native indexing, lookup, persi
 
 ```bash
 # Current production PyPI release; includes both UIs
-python -m pip install staqtapp-tds==3.5.3.post2
+python -m pip install staqtapp-tds==3.8.0
 
 # Launch the main TDS telemetry UI
 staqtapp-tds
-
-# v3.8 source candidate on the Phase 1–4 convergence branch
-git checkout agent/v380-phase1-phase4-convergence
-python -m pip install .
 
 # Exercise real publication, pinning, CAS, rollback, retirement, and recovery
 staqtapp-tds-generation-audit
@@ -265,7 +261,7 @@ The [Programmer Core API Guide](https://github.com/lastforkbender/staqtapp-tds/b
 - Semantic IR candidates, lifecycle transitions, and atomic batches;
 - Driver Foundry, VM, Runtime Manager, regression, review, evidence, Browser, and Driver Studio calls.
 
-Use the current [v3.5.3 Guaranteed Storage API reference](https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/docs/reference/Programmers_API_Reference.md) for the new storage calls. The separate [API Surface Reference PDF](https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf) is retained as a historical v3.1.23 Driver/Studio reference; it is not an exhaustive v3.5.3 inventory.
+Use the preserved [v3.5.3 Guaranteed Storage API reference](https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/docs/reference/Programmers_API_Reference.md) for those storage calls. The separate [API Surface Reference PDF](https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf) is retained as a historical v3.1.23 Driver/Studio reference; it is not an exhaustive v3.5.3 inventory.
 
 ## Safety and authority boundaries
 
@@ -279,7 +275,7 @@ TDS intentionally distinguishes preparation, evidence, review, and authority:
 
 ## Validation status
 
-The v3.8.0 source candidate completes four explicit boundaries. The v3.7
+The v3.8.0 release completes four explicit boundaries. The v3.7
 Generation Authority publishes exact CSV and composite Eaglegate generations
 with head-root CAS, cross-process pins, deterministic recovery, rollback, and
 retirement. Eaglegate adds a non-widenable target-verification constitution,
@@ -328,9 +324,14 @@ distribution can be built.
 
 Version `3.5.3.post2` installs the main telemetry Browser and PyQt5 Driver
 Studio with every standard installation. The `staqtapp-tds` command launches
-the telemetry Browser; native C extensions remain opt-in. Publication is
+the telemetry Browser; native C extensions remain opt-in. Its publication was
 restricted to the exact annotated `v3.5.3.post2` tag after the complete
-aggregate release gate succeeds.
+aggregate release gate succeeded.
+
+Version `3.8.0` carries the Phase 1–4 convergence while keeping Eaglegate's
+production boundary unchanged. Its release path additionally validates the
+PyPI long description from the built wheel and fetches every immutable Browser
+screenshot URL to require the expected PNG bytes before trusted publication.
 
 ## Repository map
 

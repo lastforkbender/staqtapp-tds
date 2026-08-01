@@ -26,6 +26,8 @@ jobs:
           python-version: '3.13'
       - name: Check source release hygiene
         run: python scripts/check_release.py
+      - name: Check PyPI README screenshot contract
+        run: python scripts/check_pypi_readme.py
       - name: Verify generated documentation is current
         run: git diff --exit-code
 
@@ -417,6 +419,7 @@ jobs:
       - name: Validate distribution metadata and contents
         run: |
           python -m twine check dist/*
+          python scripts/check_pypi_readme.py --network --wheel dist/*.whl
           python -m pip install --force-reinstall dist/*.whl
           python scripts/release_version.py --verify-installed
       - name: Archive validated distributions

@@ -20,10 +20,11 @@ v3.6.0 -> v3.6.1 -> v3.6.2
 
 Staqtapp-TDS will not publish another `.postN` release.
 
-The current source-candidate architecture line is **v3.8.0**, the packed
-Waypoint Graph Foundation and qualification-only Eaglegate convergence. The
-current production PyPI identity remains `v3.5.3.post2` until a separate
-release-controller run completes.
+The current published architecture line is **v3.8.0**, the packed Waypoint
+Graph Foundation and qualification-only Eaglegate convergence. The current
+production PyPI identity is `3.8.0`. The credentialed H100 workflow has not
+been executed; publication grants no Eaglegate canary, promotion, or activation
+authority.
 
 ## Operational rules
 

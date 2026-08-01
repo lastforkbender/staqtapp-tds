@@ -9,9 +9,9 @@ artifacts, one-shot materializers, obsolete native workflows, generated status
 files, or old copies of already-merged native code.
 
 The source identity assigned to this Phase-2 architecture is **3.7.0**. It is
-preserved here as a phase identity, not as the repository's current candidate
-or public release. `README.md` and `docs/VERSIONING.md` are authoritative for
-the current source-candidate and production identities.
+preserved here as a phase identity, not as the repository's current source or
+public release identity. `README.md` and `docs/VERSIONING.md` are authoritative
+for the current source and production identity.
 
 ## Governing invariant
 

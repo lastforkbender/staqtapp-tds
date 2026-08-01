@@ -1,6 +1,6 @@
-# Staqtapp-TDS v3.8.0 Phase 1–4 convergence candidate
+# Staqtapp-TDS v3.8.0
 
-> **Repository status:** v3.8.0 は review 中の source candidate であり、published package ではありません。Current production PyPI release は `3.5.3.post2` のままです。v3.6 Foundation、v3.7 Generation Authority、v3.8 Eaglegate / packed graph の source transition はこの branch に実装済みですが、production `3.8.0` には canonical merge、tag-bound qualification、publication が必要です。Credential が必要な real H100 workflow は追加済みですが、この local CPU environment では実行していません。
+> **Release status:** v3.8.0 は current production PyPI release です。Publication は complete aggregate release gate を通過した exact `v3.8.0` tag からのみ許可されます。v3.6 Foundation、v3.7 Generation Authority、v3.8 Eaglegate / packed graph transition を含みます。Manual credentialed H100 workflow は未実行であり hardware evidence に引き続き必要です。Eaglegate は shadow / target-only のままで、production activation authority を持ちません。
 
 > **v3.8.0 Phase 1–4 convergence:** Phase 1 は v3.6 Foundation、Phase 2 は v3.7 Generation Authority と exact CSV consumer、Phase 3 は単一 authority に bind された lossless Eaglegate Core、Phase 4 は canonical packed waypoint / CSR graph と exact pin された real vLLM EAGLE shadow qualification path です。Production request、canary、promotion、activation、token acceptance、KV commit authority は含みません。
 
@@ -12,7 +12,7 @@
 
 ## Browser Operations Console — 全 19 ページ
 
-以下は packaged local-only TDS Browser から取得した、個別の 1280×800 viewport capture 19 枚です。Release qualification 用の実データ observer snapshot に対して、各 navigation control を選択してから capture しました。07 は `Monitor Ready` 状態の実際の CSV Interpole Monitor です。Dashboard の結合画像や UI mock ではなく、Browser の navigation 順に縦並びで表示しています。
+以下は packaged local-only TDS Browser から取得した、個別の 1280×800 viewport capture 19 枚です。Release qualification 用の実データ observer snapshot に対して、各 navigation control を選択してから capture しました。07 は `Monitor Ready` 状態の実際の CSV Interpole Monitor です。Dashboard の結合画像や UI mock ではなく、Browser の navigation 順に縦並びで表示しています。PyPI で確実に表示するため capture は不変の image target を維持し、release CI は publication 前に 19 枚すべての remote PNG byte と built wheel metadata 内の URL を検証します。
 
 <p align="center"><strong>01 — Dashboard</strong><br>
   <img src="docs/screenshots/browser_pages/01-dashboard-1280x800.png" alt="Staqtapp-TDS Browser 01、navigation で選択された Dashboard" width="100%">
@@ -102,14 +102,10 @@ TDS は storage hot path を狭く保つ設計です。Native index、lookup、p
 
 ```bash
 # Current production PyPI release（両方の UI を含む）
-python -m pip install staqtapp-tds==3.5.3.post2
+python -m pip install staqtapp-tds==3.8.0
 
 # main TDS telemetry UI を起動
 staqtapp-tds
-
-# Phase 1–4 convergence branch 上の v3.8 source candidate
-git checkout agent/v380-phase1-phase4-convergence
-python -m pip install .
 
 # 実際の publication、pin、CAS、rollback、retirement、recovery を検証
 staqtapp-tds-generation-audit
@@ -248,7 +244,7 @@ Native storage は限定された mechanical work を担当します。Diagnosti
 - Semantic IR candidate、lifecycle transition、atomic batch;
 - Driver Foundry、VM、Runtime Manager、regression、review、evidence、Browser、Driver Studio call。
 
-新しい storage call には current [v3.5.3 Guaranteed Storage API reference](docs/reference/Programmers_API_Reference.md) を使用してください。別の [API Surface Reference PDF](tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf) は historical v3.1.23 Driver/Studio reference として保持されていますが、v3.5.3 の exhaustive inventory ではありません。
+これらの storage call には preserved [v3.5.3 Guaranteed Storage API reference](docs/reference/Programmers_API_Reference.md) を使用してください。別の [API Surface Reference PDF](tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf) は historical v3.1.23 Driver/Studio reference として保持されていますが、v3.5.3 の exhaustive inventory ではありません。
 
 ## Safety / authority boundary
 
@@ -262,7 +258,7 @@ TDS は preparation、evidence、review、authority を明確に分離します�
 
 ## Validation status
 
-v3.8.0 source candidate は 4 boundary を実装します。v3.7 Generation
+v3.8.0 release は 4 boundary を実装します。v3.7 Generation
 Authority は exact CSV と composite Eaglegate generation を head-root CAS、
 cross-process pin、deterministic recovery、rollback、retirement で publish
 します。Eaglegate は target verification を固定した constitution、
@@ -301,7 +297,9 @@ Evidence: pure monolithic suite は 832 passed / 11 skipped、native-active mono
 
 v3.5.3.post1 は PyPI long description と source archive の presentation を修正しました。すべての PyPI-facing target は absolute HTTPS URL であり、release hygiene は relative image/document target を distribution build 前に拒否します。
 
-v3.5.3.post2 は standard installation に main telemetry Browser と PyQt5 Driver Studio を含めます。`staqtapp-tds` は telemetry Browser を起動し、native C extension は opt-in のままです。Publication は complete aggregate release gate 通過後の exact annotated `v3.5.3.post2` tag に限定されます。
+v3.5.3.post2 は standard installation に main telemetry Browser と PyQt5 Driver Studio を含めます。`staqtapp-tds` は telemetry Browser を起動し、native C extension は opt-in のままです。Publication は complete aggregate release gate 通過後の exact annotated `v3.5.3.post2` tag に限定されました。
+
+v3.8.0 は Eaglegate の production boundary を変更せずに Phase 1–4 convergence を提供します。Trusted publication 前に built wheel の PyPI long description と、不変の Browser screenshot URL 19 件すべての PNG byte を release gate で検証します。
 
 ## Repository map
 

@@ -113,6 +113,11 @@ def test_release_workflow_makes_publication_depend_on_every_gate() -> None:
     assert "staqtapp-tds-distributions" in workflow
     assert "id-token: write" in workflow
     assert not (ROOT / ".github" / "workflows" / "publish.yml").exists()
+    assert "python scripts/check_pypi_readme.py" in workflow
+    assert (
+        "python scripts/check_pypi_readme.py --network --wheel dist/*.whl"
+        in workflow
+    )
 
 
 def test_production_pypi_smoke_covers_every_supported_os() -> None:
