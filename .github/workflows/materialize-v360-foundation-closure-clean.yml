@@ -31,6 +31,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          export PYTHONDONTWRITEBYTECODE=1
           python - <<'PY'
           from __future__ import annotations
 
@@ -111,6 +112,8 @@ jobs:
               raise SystemExit('Foundation Closure improperly admitted Atomic Generations')
           print(report['report_root'])
           PY
+          find src scripts tools tests -type d -name __pycache__ -prune -exec rm -rf {} +
+          find src scripts tools tests -type f -name '*.pyc' -delete
           python scripts/check_release.py
       - name: Commit the clean Foundation Closure source
         shell: bash
