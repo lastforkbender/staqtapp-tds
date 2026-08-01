@@ -786,7 +786,7 @@ def test_v351_serialized_candidate_and_lifecycle_are_accepted_compatibly():
     assert receipt.ok is True
     assert receipt.result_lifecycle.suite_release_version == "3.6.0"
     assert len(receipt.result_lifecycle.history) == 2
-    assert any("compatible_release_replay:3.5.1->3.5.3" in w for w in receipt.warnings)
+    assert any("compatible_release_replay:3.5.1->3.6.0" in w for w in receipt.warnings)
 
 
 def test_batch_receipt_keeps_all_semantic_and_storage_boundaries_closed():
