@@ -1,6 +1,6 @@
-> **v3.6.0 Foundation Closure**
+> **v3.6.0 Foundation Closure source candidate**
 >
-> This release closes the native correctness and Frontier authority substrate:
+> This source candidate closes the native correctness and Frontier authority substrate:
 > fail-closed ABI/lifecycle admission, strict checksum and UTF-8 truth,
 > generation-bound handles, bounded C11 diagnostics, immutable packed reads,
 > and exact x86-64/AArch64 semantics. It adds no Atomic Generation Plane,
@@ -11,6 +11,8 @@
 > At-rest encryption is not implemented. Requests using `DirFlags.ENCRYPTED` fail closed instead of storing plaintext. New v2 persistence files require their integrity sidecar. `.tds` input should be treated as trusted until explicit resource-budget hardening is complete. Native extensions are optional and are built only when `STAQTAPP_TDS_BUILD_NATIVE=1` is set.
 
 # Staqtapp-TDS v3.6.0
+
+> **Repository status:** `3.6.0` is the qualified Foundation source candidate. The current production PyPI release remains `3.5.3.post2` until the exact merged and tagged release matrix passes and publication completes.
 
 **Temporal Directory System - native-indexed `.tds` storage, controlled variables, trace ranking, CSV evidence operations, semantic review, and centralized observability for AI systems.**
 
@@ -104,7 +106,10 @@ TDS is designed around a narrow storage hot path. Native indexing, lookup, persi
 ## Install
 
 ```bash
-# Published release from production PyPI; includes both UIs
+# Current production PyPI release; includes both UIs
+python -m pip install staqtapp-tds==3.5.3.post2
+
+# Candidate package identity; use this command only after 3.6.0 publication
 python -m pip install staqtapp-tds==3.6.0
 
 # Launch the main TDS telemetry UI

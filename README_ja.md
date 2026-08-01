@@ -1,6 +1,8 @@
 # Staqtapp-TDS v3.6.0
 
-> **v3.6.0 Foundation Closure:** fail-closed native ABI / lifecycle、strict
+> **Repository status:** `3.6.0` は qualified Foundation source candidate です。Exact merged/tagged release matrix と publication が完了するまで、production PyPI release は `3.5.3.post2` のままです。
+
+> **v3.6.0 Foundation Closure source candidate:** fail-closed native ABI / lifecycle、strict
 > checksum / UTF-8 truth、generation-bound handle、bounded C11 diagnostics、
 > immutable packed read、x86-64 / AArch64 semantic parity を閉じます。
 > Atomic Generation Plane、Eaglegate execution、learned serving、activation
@@ -98,7 +100,10 @@ TDS は storage hot path を狭く保つ設計です。Native index、lookup、p
 ## インストール
 
 ```bash
-# Production PyPI corrective release（両方の UI を含む）
+# Current production PyPI release（両方の UI を含む）
+python -m pip install staqtapp-tds==3.5.3.post2
+
+# Candidate package identity（3.6.0 publication 完了後に使用）
 python -m pip install staqtapp-tds==3.6.0
 
 # main TDS telemetry UI を起動
