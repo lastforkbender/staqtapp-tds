@@ -36,6 +36,6 @@ def test_readmes_describe_real_v370_scope_without_false_release_claims() -> None
         assert "3.5.3.post2" in text
         assert "Eaglegate" in text
         assert "inactive" in text
-    assert "published package remains `3.5.3.post2`" in english
+    assert "The published package remains `3.5.3.post2`" in english
     assert "v3.7.0 is published" not in english
     assert "Eaglegate is active" not in english
