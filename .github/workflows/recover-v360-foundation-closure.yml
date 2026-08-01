@@ -1,0 +1,107 @@
+name: Recover exact v3.6 Foundation Closure
+
+on:
+  push:
+    branches:
+      - agent/v360-foundation-closure
+
+permissions:
+  contents: write
+
+concurrency:
+  group: recover-v360-foundation-closure
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: agent/v360-foundation-closure
+      - name: Reconstruct the exact qualified patch from immutable Git objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          commits=(
+            b529a7e838e92d9959ecb710dd804de8bc8cb7be
+            aef0179c07fbc7b24b1b8fcff7f45efeca0f008a
+            7e6f85b58ea172f043678361f9cd8baaa9b4e3f4
+            1c9cc73294c85c963fc590dbc006499518cc8b09
+            a1ed85d641f4376c081a2b761438bc16c976b946
+            c93641a6bd08e702a16ca2d1dfc90ebe687c0883
+            c9487ff890bf0598d71d9776094fc2a5e6efa7ad
+            6b4b50ad4a2228191e7d6ef57e29da4dcbe4a684
+            3ddfe2e5b866ee86ae61d39cfa461405c946c43a
+            3ad9f1fd8513edc073d4943785935cd1fcd2c711
+            dff98c500f5176658d89cd4313bb58fc8488565d
+            d3a0839547de8c8171babee86da2ab133f3d3c19
+            8a8adf2e5379b53b1102aaf4e5f4965047269bdb
+            9881717c09b00ab2f5b1441151931f3fe6384e91
+            3035ada3ccbcec2a535f1ea99619f3fc64357322
+            a7dde9d17e67fac3d117e71c5c406ebc904d559d
+            5092adfef119feec828abc179ffac1c23520e564
+            9853faca89ddcb19d444642e01d87823298c1310
+            5832e5c0b9b7abd1eaca7774810f6fb912725fff
+            bf4786d5a0bc247d33d94b25d8d79a065c0accbc
+            624b2e67aefb069ddced3ed35dc5b4869b8b3d79
+          )
+          parts=(
+            part-00 part-01 part-02 part-03 part-04 part-05 part-06 part-07 part-08 part-09
+            part-10a0 part-10a1 part-10a2 part-10b0 part-10b1 part-10b2
+            part-11a part-11b part-11c part-12a part-12b
+          )
+          : > /tmp/closure.b64
+          for index in "${!commits[@]}"; do
+            commit="${commits[$index]}"
+            part="${parts[$index]}"
+            git fetch --no-tags origin "$commit"
+            git show "$commit:.github/v360-foundation-closure.patch.$part" >> /tmp/closure.b64
+          done
+          base64 --decode /tmp/closure.b64 > /tmp/closure.patch
+          test "$(wc -c < /tmp/closure.patch)" = "103151"
+          printf '%s  %s\n' \
+            'b323dba47485b4b9a0d61b9a62c9953430ec0081c0ad8cac510f370c82f21b86' \
+            /tmp/closure.patch | sha256sum -c --strict
+          git apply --check /tmp/closure.patch
+          git apply /tmp/closure.patch
+      - name: Remove temporary transfer machinery
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/v360-foundation-closure.patch.gz.b64
+          rm -f .github/v360-foundation-closure.trigger
+          rm -f .github/v360-foundation-closure.recovery-trigger
+          rm -f .github/workflows/materialize-v360-foundation-closure.yml
+          rm -f .github/workflows/recover-v360-foundation-closure.yml
+          git diff --check
+      - name: Qualify the materialized Foundation Closure
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+          NUMBA_DISABLE_JIT: '1'
+        run: |
+          set -euo pipefail
+          python -S tools/foundation_closure_v360.py \
+            --source-root . \
+            --output /tmp/foundation-closure.json \
+            --check
+          python scripts/check_release.py
+          python -m pytest -q \
+            tests/test_v360_foundation_closure.py \
+            tests/test_release_version_policy.py \
+            tests/test_v360_native_lifecycle_admission.py \
+            tests/test_v360_native_architecture_parity.py \
+            tests/test_v301_release_pipeline.py \
+            tests/test_v353_release_qualification.py \
+            tests/test_install_contract.py
+      - name: Commit the clean Foundation Closure candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Close v3.6 Foundation Repair'
+          git push origin HEAD:agent/v360-foundation-closure
