@@ -23,6 +23,13 @@ def test_standard_install_includes_main_telemetry_ui_launcher():
     assert project["scripts"]["staqtapp-tds-generation-audit"] == (
         "staqtapp_tds.generation.audit:main"
     )
+    assert project["scripts"]["staqtapp-tds-eaglegate"] == "staqtapp_tds.eaglegate.console:main"
+    assert project["scripts"]["staqtapp-tds-eaglegate-lab"] == (
+        "staqtapp_tds.eaglegate.exactness:main"
+    )
+    assert project["scripts"]["staqtapp-tds-eaglegate-adapter-lab"] == (
+        "staqtapp_tds.eaglegate.adapter:main"
+    )
     assert metadata["tool"]["setuptools"]["package-data"]["staqtapp_tds.admin"] == [
         "templates/*.html",
         "static/css/*.css",
