@@ -201,6 +201,7 @@ class AtomicGenerationStore:
         self.pins_dir = self.root / "pins"
         self._mutex = threading.RLock()
         self._pins: dict[str, int] = {}
+        self._pin_locks: dict[str, tuple[int, int]] = {}
         for directory in (
             self.root,
             self.objects_dir,
@@ -269,11 +270,36 @@ class AtomicGenerationStore:
             open_flags |= os.O_CLOEXEC
         if hasattr(os, "O_NOFOLLOW"):
             open_flags |= os.O_NOFOLLOW
+        try:
+            before = path.lstat()
+        except FileNotFoundError:
+            before = None
+        except OSError as exc:
+            raise GenerationStoreError(
+                f"cannot safely inspect regular file: {path}",
+                fault=GenerationFault.INTEGRITY_FAILURE,
+            ) from exc
+        reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+        if before is not None and (
+            stat.S_ISLNK(before.st_mode)
+            or bool(getattr(before, "st_file_attributes", 0) & reparse_flag)
+        ):
+            raise GenerationStoreError(
+                f"path is a symlink or reparse point: {path}",
+                fault=GenerationFault.INTEGRITY_FAILURE,
+            )
         fd = os.open(path, open_flags, mode)
         try:
-            if not stat.S_ISREG(os.fstat(fd).st_mode):
+            opened = os.fstat(fd)
+            current = path.lstat()
+            if (
+                not stat.S_ISREG(opened.st_mode)
+                or not stat.S_ISREG(current.st_mode)
+                or bool(getattr(current, "st_file_attributes", 0) & reparse_flag)
+                or (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino)
+            ):
                 raise GenerationStoreError(
-                    f"path is not a regular file: {path}",
+                    f"path is not the opened safe regular file: {path}",
                     fault=GenerationFault.INTEGRITY_FAILURE,
                 )
         except BaseException:
@@ -1245,10 +1271,7 @@ class AtomicGenerationStore:
                 )
             if self.is_retired(generation_root):
                 raise GenerationStoreError("retired generation cannot be pinned")
-            pin_fd = self._acquire_advisory_lock(
-                self._pin_path(generation_root),
-                shared=True,
-            )
+            pin_fd = self._acquire_pin_lock(generation_root)
             try:
                 if self.is_retired(generation_root):
                     raise GenerationStoreError("retired generation cannot be pinned")
@@ -1262,12 +1285,38 @@ class AtomicGenerationStore:
                     pin_fd,
                 )
             except BaseException:
-                self._release_advisory_lock(pin_fd)
+                self._release_pin_lock(generation_root, pin_fd)
                 raise
+
+    def _acquire_pin_lock(self, generation_root: str) -> int:
+        with self._mutex:
+            existing = self._pin_locks.get(generation_root)
+            if existing is not None:
+                fd, references = existing
+                self._pin_locks[generation_root] = (fd, references + 1)
+                return fd
+            fd = self._acquire_advisory_lock(
+                self._pin_path(generation_root),
+                shared=True,
+            )
+            self._pin_locks[generation_root] = (fd, 1)
+            return fd
+
+    def _release_pin_lock(self, generation_root: str, pin_fd: int) -> None:
+        with self._mutex:
+            existing = self._pin_locks.get(generation_root)
+            if existing is None or existing[0] != pin_fd:
+                raise GenerationStoreError("generation pin lock identity mismatch")
+            _, references = existing
+            if references > 1:
+                self._pin_locks[generation_root] = (pin_fd, references - 1)
+                return
+            self._pin_locks.pop(generation_root)
+            self._release_advisory_lock(pin_fd)
 
     def _release_pin(self, generation_root: str, pin_fd: int) -> None:
         try:
-            self._release_advisory_lock(pin_fd)
+            self._release_pin_lock(generation_root, pin_fd)
         finally:
             with self._mutex:
                 count = self._pins.get(generation_root, 0)

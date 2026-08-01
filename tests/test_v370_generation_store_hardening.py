@@ -101,6 +101,26 @@ def test_generation_descriptors_request_binary_mode_for_canonical_records(
     assert b"\r\n" not in raw_log
 
 
+def test_nested_process_pins_share_one_os_lock_until_the_last_close(
+    tmp_path: Path,
+) -> None:
+    namespace = "dataset:nested-pins"
+    store = AtomicGenerationStore(tmp_path / "authority")
+    published = _publish_first(store, namespace)
+
+    first = store.pin(namespace, published.head.generation_root)
+    second = store.pin(namespace, published.head.generation_root)
+    assert first._pin_fd == second._pin_fd
+    assert store.pin_count(published.head.generation_root) == 2
+
+    first.close()
+    assert store.pin_count(published.head.generation_root) == 1
+    assert store._pin_locks[published.head.generation_root][1] == 1
+    second.close()
+    assert store.pin_count(published.head.generation_root) == 0
+    assert published.head.generation_root not in store._pin_locks
+
+
 def test_namespace_lock_is_persistent_but_crash_released(tmp_path: Path) -> None:
     namespace = "dataset:crash-lock"
     context = multiprocessing.get_context("spawn")

@@ -11,6 +11,8 @@ keeping production activation and package publication separate.
   target/runtime identity, exactness, adapter conformance, and receipt lineage.
 - Forced raw Generation Authority descriptors into Windows binary mode so the
   canonical LF-delimited publication log remains byte-identical across OSes.
+- Added process-reentrant shared generation pins and explicit Windows
+  symlink/reparse rejection without weakening cross-process retirement locks.
 - Hard-rejected canary and active configuration/publication; local project
   files remain candidate intent and the console remains target-only.
 - Added a real executable vLLM `0.26.0` EAGLE (not EAGLE-3) shadow adapter pinned
