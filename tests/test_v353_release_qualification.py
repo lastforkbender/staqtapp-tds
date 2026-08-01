@@ -15,9 +15,9 @@ from staqtapp_tds.version import VERSION_INFO
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_v353_post2_release_identity_and_phase_evidence_are_explicit() -> None:
-    assert __version__ == "3.5.3.post2"
-    assert VERSION_INFO == (3, 5, 3)
+def test_v360_identity_preserves_v353_phase_evidence() -> None:
+    assert __version__ == "3.6.0"
+    assert VERSION_INFO == (3, 6, 0)
     assert StorageMode.LEGACY.value == "legacy"
     assert StorageMode.GUARANTEED_SEGMENTED.value == "guaranteed-segmented"
     assert ControlledStorage.ACTIVATE_ACKNOWLEDGEMENT == "activate-guaranteed-segmented"
@@ -32,6 +32,8 @@ def test_v353_post2_release_identity_and_phase_evidence_are_explicit() -> None:
         "V353_POST1_PYPI_PRESENTATION_STATUS.txt",
         "docs/118_v353_dev10_Controlled_Activation.md",
         "docs/119_v353_dev11_Release_Qualification.md",
+        "DEV19_V360_FOUNDATION_CLOSURE_STATUS.txt",
+        "docs/129_v360_Foundation_Closure.md",
     ):
         assert (ROOT / relative).is_file()
     phase11 = (ROOT / "DEV11_RELEASE_QUALIFICATION_STATUS.txt").read_text(encoding="utf-8")

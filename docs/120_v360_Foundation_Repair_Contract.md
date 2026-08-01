@@ -2,6 +2,8 @@
 
 ## Status
 
+**Closed by the v3.6.0 Foundation Closure contract in `docs/129_v360_Foundation_Closure.md`.**
+
 This is the first implementation contract derived from the **Frontier Evidence
 Fabric — Native Trace Ranking Sentinel Redesign** against the immutable
 `v3.5.3.post2` / `281cfedf3531beb3c9e2a85330cd2b8210374faa` baseline.
@@ -16,7 +18,7 @@ sentinel decisions, no graph search, and no learned writes. Its job is to make
 later intelligence safe to add.
 
 ```text
-current v3.5.3.post2 implementation
+historical v3.5.3.post2 implementation
         |
         v
 v3.6.0: Trace Rank ABI v2 contract + locked baseline
@@ -133,5 +135,5 @@ Phase 1 is complete only when:
 6. The next published version is `3.6.0`, with corrections using patch bumps
    rather than `.postN` suffixes.
 
-After the v3.6.0 contract and native-repair gates qualify, Wave A may proceed to
+After the v3.6.0 contract and native-repair gates qualified, Wave A may proceed to
 the separately versioned v3.7.0 atomic CSV generation work.

@@ -1,16 +1,18 @@
-> **v3.5.3.post2 mandatory UI install correction**
+> **v3.6.0 Foundation Closure source candidate**
 >
-> This corrective post-release keeps the qualified v3.5.3 storage behavior and
-> the verified PyPI presentation while installing the main telemetry Browser
-> and Driver Studio with every standard installation. The `staqtapp-tds`
-> command launches the telemetry Browser. The native C extensions remain
-> explicitly opt-in through `STAQTAPP_TDS_BUILD_NATIVE=1`.
+> This source candidate closes the native correctness and Frontier authority substrate:
+> fail-closed ABI/lifecycle admission, strict checksum and UTF-8 truth,
+> generation-bound handles, bounded C11 diagnostics, immutable packed reads,
+> and exact x86-64/AArch64 semantics. It adds no Atomic Generation Plane,
+> Eaglegate execution, learned serving, or activation authority.
 
-> **v3.5.3.post2 release security contract**
+> **v3.6.0 release security contract**
 >
 > At-rest encryption is not implemented. Requests using `DirFlags.ENCRYPTED` fail closed instead of storing plaintext. New v2 persistence files require their integrity sidecar. `.tds` input should be treated as trusted until explicit resource-budget hardening is complete. Native extensions are optional and are built only when `STAQTAPP_TDS_BUILD_NATIVE=1` is set.
 
-# Staqtapp-TDS v3.5.3.post2
+# Staqtapp-TDS v3.6.0
+
+> **Repository status:** `3.6.0` is the qualified Foundation source candidate. The current production PyPI release remains `3.5.3.post2` until the exact merged and tagged release matrix passes and publication completes.
 
 **Temporal Directory System - native-indexed `.tds` storage, controlled variables, trace ranking, CSV evidence operations, semantic review, and centralized observability for AI systems.**
 
@@ -104,8 +106,11 @@ TDS is designed around a narrow storage hot path. Native indexing, lookup, persi
 ## Install
 
 ```bash
-# Published release from production PyPI; includes both UIs
+# Current production PyPI release; includes both UIs
 python -m pip install staqtapp-tds==3.5.3.post2
+
+# Candidate package identity; use this command only after 3.6.0 publication
+python -m pip install staqtapp-tds==3.6.0
 
 # Launch the main TDS telemetry UI
 staqtapp-tds
@@ -263,7 +268,15 @@ TDS intentionally distinguishes preparation, evidence, review, and authority:
 
 ## Validation status
 
-The v3.5.3 runtime release qualification is complete:
+The v3.6.0 Foundation source closes the native and authority repair train with
+a machine-checkable process-state ledger, a deterministic closure report, exact
+x86-64/AArch64 semantic parity, fail-closed lifecycle admission, sanitizer and
+fuzz qualification, and a deliberately narrow shared-runner no-regression
+claim. The named-reference-CPU and universal scaling claims remain false. See
+`DEV19_V360_FOUNDATION_CLOSURE_STATUS.txt` and
+`docs/129_v360_Foundation_Closure.md`.
+
+The historical v3.5.3 runtime release qualification is complete:
 
 - Phase 10 controlled activation, exact migration proof, and lossless rollback tests;
 - Phase 11 GC corruption, publication-window, replacement, interruption, concurrency, and accounting tests;

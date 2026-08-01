@@ -12,13 +12,15 @@ Staqtapp-TDS release uses exactly three numeric components:
 MAJOR.MINOR.PATCH
 ```
 
-The next upgrade is **v3.6.0**. Corrective releases increment the patch number:
+The current Foundation release is **v3.6.0**. Corrective releases increment the patch number:
 
 ```text
 v3.6.0 -> v3.6.1 -> v3.6.2
 ```
 
 Staqtapp-TDS will not publish another `.postN` release.
+
+The next architecture line is **v3.7.0**, the Atomic Generation Plane.
 
 ## Operational rules
 

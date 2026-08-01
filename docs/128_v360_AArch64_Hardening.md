@@ -131,10 +131,11 @@ regression blocks this tranche.
 
 ## Release posture
 
-The repository package remains the historical `3.5.3.post2` identity during
-Foundation development. A completed Foundation Repair becomes `3.6.0` only after
-all required Phase-2 gates qualify. Corrections advance the patch number and do
-not create another `.postN` release.
+This report was produced while the repository still used the historical
+`3.5.3.post2` identity. The required correctness, lifecycle, architecture, ARM,
+and release gates are reconciled by `docs/129_v360_Foundation_Closure.md`; the
+Foundation source identity is `3.6.0`. Corrections advance the patch number and
+do not create another `.postN` release.
 
 ## First qualified native ARM result
 
