@@ -227,9 +227,10 @@ The focused tests cover:
 - stale writer, rollback, retirement, report-substitution, and mixed-binding
   rejection without a second Eaglegate `CURRENT`.
 
-## Next bounded slice
+## Phase-4 successor
 
-The next bounded slice is the explicitly pinned, qualification-only vLLM EAGLE
-shadow adapter. It must execute a named runtime/model matrix, retain target-only
-fallback, persist no prompts/logits/KV, and keep real hardware qualification
-distinct from these fixed reference-suite results.
+The explicitly pinned, qualification-only vLLM EAGLE shadow adapter is now
+implemented in `staqtapp_tds.eaglegate.vllm_shadow`. It executes a named
+runtime/model matrix, retains target-only fallback, persists no
+prompts/logits/KV, and keeps manual real-hardware qualification distinct from
+the fixed local reference-suite results.

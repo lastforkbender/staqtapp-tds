@@ -1,3 +1,29 @@
+# v3.8.0 — Eaglegate Core, real vLLM shadow, and packed waypoint graph
+
+Completed the source implementation for the Phase 3/4 convergence line while
+keeping production activation and package publication separate.
+
+- Added the non-widenable Eaglegate lossless constitution, deterministic
+  admission, exactness laboratory, adversarial adapter ABI, and content-free
+  evidence contracts.
+- Published composite Eaglegate ServingEpoch candidates only through the v3.7
+  Generation Authority, binding storage, policy plus ordered plans,
+  target/runtime identity, exactness, adapter conformance, and receipt lineage.
+- Hard-rejected canary and active configuration/publication; local project
+  files remain candidate intent and the console remains target-only.
+- Added a real executable vLLM `0.26.0` EAGLE (not EAGLE-3) shadow adapter pinned
+  to exact target/draft revisions, H100 SM90 BF16, standard rejection sampling,
+  batch size one, explicit seeds, and 1/2/3-token plans.
+- Added off-path greedy, sampled-distribution, public continuation/KV-semantic,
+  cancellation/shutdown, runtime-attestation, cleanup, and content-free
+  Generation Authority evidence gates. The real H100 lane remains a manual
+  credentialed workflow and is not claimed as locally executed.
+- Added the Phase-4 Trace Rank ABI v2 packed waypoint/CSR graph: fixed-width
+  generation, provenance, Q15 feature, waypoint, offset, and edge records with
+  checked bounds, canonical rebuild, exact source spans, SHA-256, and CRC32.
+- Preserved target token/KV authority and deferred Dijkstra, learned search,
+  production routing, canarying, promotion, and activation.
+
 # v3.7.0 — Atomic Generation Authority
 
 Introduced one generic, crash-safe authority for immutable generation identity,

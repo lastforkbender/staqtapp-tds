@@ -1,0 +1,163 @@
+name: Staqtapp-TDS real vLLM EAGLE shadow qualification
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_meta_llama_license:
+        description: I confirm this run may use an account licensed for Meta-Llama-3-8B-Instruct
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eaglegate-vllm-shadow-real-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  real-vllm-shadow:
+    name: Pinned vLLM EAGLE shadow (H100 SM90 BF16)
+    runs-on: [self-hosted, linux, x64, h100, sm90]
+    timeout-minutes: 240
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HUGGING_FACE_HUB_TOKEN: ${{ secrets.HF_TOKEN }}
+      VLLM_TARGET_DEVICE: cuda
+      TDS_VLLM_SOURCE_CHECKOUT: ${{ github.workspace }}/.qualification/vllm
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Require explicit model-license acknowledgement and token
+        shell: bash
+        env:
+          LICENSE_ACKNOWLEDGED: ${{ inputs.confirm_meta_llama_license }}
+        run: |
+          set -euo pipefail
+          test "$LICENSE_ACKNOWLEDGED" = "true"
+          test -n "$HF_TOKEN"
+
+      - name: Check out Staqtapp-TDS
+        uses: actions/checkout@v7
+
+      - name: Check out the exact vLLM release source
+        uses: actions/checkout@v7
+        with:
+          repository: vllm-project/vllm
+          ref: 568afb3a13806beb53bb2e6bd518269357b237c0
+          path: .qualification/vllm
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Verify pinned source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C "$TDS_VLLM_SOURCE_CHECKOUT" rev-parse HEAD)" = \
+            "568afb3a13806beb53bb2e6bd518269357b237c0"
+          test "$(git -C "$TDS_VLLM_SOURCE_CHECKOUT" describe --tags --exact-match)" = \
+            "v0.26.0"
+
+      - name: Install TDS and focused test dependencies
+        run: python -m pip install -e .[test]
+
+      - name: Build and install the exact vLLM checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip setuptools wheel ninja cmake
+          python -m pip install --editable "$TDS_VLLM_SOURCE_CHECKOUT"
+
+      - name: Prove the injected real construction and call path
+        run: >-
+          python -m pytest -p no:cacheprovider -q
+          tests/test_v380_vllm_shadow.py
+
+      - name: Run the real qualification-only matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/tds-eaglegate-evidence"
+          python -m staqtapp_tds.eaglegate.vllm_shadow \
+            --real-qualification \
+            --source-checkout "$TDS_VLLM_SOURCE_CHECKOUT" \
+            --evidence-store "$RUNNER_TEMP/tds-eaglegate-evidence/store" \
+            --provision-serving-epoch \
+            > "$RUNNER_TEMP/tds-eaglegate-evidence/report.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report_path = Path(os.environ["RUNNER_TEMP"]) / "tds-eaglegate-evidence" / "report.json"
+          report = json.loads(report_path.read_text(encoding="utf-8"))
+          if report.get("passed") is not True:
+              raise SystemExit("real vLLM shadow qualification did not pass")
+          if not report.get("serving_generation_root", "").startswith("sha256:"):
+              raise SystemExit("report is not bound to a ServingEpoch generation")
+          binding = report.get("serving_binding", {})
+          if binding.get("serving_mode") != "shadow":
+              raise SystemExit("report ServingEpoch is not shadow mode")
+          if report.get("serving_binding_root", "") == "":
+              raise SystemExit("report omitted its full ServingEpoch binding root")
+          matrix = report.get("matrix", {})
+          if matrix.get("kv_cache_dtype") != "bfloat16":
+              raise SystemExit("report lost the pinned KV-cache dtype contract")
+          if matrix.get("kv_cache_resolved_dtype") != "bfloat16":
+              raise SystemExit("report lost the resolved BF16 KV-cache contract")
+          if matrix.get("kv_block_size") != 16:
+              raise SystemExit("report lost the pinned KV block size")
+          if matrix.get("prefix_caching") is not False:
+              raise SystemExit("report widened prefix-cache behavior")
+          expected_catalog = [
+              (plan, gate)
+              for plan in (1, 2, 3)
+              for gate in (
+                  "greedy-equality",
+                  "sampled-distribution",
+                  "continuation-semantics",
+                  "cancellation-shutdown-cleanup",
+              )
+          ]
+          observed_catalog = [
+              (gate.get("plan_tokens"), gate.get("name"))
+              for gate in report.get("gates", [])
+          ]
+          if observed_catalog != expected_catalog:
+              raise SystemExit("report gate catalog is incomplete or reordered")
+          if any(gate.get("executed") is not True for gate in report["gates"]):
+              raise SystemExit("a required gate was not executed")
+          if "gpu_name" in report.get("attestation", {}):
+              raise SystemExit("report persisted a raw GPU name")
+          if report.get("qualification_only") is not True:
+              raise SystemExit("report lost its qualification-only boundary")
+          if report.get("production_serving_qualified") is not False:
+              raise SystemExit("report widened production authority")
+          if report.get("canary_authority") is not False:
+              raise SystemExit("report widened canary authority")
+          if report.get("contains_prompt_content") is not False:
+              raise SystemExit("report persisted prompt content")
+          if report.get("contains_token_sequences") is not False:
+              raise SystemExit("report persisted token sequences")
+          if report.get("contains_logits") is not False:
+              raise SystemExit("report persisted logits")
+          if report.get("contains_kv_tensors") is not False:
+              raise SystemExit("report persisted KV tensors")
+          if report.get("direct_kv_tensor_equivalence_tested") is not False:
+              raise SystemExit("report overstated its KV observation scope")
+          print(report["report_root"])
+          PY
+
+      - name: Archive content-free qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: eaglegate-vllm-shadow-h100-sm90-bf16
+          path: ${{ runner.temp }}/tds-eaglegate-evidence
+          if-no-files-found: warn

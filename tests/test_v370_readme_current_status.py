@@ -88,24 +88,32 @@ def links(text: str):
 
 def test_english_readme_reports_exact_current_candidate_status():
     text = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert "# Staqtapp-TDS v3.7.0 Atomic Generation Authority candidate" in text
+    assert "# Staqtapp-TDS v3.8.0 Phase 1–4 convergence candidate" in text
     assert "current production PyPI release remains `3.5.3.post2`" in text
     assert "python -m pip install staqtapp-tds==3.5.3.post2" in text
     assert "python -m pip install staqtapp-tds==3.6.0" not in text
-    assert "python -m pip install staqtapp-tds==3.7.0" not in text
+    assert "python -m pip install staqtapp-tds==3.8.0" not in text
     assert "`docs/130_v370_Atomic_Generation_Authority.md`" in text
     assert "src/staqtapp_tds/generation/" in text
+    assert "src/staqtapp_tds/eaglegate/" in text
+    assert "src/staqtapp_tds/trace_rank/" in text
+    assert "`docs/131_v380_Eaglegate_Real_vLLM_Shadow.md`" in text
+    assert "`docs/132_v380_Packed_Waypoint_CSR_Graph.md`" in text
 
 
 def test_japanese_readme_reports_exact_current_candidate_status():
     text = (ROOT / "README_ja.md").read_text(encoding="utf-8")
-    assert "# Staqtapp-TDS v3.7.0 Atomic Generation Authority candidate" in text
+    assert "# Staqtapp-TDS v3.8.0 Phase 1–4 convergence candidate" in text
     assert "Current production PyPI release は `3.5.3.post2`" in text
     assert "python -m pip install staqtapp-tds==3.5.3.post2" in text
     assert "python -m pip install staqtapp-tds==3.6.0" not in text
-    assert "python -m pip install staqtapp-tds==3.7.0" not in text
+    assert "python -m pip install staqtapp-tds==3.8.0" not in text
     assert "`docs/130_v370_Atomic_Generation_Authority.md`" in text
     assert "src/staqtapp_tds/generation/" in text
+    assert "src/staqtapp_tds/eaglegate/" in text
+    assert "src/staqtapp_tds/trace_rank/" in text
+    assert "`docs/131_v380_Eaglegate_Real_vLLM_Shadow.md`" in text
+    assert "`docs/132_v380_Packed_Waypoint_CSR_Graph.md`" in text
 
 
 def test_all_19_english_screenshots_and_important_links_are_preserved():

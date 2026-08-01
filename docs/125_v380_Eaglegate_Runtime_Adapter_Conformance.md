@@ -173,11 +173,11 @@ A passing report qualifies the TDS fake-runtime ABI, cleanup ordering, trace
 integrity, exact target-only equivalence, and authority/evidence boundaries. It
 does not qualify any named external runtime or model build.
 
-## Next bounded tranche
+## Real-runtime successor
 
-The next step is a shadow-only adapter for one explicitly pinned real runtime.
-It must execute the named runtime/model matrix while proving that unsupported
-sampler, RNG, logits-processor, termination, KV, kernel, or deadline contracts
-remain target-only. A metadata-only or non-executing fixture cannot satisfy
-this gate. Actual acceleration remains unadmitted until the specific runtime
-adapter, H100 hardware lane, and lossless differential corpus pass together.
+`staqtapp_tds.eaglegate.vllm_shadow` now implements a shadow-only adapter for
+one explicitly pinned real runtime/model/hardware matrix; it is not a
+metadata-only fixture. Its manual H100 gate and exact limitations are recorded
+in `docs/131_v380_Eaglegate_Real_vLLM_Shadow.md`. Actual acceleration remains
+unadmitted: the real workflow qualifies only off-path evidence and exposes no
+production route, canary, promotion, or activation command.

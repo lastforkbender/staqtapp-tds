@@ -8,9 +8,10 @@ hardened repository line and does not import stale native-repair transfer
 artifacts, one-shot materializers, obsolete native workflows, generated status
 files, or old copies of already-merged native code.
 
-The intended future public release identity is **3.7.0**. Until this branch is
-reviewed, merged, tagged, and published, the README must distinguish public
-release status from source-candidate status.
+The source identity assigned to this Phase-2 architecture is **3.7.0**. It is
+preserved here as a phase identity, not as the repository's current candidate
+or public release. `README.md` and `docs/VERSIONING.md` are authoritative for
+the current source-candidate and production identities.
 
 ## Governing invariant
 
@@ -313,6 +314,6 @@ The new convergence review supersedes the old divergent Atomic CSV contract
 review. It must contain the generic contract, reference store, focused tests,
 this architecture record, and one dedicated qualification workflow together.
 
-A `3.7.0` release claim is permitted only after the exact merged source passes
-the complete repository release matrix and a tag-bound distribution
-qualification. Until then it remains a source candidate.
+This record does not claim that `3.7.0` was published. Any publication claim is
+controlled by the current README, version policy, exact-source release matrix,
+and tag-bound distribution qualification.

@@ -31,7 +31,7 @@ class CountingDirectory(TDSDirectory):
 
 
 def test_version_333_csv_scan_artifact_materialization():
-    assert __version__ == "3.7.0"
+    assert __version__ == "3.8.0"
 
 
 def test_csv_scan_artifacts_materialize_as_optional_derived_artifacts():

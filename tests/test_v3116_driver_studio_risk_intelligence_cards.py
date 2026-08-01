@@ -104,7 +104,7 @@ def _bundle(*, action=ReviewAction.APPROVE):
 
 
 def test_v3116_version():
-    assert __version__ == "3.7.0"
+    assert __version__ == "3.8.0"
 
 
 def test_risk_intelligence_capability_matrix_is_analysis_only():

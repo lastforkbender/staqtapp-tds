@@ -1,8 +1,8 @@
-# Staqtapp-TDS v3.7.0 Atomic Generation Authority candidate
+# Staqtapp-TDS v3.8.0 Phase 1–4 convergence candidate
 
-> **Repository status:** v3.7.0 は review 中の source candidate であり、published package ではありません。Current production PyPI release は `3.5.3.post2` のままです。v3.6 Foundation と v3.7 Generation Authority は canonical merge、tag-bound qualification、publication 完了後にのみ production package として扱われます。
+> **Repository status:** v3.8.0 は review 中の source candidate であり、published package ではありません。Current production PyPI release は `3.5.3.post2` のままです。v3.6 Foundation、v3.7 Generation Authority、v3.8 Eaglegate / packed graph の source transition はこの branch に実装済みですが、production `3.8.0` には canonical merge、tag-bound qualification、publication が必要です。Credential が必要な real H100 workflow は追加済みですが、この local CPU environment では実行していません。
 
-> **v3.7.0 Atomic Generation Authority source candidate:** canonical manifest、content-addressed payload、append-only lifecycle / publication receipt、publication head-root CAS、cross-process pinned reader、deterministic recovery、rollback、retirementを generic primitive として追加します。最初の実 consumer は exact CSV source bytes、canonical chunk、packed offset、bounded row anchor、closure、evidence を 1 generation に bind します。この phase に Eaglegate execution、learned serving、model authority、activation authority は含まれません。
+> **v3.8.0 Phase 1–4 convergence:** Phase 1 は v3.6 Foundation、Phase 2 は v3.7 Generation Authority と exact CSV consumer、Phase 3 は単一 authority に bind された lossless Eaglegate Core、Phase 4 は canonical packed waypoint / CSR graph と exact pin された real vLLM EAGLE shadow qualification path です。Production request、canary、promotion、activation、token acceptance、KV commit authority は含みません。
 
 > **v3.6.0 Foundation substrate:** fail-closed native ABI / lifecycle、strict checksum / UTF-8 truth、generation-bound handle、bounded C11 diagnostics、immutable packed read、x86-64 / AArch64 semantic parity を保持します。
 
@@ -91,6 +91,8 @@ TDS は storage hot path を狭く保つ設計です。Native index、lookup、p
 | Trace ranking | Confidence、depth、age、top-N、statistics、native/Python parity を持つ deterministic Spiral-compatible ranking。 |
 | CSV Suite | Original-byte preservation、dialect evidence、logical row offset、row anchor、scan parity、artifact transaction、storage binding、native scan evidence、Interpole telemetry、Semantic IR candidate、lifecycle transition、atomic batch review。 |
 | Generation Authority | Immutable content-addressed generation、publication head-root CAS、cross-process reader pin、crash recovery、rollback、retirement、exact CSV consumer、content-free executable audit。 |
+| Packed waypoint graph | Trace Rank ABI v2 の fixed-width generation、provenance、Q15 feature、waypoint、CSR、edge record。Checked bound、exact source span、canonical rebuild、SHA-256、CRC32 を含みます。 |
+| Eaglegate | Lossless authority contract、exactness / adapter lab、Generation-backed ServingEpoch、production activation を持たない exact pin の real vLLM EAGLE H100 shadow qualification path。 |
 | Evidence-bound semantics | Caller が明示した declaration と承認済み review transition を記録し、semantic truth を自動推論または自動 commit しません。 |
 | Driver platform | TDDL validation、deterministic bytecode、bounded Driver VM、Foundry proposal/test、regression evidence、review bundle、read-only Studio integration。 |
 | 集中型 Browser | Engine health、pressure、event ring、CSV Interpole、Spiral Rank、snapshot、index、storage、recovery、alert、security、settings を 1 つの local Browser で表示します。 |
@@ -105,7 +107,7 @@ python -m pip install staqtapp-tds==3.5.3.post2
 # main TDS telemetry UI を起動
 staqtapp-tds
 
-# Phase 1–4 convergence branch 上の v3.7 source candidate
+# Phase 1–4 convergence branch 上の v3.8 source candidate
 git checkout agent/v380-phase1-phase4-convergence
 python -m pip install .
 
@@ -260,15 +262,25 @@ TDS は preparation、evidence、review、authority を明確に分離します�
 
 ## Validation status
 
-v3.7.0 Atomic Generation Authority source candidate は storage generation と
-future Eaglegate epoch のための generic immutable publication primitive を
-追加します。Focused qualification は deterministic identity、authoritative
-byte round trip、lifecycle adjacency、全 crash boundary、CURRENT CAS、
-concurrent publication conflict、pinned reader、restart access、corruption
-rejection、deterministic recovery、rollback、retirement、namespace isolation
-を対象とします。Semantic、ranking、model、Browser、Studio、activation
-authority は付与しません。詳細は
-`docs/130_v370_Atomic_Generation_Authority.md` を参照してください。
+v3.8.0 source candidate は 4 boundary を実装します。v3.7 Generation
+Authority は exact CSV と composite Eaglegate generation を head-root CAS、
+cross-process pin、deterministic recovery、rollback、retirement で publish
+します。Eaglegate は target verification を固定した constitution、
+candidate-bound exactness / adapter evidence、単一の Generation-backed
+ServingEpoch lineage を追加し、CANARY / ACTIVE publication を拒否します。
+
+Phase 4 は exact immutable source / row binding と byte-identical rebuild を
+持つ bounded Trace Rank ABI v2 graph を追加します。Named-runtime adapter は
+real vLLM `0.26.0` target-only / EAGLE engine、exact target / draft revision、
+H100 SM90 BF16、standard rejection sampling、batch size 1、fixed seed、1/2/3
+token plan を dynamic に構築します。Injected-runtime local gate は pass
+していますが、hardware evidence には manual credentialed H100 run が必要
+です。Production traffic、activation、direct KV-tensor equivalence、in-flight
+cancellation は claim しません。詳細は
+`docs/130_v370_Atomic_Generation_Authority.md`、
+`docs/126_v380_Eaglegate_Generation_Authority.md`、
+`docs/131_v380_Eaglegate_Real_vLLM_Shadow.md`、
+`docs/132_v380_Packed_Waypoint_CSR_Graph.md` を参照してください。
 
 v3.6.0 Foundation source は process-state ledger、deterministic closure
 report、x86-64 / AArch64 semantic parity、fail-closed lifecycle、sanitizer、
@@ -296,6 +308,8 @@ v3.5.3.post2 は standard installation に main telemetry Browser と PyQt5 Driv
 ```text
 src/staqtapp_tds/          core storage, persistence, telemetry, native management
 src/staqtapp_tds/generation/ generic immutable generations, CAS, pinning, recovery
+src/staqtapp_tds/eaglegate/ lossless core、ServingEpoch authority、real shadow adapter
+src/staqtapp_tds/trace_rank/ ABI v2 contract と packed waypoint / CSR graph
 src/staqtapp_tds/csv_layer CSV evidence, transactions, Interpole, Semantic IR
 src/staqtapp_tds/drivers/  TDDL, bytecode, VM, Foundry, review and evidence
 src/staqtapp_tds/studio_pyqt5/ Driver Studio cockpit

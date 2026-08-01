@@ -99,6 +99,8 @@ jobs:
           assert "published package ではありません" in japanese
           assert "staqtapp-tds==3.7.0" not in english
           assert "staqtapp-tds==3.7.0" not in japanese
+          assert "staqtapp-tds==3.8.0" not in english
+          assert "staqtapp-tds==3.8.0" not in japanese
           PY
 
   generation-gates-complete:

@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_v3125_version():
-    assert __version__ == "3.7.0"
+    assert __version__ == "3.8.0"
 
 
 def test_browser_visual_consistency_css_is_packaged():

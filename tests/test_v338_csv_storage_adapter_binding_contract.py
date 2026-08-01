@@ -13,7 +13,7 @@ from staqtapp_tds.csv_layer import (
 
 
 def test_version_338_csv_storage_adapter_binding_contract():
-    assert __version__ == "3.7.0"
+    assert __version__ == "3.8.0"
 
 
 def test_csv_storage_adapter_binding_requires_committed_bridge_manifest():

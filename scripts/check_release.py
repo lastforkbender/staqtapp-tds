@@ -60,8 +60,7 @@ PYPI_README_REQUIRED_LINKS = (
     "https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf",
 )
 CURRENT_PRODUCTION_VERSION = "3.5.3.post2"
-V370_CANDIDATE_HEADING = "# Staqtapp-TDS v3.7.0 Atomic Generation Authority candidate"
-V370_CANDIDATE_MARKER = "source candidate under review, not a published package"
+SOURCE_CANDIDATE_MARKER = "source candidate under review, not a published package"
 V370_JAPANESE_CANDIDATE_MARKER = "published package ではありません"
 
 
@@ -119,6 +118,14 @@ def main() -> int:
         ROOT / "DEV19_V360_FOUNDATION_CLOSURE_STATUS.txt",
         ROOT / "docs" / "129_v360_Foundation_Closure.md",
         ROOT / "docs" / "130_v360_Process_Global_Native_State_Audit.md",
+        ROOT / "docs" / "130_v370_Atomic_Generation_Authority.md",
+        ROOT / "docs" / "126_v380_Eaglegate_Generation_Authority.md",
+        ROOT / "docs" / "131_v380_Eaglegate_Real_vLLM_Shadow.md",
+        ROOT / "docs" / "132_v380_Packed_Waypoint_CSR_Graph.md",
+        ROOT / "src" / "staqtapp_tds" / "eaglegate" / "vllm_shadow.py",
+        ROOT / "src" / "staqtapp_tds" / "trace_rank" / "graph.py",
+        ROOT / ".github" / "workflows" / "eaglegate-vllm-shadow-real.yml",
+        ROOT / ".github" / "workflows" / "packed-waypoint-graph.yml",
     )
     missing_evidence = [str(path.relative_to(ROOT)) for path in required_evidence if not path.is_file()]
     if missing_evidence:
@@ -173,12 +180,15 @@ def main() -> int:
     production_install = (
         f"python -m pip install staqtapp-tds=={CURRENT_PRODUCTION_VERSION}"
     )
-    candidate_status = V370_CANDIDATE_MARKER in readme
+    candidate_status = SOURCE_CANDIDATE_MARKER in readme
+    candidate_heading = (
+        f"# Staqtapp-TDS v{expected_version} Phase 1–4 convergence candidate"
+    )
     if candidate_status:
         if is_tag:
             return fail("a production tag cannot publish a source-candidate README")
-        if V370_CANDIDATE_HEADING not in readme:
-            return fail("PyPI README is missing the v3.7 candidate heading")
+        if candidate_heading not in readme:
+            return fail("PyPI README is missing the current candidate heading")
         if production_install not in readme:
             return fail("PyPI README is missing the current production install pin")
         if expected_install in readme and expected_version != CURRENT_PRODUCTION_VERSION:
@@ -198,8 +208,8 @@ def main() -> int:
     if japanese_candidate != candidate_status:
         return fail("English and Japanese README candidate status is inconsistent")
     if candidate_status:
-        if V370_CANDIDATE_HEADING not in japanese_readme:
-            return fail("Japanese README is missing the v3.7 candidate heading")
+        if candidate_heading not in japanese_readme:
+            return fail("Japanese README is missing the current candidate heading")
         if production_install not in japanese_readme:
             return fail("Japanese README is missing the current production install pin")
         if expected_install in japanese_readme and expected_version != CURRENT_PRODUCTION_VERSION:

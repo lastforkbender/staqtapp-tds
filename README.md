@@ -1,13 +1,11 @@
-> **v3.7.0 Atomic Generation Authority source candidate**
+> **v3.8.0 Phase 1–4 convergence source candidate**
 >
-> This branch adds the generic immutable Generation Authority above the v3.6
-> Foundation substrate: canonical manifests, content-addressed payloads,
-> append-only lifecycle and publication receipts, atomic `CURRENT`
-> head-root compare-and-swap, cross-process pinned readers, deterministic
-> recovery, rollback, and retirement. The first real consumer preserves exact
-> CSV source bytes while binding canonical chunks, packed offsets, bounded row
-> anchors, closure, and evidence. Eaglegate execution, learned serving, model
-> authority, and activation authority remain absent from this phase.
+> Phase 1 closes the v3.6 Foundation; Phase 2 adds the v3.7 Generation
+> Authority and exact CSV consumer; Phase 3 binds the lossless Eaglegate Core
+> to that sole authority; Phase 4 adds the canonical packed waypoint/CSR graph
+> and an executable, exactly pinned vLLM EAGLE shadow qualification path.
+> Eaglegate remains off the production request path with no canary, promotion,
+> activation, token-acceptance, or KV-commit authority.
 
 > **v3.6.0 Foundation substrate**
 >
@@ -19,9 +17,9 @@
 >
 > At-rest encryption is not implemented. Requests using `DirFlags.ENCRYPTED` fail closed instead of storing plaintext. New v2 persistence files require their integrity sidecar. `.tds` input should be treated as trusted until explicit resource-budget hardening is complete. Native extensions are optional and are built only when `STAQTAPP_TDS_BUILD_NATIVE=1` is set.
 
-# Staqtapp-TDS v3.7.0 Atomic Generation Authority candidate
+# Staqtapp-TDS v3.8.0 Phase 1–4 convergence candidate
 
-> **Repository status:** v3.7.0 is a source candidate under review, not a published package. The current production PyPI release remains `3.5.3.post2`. The v3.6 Foundation and v3.7 Generation Authority must complete canonical merge, tag-bound qualification, and publication before their package identities are presented as production releases.
+> **Repository status:** v3.8.0 is a source candidate under review, not a published package. The current production PyPI release remains `3.5.3.post2`. The v3.6 Foundation, v3.7 Generation Authority, and v3.8 Eaglegate/packed-graph source transitions are implemented on this branch; canonical merge, tag-bound qualification, and publication are still required before `3.8.0` is presented as a production package. The credentialed real H100 workflow is provided but was not executable in this local CPU environment.
 
 **Temporal Directory System - native-indexed `.tds` storage, controlled variables, trace ranking, CSV evidence operations, semantic review, and centralized observability for AI systems.**
 
@@ -108,6 +106,8 @@ TDS is designed around a narrow storage hot path. Native indexing, lookup, persi
 | Trace ranking | Deterministic Spiral-compatible trace ranking with confidence, depth, age, top-N limiting, statistics, and native/Python parity. |
 | CSV Suite | Original-byte preservation, dialect evidence, logical row offsets, row anchors, scan parity, artifact transactions, storage binding, native scan evidence, Interpole telemetry, Semantic IR candidates, lifecycle transitions, and atomic batch review. |
 | Generation Authority | Immutable content-addressed generations, publication head-root CAS, cross-process reader pins, crash recovery, rollback, retirement, and an exact CSV consumer with an executable content-free audit. |
+| Packed waypoint graph | Trace Rank ABI v2 fixed-width generation, provenance, Q15 feature, waypoint, CSR, and edge records with checked bounds, exact source spans, canonical rebuild, SHA-256, and CRC32. |
+| Eaglegate | Lossless authority contracts, exactness and adapter labs, Generation-backed ServingEpochs, and a real pinned vLLM EAGLE H100 shadow qualification path that cannot activate production serving. |
 | Evidence-bound semantics | TDS records explicit caller declarations and authorized review transitions; it does not silently infer or commit semantic truth. |
 | Driver platform | TDDL validation, deterministic bytecode, bounded Driver VM execution, Foundry proposal/test flows, regression evidence, review bundles, and read-only Studio integration. |
 | Centralized Browser | One local Browser surface for engine health, pressure, event rings, CSV Interpole, Spiral Rank, snapshots, indexes, storage, recovery, alerts, security, and settings. |
@@ -122,7 +122,7 @@ python -m pip install staqtapp-tds==3.5.3.post2
 # Launch the main TDS telemetry UI
 staqtapp-tds
 
-# v3.7 source candidate on the Phase 1–4 convergence branch
+# v3.8 source candidate on the Phase 1–4 convergence branch
 git checkout agent/v380-phase1-phase4-convergence
 python -m pip install .
 
@@ -279,15 +279,25 @@ TDS intentionally distinguishes preparation, evidence, review, and authority:
 
 ## Validation status
 
-The v3.7.0 Atomic Generation Authority source candidate adds one generic,
-immutable publication primitive for storage generations and future Eaglegate
-epochs. The focused qualification covers deterministic identity, exact
-authoritative-byte round trip, lifecycle adjacency, all declared crash
-boundaries, current-head CAS, concurrent publication conflict, pinned readers,
-restart access, corruption rejection, deterministic recovery, rollback,
-retirement, and namespace isolation. It grants no semantic, ranking, model,
-Browser, Studio, or activation authority. See
-`docs/130_v370_Atomic_Generation_Authority.md`.
+The v3.8.0 source candidate completes four explicit boundaries. The v3.7
+Generation Authority publishes exact CSV and composite Eaglegate generations
+with head-root CAS, cross-process pins, deterministic recovery, rollback, and
+retirement. Eaglegate adds a non-widenable target-verification constitution,
+candidate-bound exactness/adapter evidence, and a single Generation-backed
+ServingEpoch lineage. CANARY and ACTIVE publication are rejected.
+
+Phase 4 also provides `tds-packed-waypoint-csr-v1`, a bounded Trace Rank ABI v2
+binary graph with exact immutable source/row bindings and byte-identical
+decode/re-encode. The named-runtime adapter dynamically constructs real vLLM
+`0.26.0` target-only and EAGLE engines for exact pinned target/draft revisions,
+H100 SM90 BF16, standard rejection sampling, batch size one, fixed seeds, and
+1/2/3-token plans. Local injected-runtime gates pass; the manual credentialed
+H100 run remains required for hardware evidence. No production traffic,
+activation, direct KV-tensor equivalence, or in-flight cancellation claim is
+made. See `docs/130_v370_Atomic_Generation_Authority.md`,
+`docs/126_v380_Eaglegate_Generation_Authority.md`,
+`docs/131_v380_Eaglegate_Real_vLLM_Shadow.md`, and
+`docs/132_v380_Packed_Waypoint_CSR_Graph.md`.
 
 The v3.6.0 Foundation source closes the native and authority repair train with
 a machine-checkable process-state ledger, a deterministic closure report, exact
@@ -327,6 +337,8 @@ aggregate release gate succeeds.
 ```text
 src/staqtapp_tds/          core storage, persistence, telemetry, native management
 src/staqtapp_tds/generation/ generic immutable generations, CAS, pinning, recovery
+src/staqtapp_tds/eaglegate/ lossless core, ServingEpoch authority, real shadow adapter
+src/staqtapp_tds/trace_rank/ ABI v2 contracts and packed waypoint/CSR graph
 src/staqtapp_tds/csv_layer CSV evidence, transactions, Interpole, Semantic IR
 src/staqtapp_tds/drivers/  TDDL, bytecode, VM, Foundry, review and evidence
 src/staqtapp_tds/studio_pyqt5/ Driver Studio cockpit
