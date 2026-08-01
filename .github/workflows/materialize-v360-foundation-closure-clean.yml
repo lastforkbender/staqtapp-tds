@@ -15,6 +15,9 @@ concurrency:
   group: materialize-v360-foundation-closure-clean
   cancel-in-progress: false
 
+env:
+  PYTHONDONTWRITEBYTECODE: '1'
+
 jobs:
   materialize:
     if: github.actor != 'github-actions[bot]'
@@ -31,7 +34,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export PYTHONDONTWRITEBYTECODE=1
           python - <<'PY'
           from __future__ import annotations
 
@@ -93,7 +95,7 @@ jobs:
           git apply --check --whitespace=nowarn /tmp/closure.patch
           git apply --whitespace=nowarn /tmp/closure.patch
           rm -f .github/v360-foundation-closure.patch.part-*
-          rm -f .github/v360-foundation-closure-clean.trigger
+          rm -f .github/v360-foundation-closure-clean.trigger*
           rm -f .github/workflows/materialize-v360-foundation-closure-clean.yml
           git diff --check
           python -S tools/foundation_closure_v360.py --root . --json > /tmp/foundation.json
@@ -112,9 +114,11 @@ jobs:
               raise SystemExit('Foundation Closure improperly admitted Atomic Generations')
           print(report['report_root'])
           PY
-          find src scripts tools tests -type d -name __pycache__ -prune -exec rm -rf {} +
-          find src scripts tools tests -type f -name '*.pyc' -delete
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          find . -type f -name '*.pyc' -delete
           python scripts/check_release.py
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          find . -type f -name '*.pyc' -delete
       - name: Commit the clean Foundation Closure source
         shell: bash
         run: |
