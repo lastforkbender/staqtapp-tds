@@ -116,16 +116,16 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
-      - name: Install minimal native build dependencies
-        run: python -m pip install setuptools wheel pytest
+      - name: Install minimal native test dependencies
+        run: python -m pip install setuptools wheel pytest numpy
       - name: Build strict native extensions in tree
         run: python setup.py build_ext --inplace --force
-      - name: Require exact architecture and closure audit
+      - name: Require exact architecture and isolated closure audit
         shell: bash
         run: |
           set -euo pipefail
           test "$(uname -m)" = '${{ matrix.architecture }}'
-          PYTHONPATH=src python -m staqtapp_tds.native.foundation --root . --json > foundation-native.json
+          python tools/foundation_closure_v360.py --root . --json > foundation-native.json
           PYTHONPATH=src python -m pytest -q \
             tests/test_v360_foundation_closure.py \
             tests/test_v360_native_lifecycle_admission.py \
