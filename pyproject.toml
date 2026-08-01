@@ -54,6 +54,7 @@ testpaths = ["tests"]
 staqtapp-tds = "staqtapp_tds.admin.app:main"
 staqtapp-tds-admin = "staqtapp_tds.admin.console:main"
 staqtapp-tds-eaglegate = "staqtapp_tds.eaglegate.console:main"
+staqtapp-tds-eaglegate-lab = "staqtapp_tds.eaglegate.exactness:main"
 
 [tool.setuptools.package-data]
 "staqtapp_tds.admin" = ["templates/*.html", "static/css/*.css", "static/js/*.js", "static/icons/*.svg", "static/i18n/*.json"]
