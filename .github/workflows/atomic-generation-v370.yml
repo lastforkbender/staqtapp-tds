@@ -1,0 +1,154 @@
+name: Staqtapp-TDS v3.7 Atomic Generation
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - agent/v370-atomic-generation-convergence
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v370-atomic-generation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  atomic-generation-contract:
+    name: Atomic Generation (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            python: '3.10'
+          - os: ubuntu-24.04
+            python: '3.13'
+          - os: macos-14
+            python: '3.13'
+          - os: windows-2022
+            python: '3.13'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install focused qualification dependencies
+        run: python -m pip install -e ".[test]"
+      - name: Compile Atomic Generation surfaces
+        run: >-
+          python -m compileall -q
+          src/staqtapp_tds/generation.py
+          src/staqtapp_tds/csv_layer/generation_contract.py
+          src/staqtapp_tds/csv_layer/generation_store.py
+          src/staqtapp_tds/csv_layer/generation_runtime.py
+      - name: Run accumulated Atomic Generation and install contracts
+        run: >-
+          python -m pytest -q
+          tests/test_v370_csv_generation_contract.py
+          tests/test_v370_csv_generation_store.py
+          tests/test_v370_generation_runtime.py
+          tests/test_v370_generation_public_api.py
+          tests/test_v370_readme_current_status.py
+          tests/test_install_contract.py
+      - name: Generate deterministic content-free evidence twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m staqtapp_tds.generation reference > generation-a.json
+          python -m staqtapp_tds.generation reference > generation-b.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          first = Path("generation-a.json").read_bytes()
+          second = Path("generation-b.json").read_bytes()
+          if first != second:
+              raise SystemExit("Atomic Generation reference evidence is not byte-identical")
+          report = json.loads(first)
+          required_true = (
+              "old_reader_stable",
+              "exact_source_round_trip",
+              "cas_enforced",
+              "retired_generation_blocked_from_rollback",
+          )
+          for name in required_true:
+              if report.get(name) is not True:
+                  raise SystemExit(f"Atomic Generation reference check failed: {name}")
+          for name in (
+              "activation_authority",
+              "semantic_authority",
+              "model_authority",
+              "eaglegate_included",
+              "learned_serving_included",
+              "raw_content_included",
+          ):
+              if report.get(name) is not False:
+                  raise SystemExit(f"Atomic Generation authority/content widened: {name}")
+          print(report["report_root"])
+          PY
+      - name: Verify README screenshot and link preservation
+        run: python tools/update_readme_status_v370.py --check
+      - name: Prove controller has no network, subprocess, or dynamic execution surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          forbidden_imports = {
+              "asyncio.subprocess",
+              "http",
+              "requests",
+              "socket",
+              "subprocess",
+              "urllib",
+          }
+          forbidden_calls = {"eval", "exec", "compile", "__import__"}
+          for relative in (
+              "src/staqtapp_tds/generation.py",
+              "src/staqtapp_tds/csv_layer/generation_runtime.py",
+          ):
+              source = Path(relative).read_text(encoding="utf-8")
+              tree = ast.parse(source, filename=relative)
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      for alias in node.names:
+                          if any(alias.name == item or alias.name.startswith(item + ".") for item in forbidden_imports):
+                              raise SystemExit(f"forbidden import in {relative}: {alias.name}")
+                  elif isinstance(node, ast.ImportFrom) and node.module:
+                      if any(node.module == item or node.module.startswith(item + ".") for item in forbidden_imports):
+                          raise SystemExit(f"forbidden import in {relative}: {node.module}")
+                  elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+                      if node.func.id in forbidden_calls:
+                          raise SystemExit(f"forbidden dynamic call in {relative}: {node.func.id}")
+          PY
+      - name: Archive Atomic Generation evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: v370-atomic-generation-${{ matrix.os }}-py${{ matrix.python }}
+          path: |
+            generation-a.json
+            generation-b.json
+          if-no-files-found: warn
+
+  atomic-generation-gates-complete:
+    name: TDS v3.7 Atomic Generation gates complete
+    if: always()
+    needs:
+      - atomic-generation-contract
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require every Atomic Generation lane
+        env:
+          CONTRACT_RESULT: ${{ needs.atomic-generation-contract.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CONTRACT_RESULT" = "success"
