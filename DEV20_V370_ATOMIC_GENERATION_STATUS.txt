@@ -6,6 +6,8 @@ Branch: agent/v370-atomic-generation-convergence
 Base: canonical main
 Published package at branch creation: 3.5.3.post2
 Intended future release: 3.7.0
+README materialization: applied additively on the branch
+README preservation manifest: docs/readme_targets_v370.json
 
 Implemented:
 - immutable atomic CSV generation contract
@@ -25,6 +27,7 @@ Implemented:
 - non-destructive retirement of inactive unpinned generations
 - additive English/Japanese README current-status update
 - exact preservation contract for all 19 screenshots and existing links
+- one-shot README materializer removed from the final branch surface
 
 Deliberately absent:
 - destructive object collection
