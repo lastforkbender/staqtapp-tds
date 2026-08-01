@@ -42,10 +42,11 @@ jobs:
         run: python -m pip install -e .[test]
       - name: Compile Foundation Closure package
         run: python -m compileall -q src/staqtapp_tds/native
-      - name: Run closure, version, lifecycle, architecture, and release contracts
+      - name: Run closure, clean-tree, version, lifecycle, architecture, and release contracts
         run: >-
           python -m pytest -q
           tests/test_v360_foundation_closure.py
+          tests/test_v360_foundation_workflow_contract.py
           tests/test_release_version_policy.py
           tests/test_v360_native_lifecycle_admission.py
           tests/test_v360_native_architecture_parity.py
