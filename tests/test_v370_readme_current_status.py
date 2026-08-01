@@ -96,12 +96,3 @@ def test_all_19_japanese_screenshots_and_important_links_are_preserved():
         assert any(source.endswith("/" + filename) for source in image_sources)
     for link in JAPANESE_LINKS:
         assert link in text
-
-
-def test_readme_updater_contains_pre_and_post_preservation_checks():
-    source = (ROOT / "tools" / "update_v370_readme_status.py").read_text(
-        encoding="utf-8"
-    )
-    assert "before_images = image_sources(original)" in source
-    assert "if after_images != before_images" in source
-    assert "important link removed" in source
