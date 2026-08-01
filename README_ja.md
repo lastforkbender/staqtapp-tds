@@ -1,11 +1,10 @@
-# Staqtapp-TDS v3.5.3.post2
+# Staqtapp-TDS v3.6.0
 
-> **Mandatory UI install correction:** v3.5.3.post2 は qualified v3.5.3
-> storage behavior と検証済み PyPI presentation を保持し、通常の
-> installation に main telemetry Browser と PyQt5 Driver Studio を
-> 含めます。`staqtapp-tds` は telemetry Browser を起動します。
-> Native C extension は引き続き
-> `STAQTAPP_TDS_BUILD_NATIVE=1` による明示的な opt-in です。
+> **v3.6.0 Foundation Closure:** fail-closed native ABI / lifecycle、strict
+> checksum / UTF-8 truth、generation-bound handle、bounded C11 diagnostics、
+> immutable packed read、x86-64 / AArch64 semantic parity を閉じます。
+> Atomic Generation Plane、Eaglegate execution、learned serving、activation
+> authority はこの release に含まれません。
 
 **Temporal Directory System - AI システム向けの native-indexed `.tds` ストレージ、変数制御、トレース順位付け、CSV evidence 操作、semantic review、集中型 observability。**
 
@@ -100,7 +99,7 @@ TDS は storage hot path を狭く保つ設計です。Native index、lookup、p
 
 ```bash
 # Production PyPI corrective release（両方の UI を含む）
-python -m pip install staqtapp-tds==3.5.3.post2
+python -m pip install staqtapp-tds==3.6.0
 
 # main TDS telemetry UI を起動
 staqtapp-tds
@@ -256,7 +255,14 @@ TDS は preparation、evidence、review、authority を明確に分離します�
 
 ## Validation status
 
-v3.5.3 runtime release qualification は完了しています。
+v3.6.0 Foundation source は process-state ledger、deterministic closure
+report、x86-64 / AArch64 semantic parity、fail-closed lifecycle、sanitizer、
+fuzz、shared-runner no-regression evidence を閉じます。Named-reference-CPU
+claim と universal scaling claim は false のままです。詳細は
+`DEV19_V360_FOUNDATION_CLOSURE_STATUS.txt` と
+`docs/129_v360_Foundation_Closure.md` を参照してください。
+
+Historical v3.5.3 runtime release qualification は完了しています。
 
 - Phase 10 controlled activation、exact migration proof、lossless rollback test;
 - Phase 11 GC corruption、publication-window、replacement、interruption、concurrency、accounting test;

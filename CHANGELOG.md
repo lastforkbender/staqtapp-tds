@@ -1,3 +1,29 @@
+# v3.6.0 — Frontier Foundation Closure
+
+Closed the first Frontier Evidence Fabric foundation release without admitting
+learned serving, Atomic Generations, or Eaglegate execution.
+
+- Added a machine-checkable ledger for every mutable process-global native
+  state symbol and fail-closed source auditing for unclassified state.
+- Reconciled fail-closed native lifecycle admission, strict checksum/UTF-8
+  truth, generation-bound handle identity, bounded C11 diagnostic publication,
+  immutable packed reads, and x86-64/AArch64 semantic parity.
+- Classified the CSV native sidecar as stateless and retained immutable input
+  ownership before GIL-free scans.
+- Closed the performance claim at shared-runner aggregate no-regression
+  (`>=1.00x`) while explicitly keeping named-reference-CPU and universal
+  scaling claims false.
+- Added deterministic Foundation Closure evidence, a cross-platform and native
+  ARM qualification workflow, source/installed/imported version identity gates,
+  and the public `staqtapp-tds-foundation-closure` command.
+- Advanced the clean public source version to `3.6.0`; future corrections use
+  patch increments and never another `.postN` identity.
+- Preserved Browser, Studio, diagnostics, performance evidence, and the new
+  closure report as non-authoritative observers.
+
+A production tag and PyPI publication remain separate release-controller
+operations after the exact merged source head passes the tag matrix.
+
 # v3.5.3.post1 — PyPI presentation correction
 
 Corrective post-release with the qualified v3.5.3 storage implementation.

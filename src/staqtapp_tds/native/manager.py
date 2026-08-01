@@ -302,6 +302,33 @@ class NativeEngineManager:
             },
         )
 
+
+    @staticmethod
+    def _foundation_capability_snapshot() -> Dict[str, Any]:
+        """Return immutable v3.6 closure identity without reading source files."""
+
+        from staqtapp_tds.native.foundation import (
+            FOUNDATION_PERFORMANCE_CLAIM,
+            TDS_V360_FOUNDATION_CLOSURE_CONTRACT,
+            TDS_V360_RELEASE_IDENTITY,
+            native_process_state_registry_root,
+        )
+
+        return {
+            "contract_id": TDS_V360_FOUNDATION_CLOSURE_CONTRACT,
+            "release_identity": TDS_V360_RELEASE_IDENTITY,
+            "process_state_registry_root": native_process_state_registry_root(),
+            "performance_claim_root": FOUNDATION_PERFORMANCE_CLAIM.claim_root,
+            "named_reference_cpu_claim": False,
+            "universal_scaling_claim": False,
+            "storage_authority": False,
+            "semantic_authority": False,
+            "model_authority": False,
+            "policy_authority": False,
+            "activation_authority": False,
+            "release_authority": False,
+        }
+
     def capabilities_result(self) -> TDSResult:
         """Return platform and last-known native capability diagnostics."""
 
@@ -315,6 +342,7 @@ class NativeEngineManager:
                     name: report.as_dict()
                     for name, report in self._last_reports.items()
                 },
+                "foundation": self._foundation_capability_snapshot(),
             },
         )
 

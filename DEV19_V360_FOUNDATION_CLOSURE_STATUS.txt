@@ -1,0 +1,34 @@
+TDS v3.6.0 FOUNDATION CLOSURE
+
+STATUS: SOURCE CANDIDATE IMPLEMENTED; REMOTE RELEASE GATES REQUIRED
+
+Release identity: 3.6.0
+Foundation contract: tds.v360.foundation-closure.v1
+Native process-state contract: tds.v360.native-process-state.v1
+Performance claim contract: tds.v360.performance-claim.v1
+
+Closed source boundary:
+- exact fail-closed native lifecycle and capability admission
+- immutable input ownership before GIL-free native work
+- checksum and strict UTF-8 truth
+- namespace/epoch/slot-generation handle identity
+- bounded C11 diagnostic publication
+- immutable frozen packed request path
+- x86-64/AArch64 semantic parity
+- native AArch64 sanitizer, concurrency, fuzz, and shared-runner evidence
+- closed process-global native-state ledger
+- explicit 1.00x shared-runner no-regression claim
+
+Deliberately false claims:
+- named-reference-CPU scaling claim
+- universal throughput claim
+- free-threaded native safety
+- subinterpreter native support
+- Atomic Generation Plane inclusion
+- Eaglegate inclusion
+- learned serving
+- model, semantic, storage-write, policy, release, or activation authority
+
+Publication boundary:
+A production v3.6.0 tag and PyPI publication are separate release-controller
+operations after the exact merged source head passes the complete tag matrix.

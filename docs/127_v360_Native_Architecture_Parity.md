@@ -98,7 +98,7 @@ activation_authority = false
 ```
 
 They cannot activate a package, publish a generation, alter policy, authorize
-storage, approve semantics, or enable learned Trace Ranking. The package remains
-at the historical `3.5.3.post2` identity until the complete Foundation Repair
-exit gate qualifies. The completed release remains `3.6.0`, and later
-corrections use patch increments rather than `.postN`.
+storage, approve semantics, or enable learned Trace Ranking. This report was produced while the package still used the historical
+`3.5.3.post2` identity. The complete exit gate is closed by
+`docs/129_v360_Foundation_Closure.md`; the Foundation source identity is
+`3.6.0`, and later corrections use patch increments rather than `.postN`.

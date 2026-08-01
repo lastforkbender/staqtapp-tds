@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pathlib
 import hashlib
+import json
 import os
 import re
 import struct
@@ -110,6 +111,8 @@ def main() -> int:
         ROOT / "V353_POST1_PYPI_PRESENTATION_STATUS.txt",
         ROOT / "docs" / "118_v353_dev10_Controlled_Activation.md",
         ROOT / "docs" / "119_v353_dev11_Release_Qualification.md",
+        ROOT / "DEV19_V360_FOUNDATION_CLOSURE_STATUS.txt",
+        ROOT / "docs" / "129_v360_Foundation_Closure.md",
     )
     missing_evidence = [str(path.relative_to(ROOT)) for path in required_evidence if not path.is_file()]
     if missing_evidence:
@@ -158,11 +161,21 @@ def main() -> int:
     missing_links = [target for target in PYPI_README_REQUIRED_LINKS if target not in readme]
     if missing_links:
         return fail("PyPI README is missing absolute document targets: " + ", ".join(missing_links))
+    expected_heading = f"# Staqtapp-TDS v{expected_version}"
+    expected_install = f"python -m pip install staqtapp-tds=={expected_version}"
+    if expected_heading not in readme:
+        return fail(f"PyPI README is missing current heading {expected_heading!r}")
+    if expected_install not in readme:
+        return fail(f"PyPI README is missing current install pin {expected_install!r}")
     if "tag remains prohibited" in readme or "REMOTE REVIEW GATES REQUIRED" in readme:
         return fail("PyPI README contains obsolete pre-publication status wording")
     japanese_readme = (ROOT / "README_ja.md").read_text(encoding="utf-8")
     if "tag を作成できません" in japanese_readme:
         return fail("Japanese README contains obsolete pre-publication status wording")
+    if f"# Staqtapp-TDS v{expected_version}" not in japanese_readme:
+        return fail("Japanese README is missing the current release heading")
+    if f"python -m pip install staqtapp-tds=={expected_version}" not in japanese_readme:
+        return fail("Japanese README is missing the current install pin")
     capture_digests: set[str] = set()
     for filename in BROWSER_CAPTURES:
         path = capture_root / filename
@@ -196,6 +209,31 @@ def main() -> int:
 
     env = dict(os.environ)
     env["PYTHONDONTWRITEBYTECODE"] = "1"
+    closure = subprocess.run(
+        [
+            sys.executable,
+            "-S",
+            "tools/foundation_closure_v360.py",
+            "--root",
+            str(ROOT),
+            "--json",
+        ],
+        cwd=ROOT,
+        check=False,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    if closure.returncode != 0:
+        return fail("v3.6 Foundation Closure audit failed: " + closure.stderr.strip())
+    try:
+        closure_report = json.loads(closure.stdout)
+    except json.JSONDecodeError:
+        return fail("v3.6 Foundation Closure audit did not emit valid JSON")
+    if closure_report.get("passed") is not True:
+        return fail("v3.6 Foundation Closure report did not pass")
+    if closure_report.get("release_identity") != expected_version:
+        return fail("v3.6 Foundation Closure release identity mismatch")
     subprocess.run([sys.executable, "tools/generate_result_code_docs.py"], cwd=ROOT, check=True, env=env)
     return 0
 
