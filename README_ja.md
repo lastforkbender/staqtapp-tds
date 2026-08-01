@@ -1,3 +1,18 @@
+<!-- TDS-V370-CURRENT-STATUS:BEGIN -->
+> **現在の development status — v3.7 Atomic Generation convergence**
+>
+> 公開 package は、v3.6 Foundation Closure と v3.7 の正確な merge / tag gate が
+> 完了するまで `3.5.3.post2` のままです。この branch には、authoritative original
+> bytes、content-addressed chunk、packed row offset / anchor、rooted closure evidence、
+> append-only receipt、cross-process compare-and-swap publication、crash recovery、
+> generation-pinned lease、deterministic rollback、non-destructive retirement を含む
+> 実際の Atomic Generation code が追加されています。Eaglegate は分離されたままで、
+> 未 merge・inactive です。
+>
+> 以下の Browser screenshot 19 枚と、既存の programmer / API / changelog / language /
+> license / release link はすべて変更せず保持します。
+<!-- TDS-V370-CURRENT-STATUS:END -->
+
 # Staqtapp-TDS v3.5.3.post2
 
 > **Mandatory UI install correction:** v3.5.3.post2 は qualified v3.5.3

@@ -1,3 +1,18 @@
+<!-- TDS-V370-CURRENT-STATUS:BEGIN -->
+> **Current development status — v3.7 Atomic Generation convergence**
+>
+> The published package remains `3.5.3.post2` while the v3.6 Foundation Closure
+> and v3.7 release trains complete their exact merge and tag gates. This branch
+> now contains real Atomic Generation code: authoritative original bytes,
+> content-addressed chunks, packed row offsets and anchors, rooted closure
+> evidence, append-only receipts, cross-process compare-and-swap publication,
+> crash recovery, generation-pinned leases, deterministic rollback, and
+> non-destructive retirement. Eaglegate remains separate, unmerged, and inactive.
+>
+> The 19 Browser screenshots and every existing programmer, API, changelog,
+> language, license, and release link below are preserved unchanged.
+<!-- TDS-V370-CURRENT-STATUS:END -->
+
 > **v3.5.3.post2 mandatory UI install correction**
 >
 > This corrective post-release keeps the qualified v3.5.3 storage behavior and

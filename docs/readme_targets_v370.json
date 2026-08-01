@@ -1,0 +1,75 @@
+{
+  "english": {
+    "images": [
+      "https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/01-dashboard-1280x800.png",
+      "https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/02-engine-health-1280x800.png",
+      "https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/03-real-time-metrics-1280x800.png",
+      "https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/04-transition-timeline-1280x800.png",
+      "https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/05-event-ring-monitor-1280x800.png",
+      "https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/06-pressure-diagnostics-1280x800.png",
+      "https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/07-csv-interpole-1280x800.png",
+      "https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/08-snapshot-explorer-1280x800.png",
+      "https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/09-lock-contention-1280x800.png",
+      "https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/10-workload-analytics-1280x800.png",
+      "https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/11-spiral-rank-1280x800.png",
+      "https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/12-index-analytics-1280x800.png",
+      "https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/13-storage-analytics-1280x800.png",
+      "https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/14-comparative-views-1280x800.png",
+      "https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/15-recovery-planner-1280x800.png",
+      "https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/16-policy-proposals-1280x800.png",
+      "https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/17-alerts-events-1280x800.png",
+      "https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/18-security-1280x800.png",
+      "https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/19-settings-1280x800.png"
+    ],
+    "markdown_links": [
+      "https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf",
+      "https://github.com/lastforkbender/staqtapp-tds/blob/main/README_ja.md",
+      "https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf",
+      "https://github.com/lastforkbender/staqtapp-tds/blob/main/CHANGELOG.md",
+      "https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf",
+      "https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/docs/reference/Programmers_API_Reference.md",
+      "https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf",
+      "https://github.com/lastforkbender/staqtapp-tds/tree/v3.5.3",
+      "https://pypi.org/project/staqtapp-tds/3.5.3/",
+      "https://github.com/lastforkbender/staqtapp-tds/actions/runs/29500270923",
+      "https://github.com/lastforkbender/staqtapp-tds/releases/tag/v3.5.3",
+      "https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/LICENSE"
+    ]
+  },
+  "format": "tds.v370.readme-target-manifest.v1",
+  "japanese": {
+    "images": [
+      "docs/screenshots/browser_pages/01-dashboard-1280x800.png",
+      "docs/screenshots/browser_pages/02-engine-health-1280x800.png",
+      "docs/screenshots/browser_pages/03-real-time-metrics-1280x800.png",
+      "docs/screenshots/browser_pages/04-transition-timeline-1280x800.png",
+      "docs/screenshots/browser_pages/05-event-ring-monitor-1280x800.png",
+      "docs/screenshots/browser_pages/06-pressure-diagnostics-1280x800.png",
+      "docs/screenshots/browser_pages/07-csv-interpole-1280x800.png",
+      "docs/screenshots/browser_pages/08-snapshot-explorer-1280x800.png",
+      "docs/screenshots/browser_pages/09-lock-contention-1280x800.png",
+      "docs/screenshots/browser_pages/10-workload-analytics-1280x800.png",
+      "docs/screenshots/browser_pages/11-spiral-rank-1280x800.png",
+      "docs/screenshots/browser_pages/12-index-analytics-1280x800.png",
+      "docs/screenshots/browser_pages/13-storage-analytics-1280x800.png",
+      "docs/screenshots/browser_pages/14-comparative-views-1280x800.png",
+      "docs/screenshots/browser_pages/15-recovery-planner-1280x800.png",
+      "docs/screenshots/browser_pages/16-policy-proposals-1280x800.png",
+      "docs/screenshots/browser_pages/17-alerts-events-1280x800.png",
+      "docs/screenshots/browser_pages/18-security-1280x800.png",
+      "docs/screenshots/browser_pages/19-settings-1280x800.png"
+    ],
+    "markdown_links": [
+      "tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf",
+      "README.md",
+      "tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf",
+      "CHANGELOG.md",
+      "tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf",
+      "docs/reference/Programmers_API_Reference.md",
+      "tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf",
+      "LICENSE"
+    ]
+  },
+  "original_english_sha256": "sha256:5af9020d07c9a6aaa66e8b4630f6a00f0621dbe6b9a2650dd91c34bed2d33fc3",
+  "original_japanese_sha256": "sha256:192502e477d18e19417e4f40e6c21af2fcf9d13fe27e02a58f1bdc7378b1394a"
+}
