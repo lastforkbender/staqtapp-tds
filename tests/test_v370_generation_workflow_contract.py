@@ -11,7 +11,9 @@ def test_v370_has_one_permanent_generation_workflow_and_no_transfer_artifacts():
     assert "Staqtapp-TDS v3.7 Atomic Generation Authority" in source
     assert "tests/test_v370_generation_contract.py" in source
     assert "tests/test_v370_generation_store.py" in source
+    assert "tests/test_v370_generation_process_cas.py" in source
     assert "tests/test_v370_readme_current_status.py" in source
+    assert "tests/test_v370_generation_workflow_contract.py" in source
     assert "TDS v3.7 Generation Authority gates complete" in source
 
     for forbidden in (
