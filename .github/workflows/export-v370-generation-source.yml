@@ -1,0 +1,44 @@
+name: Export v3.7 generation convergence source
+
+on:
+  push:
+    branches:
+      - agent/v370-source-export
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/v370-source-export
+      - name: Require the bounded source set
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            docs/122_v370_Atomic_CSV_Generation_Contract.md
+            src/staqtapp_tds/csv_layer/generation_contract.py
+            src/staqtapp_tds/csv_layer/generation_store.py
+            tests/test_v370_csv_generation_contract.py
+            tests/test_v370_csv_generation_store.py
+          )
+          for file in "${files[@]}"; do
+            test -f "$file"
+            sha256sum "$file"
+          done
+      - name: Archive only generation convergence source
+        uses: actions/upload-artifact@v7
+        with:
+          name: v370-generation-convergence-source
+          path: |
+            docs/122_v370_Atomic_CSV_Generation_Contract.md
+            src/staqtapp_tds/csv_layer/generation_contract.py
+            src/staqtapp_tds/csv_layer/generation_store.py
+            tests/test_v370_csv_generation_contract.py
+            tests/test_v370_csv_generation_store.py
+          if-no-files-found: error
+          retention-days: 7
