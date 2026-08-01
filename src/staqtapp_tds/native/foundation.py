@@ -15,7 +15,7 @@ from pathlib import Path
 import re
 from typing import Any, Iterable, Sequence
 
-from staqtapp_tds.version import __version__
+from staqtapp_tds.version import VERSION_INFO, __version__
 
 TDS_V360_FOUNDATION_CLOSURE_CONTRACT = "tds.v360.foundation-closure.v1"
 TDS_V360_PROCESS_STATE_CONTRACT = "tds.v360.native-process-state.v1"
@@ -380,7 +380,8 @@ class FoundationClosureReport:
     @property
     def passed(self) -> bool:
         return (
-            self.release_identity == __version__
+            self.release_identity == TDS_V360_RELEASE_IDENTITY
+            and VERSION_INFO >= (3, 6, 0)
             and self.source_audit.passed
             and self.performance_claim.shared_runner_no_regression_qualified
             and self.performance_claim.cross_architecture_semantic_parity_qualified

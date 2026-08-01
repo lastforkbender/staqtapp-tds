@@ -1,12 +1,10 @@
-# Staqtapp-TDS v3.6.0
+# Staqtapp-TDS v3.7.0 Atomic Generation Authority candidate
 
-> **Repository status:** `3.6.0` は qualified Foundation source candidate です。Exact merged/tagged release matrix と publication が完了するまで、production PyPI release は `3.5.3.post2` のままです。
+> **Repository status:** v3.7.0 は review 中の source candidate であり、published package ではありません。Current production PyPI release は `3.5.3.post2` のままです。v3.6 Foundation と v3.7 Generation Authority は canonical merge、tag-bound qualification、publication 完了後にのみ production package として扱われます。
 
-> **v3.6.0 Foundation Closure source candidate:** fail-closed native ABI / lifecycle、strict
-> checksum / UTF-8 truth、generation-bound handle、bounded C11 diagnostics、
-> immutable packed read、x86-64 / AArch64 semantic parity を閉じます。
-> Atomic Generation Plane、Eaglegate execution、learned serving、activation
-> authority はこの release に含まれません。
+> **v3.7.0 Atomic Generation Authority source candidate:** canonical manifest、content-addressed payload、append-only lifecycle / publication receipt、publication head-root CAS、cross-process pinned reader、deterministic recovery、rollback、retirementを generic primitive として追加します。最初の実 consumer は exact CSV source bytes、canonical chunk、packed offset、bounded row anchor、closure、evidence を 1 generation に bind します。この phase に Eaglegate execution、learned serving、model authority、activation authority は含まれません。
+
+> **v3.6.0 Foundation substrate:** fail-closed native ABI / lifecycle、strict checksum / UTF-8 truth、generation-bound handle、bounded C11 diagnostics、immutable packed read、x86-64 / AArch64 semantic parity を保持します。
 
 **Temporal Directory System - AI システム向けの native-indexed `.tds` ストレージ、変数制御、トレース順位付け、CSV evidence 操作、semantic review、集中型 observability。**
 
@@ -92,6 +90,7 @@ TDS は storage hot path を狭く保つ設計です。Native index、lookup、p
 | Native-indexed storage | Optional compiled index/checksum path、deterministic Python fallback、明示的な native capability report。 |
 | Trace ranking | Confidence、depth、age、top-N、statistics、native/Python parity を持つ deterministic Spiral-compatible ranking。 |
 | CSV Suite | Original-byte preservation、dialect evidence、logical row offset、row anchor、scan parity、artifact transaction、storage binding、native scan evidence、Interpole telemetry、Semantic IR candidate、lifecycle transition、atomic batch review。 |
+| Generation Authority | Immutable content-addressed generation、publication head-root CAS、cross-process reader pin、crash recovery、rollback、retirement、exact CSV consumer、content-free executable audit。 |
 | Evidence-bound semantics | Caller が明示した declaration と承認済み review transition を記録し、semantic truth を自動推論または自動 commit しません。 |
 | Driver platform | TDDL validation、deterministic bytecode、bounded Driver VM、Foundry proposal/test、regression evidence、review bundle、read-only Studio integration。 |
 | 集中型 Browser | Engine health、pressure、event ring、CSV Interpole、Spiral Rank、snapshot、index、storage、recovery、alert、security、settings を 1 つの local Browser で表示します。 |
@@ -103,14 +102,15 @@ TDS は storage hot path を狭く保つ設計です。Native index、lookup、p
 # Current production PyPI release（両方の UI を含む）
 python -m pip install staqtapp-tds==3.5.3.post2
 
-# Candidate package identity（3.6.0 publication 完了後に使用）
-python -m pip install staqtapp-tds==3.6.0
-
 # main TDS telemetry UI を起動
 staqtapp-tds
 
-# Source checkout（両方の UI を含む）
+# Phase 1–4 convergence branch 上の v3.7 source candidate
+git checkout agent/v380-phase1-phase4-convergence
 python -m pip install .
+
+# 実際の publication、pin、CAS、rollback、retirement、recovery を検証
+staqtapp-tds-generation-audit
 ```
 
 Python 3.10 以上、NumPy、PyQt5 が standard installation に必要です。Driver Studio は自動的に install され、`staqtapp-tds` は main HTML/CSS/JS telemetry Browser を起動します。C extension は optional です。Caller が native-only を明示的に強制しない限り、対応する operation には deterministic Python fallback があります。
@@ -260,6 +260,16 @@ TDS は preparation、evidence、review、authority を明確に分離します�
 
 ## Validation status
 
+v3.7.0 Atomic Generation Authority source candidate は storage generation と
+future Eaglegate epoch のための generic immutable publication primitive を
+追加します。Focused qualification は deterministic identity、authoritative
+byte round trip、lifecycle adjacency、全 crash boundary、CURRENT CAS、
+concurrent publication conflict、pinned reader、restart access、corruption
+rejection、deterministic recovery、rollback、retirement、namespace isolation
+を対象とします。Semantic、ranking、model、Browser、Studio、activation
+authority は付与しません。詳細は
+`docs/130_v370_Atomic_Generation_Authority.md` を参照してください。
+
 v3.6.0 Foundation source は process-state ledger、deterministic closure
 report、x86-64 / AArch64 semantic parity、fail-closed lifecycle、sanitizer、
 fuzz、shared-runner no-regression evidence を閉じます。Named-reference-CPU
@@ -285,6 +295,7 @@ v3.5.3.post2 は standard installation に main telemetry Browser と PyQt5 Driv
 
 ```text
 src/staqtapp_tds/          core storage, persistence, telemetry, native management
+src/staqtapp_tds/generation/ generic immutable generations, CAS, pinning, recovery
 src/staqtapp_tds/csv_layer CSV evidence, transactions, Interpole, Semantic IR
 src/staqtapp_tds/drivers/  TDDL, bytecode, VM, Foundry, review and evidence
 src/staqtapp_tds/studio_pyqt5/ Driver Studio cockpit

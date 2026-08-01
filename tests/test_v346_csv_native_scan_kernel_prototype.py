@@ -56,7 +56,7 @@ def _native_scan_ready_csv(
 
 
 def test_version_346_csv_native_scan_kernel_prototype():
-    assert __version__ == "3.6.0"
+    assert __version__ == "3.7.0"
     assert CSV_NATIVE_SCAN_KERNEL_VERSION == "1.0"
 
 

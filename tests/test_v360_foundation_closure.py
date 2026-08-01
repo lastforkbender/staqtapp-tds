@@ -30,12 +30,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_v360_release_identity_and_scope_are_exact() -> None:
-    assert __version__ == TDS_V360_RELEASE_IDENTITY == "3.6.0"
-    assert VERSION_INFO == (3, 6, 0)
+    assert TDS_V360_RELEASE_IDENTITY == "3.6.0"
+    assert VERSION_INFO >= (3, 6, 0)
     report = build_foundation_closure_report(ROOT)
     assert report.contract_id == TDS_V360_FOUNDATION_CLOSURE_CONTRACT
     assert report.passed is True
     canonical = report.canonical_dict()
+    assert canonical["release_identity"] == "3.6.0"
+    assert canonical["source_version"] == __version__
     assert canonical["atomic_generation_plane_included"] is False
     assert canonical["eaglegate_included"] is False
     assert canonical["learned_serving_included"] is False

@@ -1,7 +1,11 @@
-"""Immutable, atomically promoted persistence generations for TDS v3.
+"""Frozen v3.5 compatibility store for complete ``.tds`` images.
 
-This module is the v3.5.3-dev2 correctness prototype.  It intentionally keeps
-full generation images and is not yet wired into the legacy v2 mount path.
+New consumers must use :mod:`staqtapp_tds.generation`, the canonical v3.7
+Generation Authority.  This module remains public only so existing v3.5
+callers and recovery media keep working; it must not be used to create a
+parallel Eaglegate, CSV-evidence, policy, or activation authority.  A future
+format migration requires an explicit verified adapter rather than silently
+rewriting this legacy on-disk layout.
 """
 from __future__ import annotations
 
@@ -21,6 +25,7 @@ from .persistence_policy import CleanupMode, PersistencePolicy, PersistenceStatu
 from .tds_json import dumps_canonical, loads_strict
 
 _GENERATION_RE = re.compile(r"^gen-(\d{20})-([0-9a-f]{12})$")
+LEGACY_GENERATION_STORE_COMPATIBILITY_ONLY = True
 
 
 class GenerationError(RuntimeError):

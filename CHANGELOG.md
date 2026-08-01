@@ -1,3 +1,25 @@
+# v3.7.0 — Atomic Generation Authority
+
+Introduced one generic, crash-safe authority for immutable generation identity,
+publication, recovery, reader pinning, rollback, and retirement. CSV is its
+first complete consumer; Eaglegate and other subsystems consume the same
+mechanical authority rather than inventing parallel durable `CURRENT` state.
+
+- Added canonical domain-separated manifests, payload and qualification roots,
+  lifecycle receipts, append-only publication records, and head-identity CAS.
+- Added bounded, no-symlink verification and deterministic recovery across
+  every declared write, `fsync`, manifest-publication, head-CAS, and recovery
+  fault boundary.
+- Added crash-released OS advisory namespace locks and cross-process reader
+  leases that block retirement while a generation is live.
+- Added a full CSV consumer binding authoritative source bytes, row offsets,
+  anchors, chunks, closure, parser/dialect identity, and evidence to one root.
+- Kept Browser, Studio, semantic, ranking, model, policy, training, and
+  activation authority explicitly outside the Generation Authority.
+- Preserved the complete v3.6 Foundation Closure audit as an inherited fixed
+  substrate instead of tying that historical closure identity to the current
+  package version.
+
 # v3.6.0 — Frontier Foundation Closure
 
 Closed the first Frontier Evidence Fabric foundation release without admitting

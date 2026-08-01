@@ -1,18 +1,27 @@
-> **v3.6.0 Foundation Closure source candidate**
+> **v3.7.0 Atomic Generation Authority source candidate**
 >
-> This source candidate closes the native correctness and Frontier authority substrate:
-> fail-closed ABI/lifecycle admission, strict checksum and UTF-8 truth,
-> generation-bound handles, bounded C11 diagnostics, immutable packed reads,
-> and exact x86-64/AArch64 semantics. It adds no Atomic Generation Plane,
-> Eaglegate execution, learned serving, or activation authority.
+> This branch adds the generic immutable Generation Authority above the v3.6
+> Foundation substrate: canonical manifests, content-addressed payloads,
+> append-only lifecycle and publication receipts, atomic `CURRENT`
+> head-root compare-and-swap, cross-process pinned readers, deterministic
+> recovery, rollback, and retirement. The first real consumer preserves exact
+> CSV source bytes while binding canonical chunks, packed offsets, bounded row
+> anchors, closure, and evidence. Eaglegate execution, learned serving, model
+> authority, and activation authority remain absent from this phase.
 
-> **v3.6.0 release security contract**
+> **v3.6.0 Foundation substrate**
+>
+> The source line retains fail-closed native ABI/lifecycle admission, strict
+> checksum and UTF-8 truth, generation-bound handles, bounded C11 diagnostics,
+> immutable packed reads, and exact x86-64/AArch64 semantics.
+
+> **Current security contract**
 >
 > At-rest encryption is not implemented. Requests using `DirFlags.ENCRYPTED` fail closed instead of storing plaintext. New v2 persistence files require their integrity sidecar. `.tds` input should be treated as trusted until explicit resource-budget hardening is complete. Native extensions are optional and are built only when `STAQTAPP_TDS_BUILD_NATIVE=1` is set.
 
-# Staqtapp-TDS v3.6.0
+# Staqtapp-TDS v3.7.0 Atomic Generation Authority candidate
 
-> **Repository status:** `3.6.0` is the qualified Foundation source candidate. The current production PyPI release remains `3.5.3.post2` until the exact merged and tagged release matrix passes and publication completes.
+> **Repository status:** v3.7.0 is a source candidate under review, not a published package. The current production PyPI release remains `3.5.3.post2`. The v3.6 Foundation and v3.7 Generation Authority must complete canonical merge, tag-bound qualification, and publication before their package identities are presented as production releases.
 
 **Temporal Directory System - native-indexed `.tds` storage, controlled variables, trace ranking, CSV evidence operations, semantic review, and centralized observability for AI systems.**
 
@@ -98,6 +107,7 @@ TDS is designed around a narrow storage hot path. Native indexing, lookup, persi
 | Native-indexed storage | Optional compiled index and checksum paths with deterministic Python fallbacks and explicit native capability reporting. |
 | Trace ranking | Deterministic Spiral-compatible trace ranking with confidence, depth, age, top-N limiting, statistics, and native/Python parity. |
 | CSV Suite | Original-byte preservation, dialect evidence, logical row offsets, row anchors, scan parity, artifact transactions, storage binding, native scan evidence, Interpole telemetry, Semantic IR candidates, lifecycle transitions, and atomic batch review. |
+| Generation Authority | Immutable content-addressed generations, publication head-root CAS, cross-process reader pins, crash recovery, rollback, retirement, and an exact CSV consumer with an executable content-free audit. |
 | Evidence-bound semantics | TDS records explicit caller declarations and authorized review transitions; it does not silently infer or commit semantic truth. |
 | Driver platform | TDDL validation, deterministic bytecode, bounded Driver VM execution, Foundry proposal/test flows, regression evidence, review bundles, and read-only Studio integration. |
 | Centralized Browser | One local Browser surface for engine health, pressure, event rings, CSV Interpole, Spiral Rank, snapshots, indexes, storage, recovery, alerts, security, and settings. |
@@ -109,14 +119,15 @@ TDS is designed around a narrow storage hot path. Native indexing, lookup, persi
 # Current production PyPI release; includes both UIs
 python -m pip install staqtapp-tds==3.5.3.post2
 
-# Candidate package identity; use this command only after 3.6.0 publication
-python -m pip install staqtapp-tds==3.6.0
-
 # Launch the main TDS telemetry UI
 staqtapp-tds
 
-# Source checkout; includes both UIs
+# v3.7 source candidate on the Phase 1–4 convergence branch
+git checkout agent/v380-phase1-phase4-convergence
 python -m pip install .
+
+# Exercise real publication, pinning, CAS, rollback, retirement, and recovery
+staqtapp-tds-generation-audit
 ```
 
 Python 3.10 or newer, NumPy, and PyQt5 are required by the standard installation. Driver Studio is installed automatically, while `staqtapp-tds` launches the main HTML/CSS/JS telemetry Browser. The C extensions remain optional; supported operations retain deterministic Python fallback paths unless a caller explicitly forces native-only execution.
@@ -268,6 +279,16 @@ TDS intentionally distinguishes preparation, evidence, review, and authority:
 
 ## Validation status
 
+The v3.7.0 Atomic Generation Authority source candidate adds one generic,
+immutable publication primitive for storage generations and future Eaglegate
+epochs. The focused qualification covers deterministic identity, exact
+authoritative-byte round trip, lifecycle adjacency, all declared crash
+boundaries, current-head CAS, concurrent publication conflict, pinned readers,
+restart access, corruption rejection, deterministic recovery, rollback,
+retirement, and namespace isolation. It grants no semantic, ranking, model,
+Browser, Studio, or activation authority. See
+`docs/130_v370_Atomic_Generation_Authority.md`.
+
 The v3.6.0 Foundation source closes the native and authority repair train with
 a machine-checkable process-state ledger, a deterministic closure report, exact
 x86-64/AArch64 semantic parity, fail-closed lifecycle admission, sanitizer and
@@ -305,6 +326,7 @@ aggregate release gate succeeds.
 
 ```text
 src/staqtapp_tds/          core storage, persistence, telemetry, native management
+src/staqtapp_tds/generation/ generic immutable generations, CAS, pinning, recovery
 src/staqtapp_tds/csv_layer CSV evidence, transactions, Interpole, Semantic IR
 src/staqtapp_tds/drivers/  TDDL, bytecode, VM, Foundry, review and evidence
 src/staqtapp_tds/studio_pyqt5/ Driver Studio cockpit

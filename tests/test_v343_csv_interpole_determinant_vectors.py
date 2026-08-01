@@ -39,7 +39,7 @@ def _interpole_vector_ready_csv(
 
 
 def test_version_343_csv_interpole_determinant_vectors():
-    assert __version__ == "3.6.0"
+    assert __version__ == "3.7.0"
 
 
 def test_csv_interpole_determinant_prepare_builds_no_write_vector():

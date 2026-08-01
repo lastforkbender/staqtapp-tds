@@ -14,7 +14,7 @@ from staqtapp_tds.studio_pyqt5 import (
 
 
 def test_v3118_version():
-    assert __version__ == "3.6.0"
+    assert __version__ == "3.7.0"
 
 
 def test_manual_builder_ui_runtime_is_import_safe_and_not_authority():

@@ -19,7 +19,7 @@ from staqtapp_tds.csv_layer import (
 
 
 def test_version_334_csv_artifact_security_envelope():
-    assert __version__ == "3.6.0"
+    assert __version__ == "3.7.0"
 
 
 def test_csv_id_validation_accepts_bounded_artifact_safe_ids():

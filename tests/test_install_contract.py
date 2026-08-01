@@ -20,6 +20,9 @@ def test_standard_install_includes_main_telemetry_ui_launcher():
     assert project["scripts"]["staqtapp-tds-foundation-closure"] == (
         "staqtapp_tds.native.foundation:main"
     )
+    assert project["scripts"]["staqtapp-tds-generation-audit"] == (
+        "staqtapp_tds.generation.audit:main"
+    )
     assert metadata["tool"]["setuptools"]["package-data"]["staqtapp_tds.admin"] == [
         "templates/*.html",
         "static/css/*.css",

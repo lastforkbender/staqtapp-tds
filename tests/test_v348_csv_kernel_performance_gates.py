@@ -60,7 +60,7 @@ def _performance_ready_csv(
 
 
 def test_version_348_csv_kernel_performance_gates():
-    assert __version__ == "3.6.0"
+    assert __version__ == "3.7.0"
     assert CSV_KERNEL_PERFORMANCE_GATE_VERSION == "1.0"
 
 

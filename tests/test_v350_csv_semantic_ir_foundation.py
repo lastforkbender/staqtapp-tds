@@ -92,7 +92,7 @@ def _declarations() -> tuple[CSVSemanticIRDeclaration, ...]:
 
 
 def test_version_350_formal_semantic_ir_foundation_contract():
-    assert __version__ == "3.6.0"
+    assert __version__ == "3.7.0"
     assert CSV_SEMANTIC_IR_VERSION == "1.0"
     assert CSV_SEMANTIC_IR_PAYLOAD_BYTE_LIMIT >= 131_072
     assert CSV_SEMANTIC_IR_MAX_PROPOSITIONS == 256
