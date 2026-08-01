@@ -24,6 +24,12 @@ def test_standard_install_includes_main_telemetry_ui_launcher():
     assert project["scripts"]["staqtapp-tds-eaglegate-adapter-lab"] == (
         "staqtapp_tds.eaglegate.adapter:main"
     )
+    assert project["scripts"]["staqtapp-tds-eaglegate-vllm-shadow"] == (
+        "staqtapp_tds.eaglegate.vllm_shadow:main"
+    )
+    assert project["scripts"]["staqtapp-tds-eaglegate-vllm-shadow-lab"] == (
+        "staqtapp_tds.eaglegate.vllm_shadow_suite:main"
+    )
     assert metadata["tool"]["setuptools"]["package-data"]["staqtapp_tds.admin"] == [
         "templates/*.html",
         "static/css/*.css",

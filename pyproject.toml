@@ -56,6 +56,8 @@ staqtapp-tds-admin = "staqtapp_tds.admin.console:main"
 staqtapp-tds-eaglegate = "staqtapp_tds.eaglegate.console:main"
 staqtapp-tds-eaglegate-lab = "staqtapp_tds.eaglegate.exactness:main"
 staqtapp-tds-eaglegate-adapter-lab = "staqtapp_tds.eaglegate.adapter:main"
+staqtapp-tds-eaglegate-vllm-shadow = "staqtapp_tds.eaglegate.vllm_shadow:main"
+staqtapp-tds-eaglegate-vllm-shadow-lab = "staqtapp_tds.eaglegate.vllm_shadow_suite:main"
 
 [tool.setuptools.package-data]
 "staqtapp_tds.admin" = ["templates/*.html", "static/css/*.css", "static/js/*.js", "static/icons/*.svg", "static/i18n/*.json"]
