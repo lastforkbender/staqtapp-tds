@@ -1,0 +1,155 @@
+name: Staqtapp-TDS Eaglegate vLLM shadow SDK
+
+on:
+  pull_request:
+    branches:
+      - agent/eaglegate-adapter-conformance
+  push:
+    branches:
+      - agent/eaglegate-vllm-shadow-sdk
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eaglegate-vllm-shadow-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  vllm-shadow-contract:
+    name: vLLM shadow contract (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            python: '3.10'
+          - os: ubuntu-24.04
+            python: '3.13'
+          - os: macos-14
+            python: '3.13'
+          - os: windows-2022
+            python: '3.13'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install focused test dependencies
+        run: python -m pip install -e .[test]
+      - name: Compile the complete Eaglegate package
+        run: python -m compileall -q src/staqtapp_tds/eaglegate
+      - name: Run foundation exactness adapter shadow workflow and install contracts
+        run: >-
+          python -m pytest -q
+          tests/test_v380_eaglegate_lossless_foundation.py
+          tests/test_v380_eaglegate_workflow_contract.py
+          tests/test_v380_eaglegate_exactness_laboratory.py
+          tests/test_v380_eaglegate_exactness_workflow_contract.py
+          tests/test_v380_eaglegate_adapter_conformance.py
+          tests/test_v380_eaglegate_adapter_workflow_contract.py
+          tests/test_v380_eaglegate_vllm_shadow.py
+          tests/test_v380_eaglegate_vllm_shadow_workflow_contract.py
+          tests/test_install_contract.py
+      - name: Generate deterministic non-executing vLLM shadow evidence twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m staqtapp_tds.eaglegate.vllm_shadow_suite --json > vllm-shadow-a.json
+          python -m staqtapp_tds.eaglegate.vllm_shadow_suite --json > vllm-shadow-b.json
+          cmp vllm-shadow-a.json vllm-shadow-b.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("vllm-shadow-a.json").read_text(encoding="utf-8"))
+          if report.get("passed") is not True:
+              raise SystemExit("vLLM shadow report did not pass")
+          if report.get("check_count") != 10:
+              raise SystemExit("vLLM shadow catalog changed unexpectedly")
+          expected_false = (
+              "runtime_invoked",
+              "model_invoked",
+              "inference_performed",
+              "token_acceptance_authority",
+              "kv_commit_authority",
+              "activation_authority",
+              "real_runtime_qualified",
+          )
+          widened = [name for name in expected_false if report.get(name) is not False]
+          if widened:
+              raise SystemExit(f"vLLM shadow authority widened: {widened}")
+          if report.get("runtime_name") != "vllm":
+              raise SystemExit("named runtime fixture changed")
+          if report.get("method") != "eagle":
+              raise SystemExit("named speculative method changed")
+          forbidden = {
+              "prompt", "prompt_text", "tokens", "token_sequence", "logits",
+              "logits_payload", "hidden_states", "kv_tensor", "kv_tensors",
+          }
+
+          def keys(value):
+              if isinstance(value, dict):
+                  for key, item in value.items():
+                      yield key
+                      yield from keys(item)
+              elif isinstance(value, list):
+                  for item in value:
+                      yield from keys(item)
+
+          leaked = sorted(forbidden.intersection(keys(report)))
+          if leaked:
+              raise SystemExit(f"content-bearing evidence keys present: {leaked}")
+          print(report["report_root"])
+          PY
+      - name: Prove source contains no vLLM torch network or subprocess import
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          source = Path("src/staqtapp_tds/eaglegate/vllm_shadow.py").read_text(
+              encoding="utf-8"
+          )
+          tree = ast.parse(source)
+          forbidden = {
+              "vllm", "torch", "requests", "urllib", "socket", "subprocess",
+              "http", "http.client",
+          }
+          found = []
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Import):
+                  found.extend(alias.name for alias in node.names if alias.name in forbidden)
+              elif isinstance(node, ast.ImportFrom) and node.module in forbidden:
+                  found.append(node.module)
+          if found:
+              raise SystemExit(f"forbidden runtime imports: {sorted(set(found))}")
+          PY
+      - name: Archive vLLM shadow evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: eaglegate-vllm-shadow-${{ matrix.os }}-py${{ matrix.python }}
+          path: |
+            vllm-shadow-a.json
+            vllm-shadow-b.json
+          if-no-files-found: warn
+
+  vllm-shadow-gates-complete:
+    name: Eaglegate vLLM shadow gates complete
+    if: always()
+    needs:
+      - vllm-shadow-contract
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require every vLLM shadow lane
+        env:
+          SHADOW_RESULT: ${{ needs.vllm-shadow-contract.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$SHADOW_RESULT" = "success"
