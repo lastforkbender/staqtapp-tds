@@ -1,0 +1,54 @@
+name: Apply v3.7 README status and convergence cleanup
+
+on:
+  push:
+    branches:
+      - agent/v370-generation-convergence
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-v370-readme-status
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/v370-generation-convergence
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Update READMEs without changing screenshots or important links
+        run: python tools/update_v370_readme_status.py
+      - name: Remove obsolete convergence transfer surfaces
+        shell: bash
+        run: |
+          rm -f .github/v370-baseline-export.trigger
+          rm -f .github/workflows/export-v370-baseline.yml
+          rm -f .github/workflows/apply-v370-readme-status.yml
+      - name: Validate the clean v3.7 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          python -m pip install -e '.[test]'
+          python -m pytest -q \
+            tests/test_v370_generation_contract.py \
+            tests/test_v370_generation_store.py \
+            tests/test_v370_readme_current_status.py \
+            tests/test_install_contract.py
+      - name: Commit the normal source diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Apply v3.7 Generation Authority README status'
+          git push origin HEAD:agent/v370-generation-convergence
