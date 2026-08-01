@@ -27,6 +27,9 @@ def test_standard_install_includes_main_telemetry_ui_launcher():
     assert project["scripts"]["staqtapp-tds-eaglegate-shadow"] == (
         "staqtapp_tds.eaglegate.shadow:main"
     )
+    assert project["scripts"]["staqtapp-tds-eaglegate-attest"] == (
+        "staqtapp_tds.eaglegate.attestation:main"
+    )
     assert metadata["tool"]["setuptools"]["package-data"]["staqtapp_tds.admin"] == [
         "templates/*.html",
         "static/css/*.css",
