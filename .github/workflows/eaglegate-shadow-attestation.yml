@@ -1,0 +1,132 @@
+name: Staqtapp-TDS Eaglegate shadow attestation
+
+on:
+  pull_request:
+    branches:
+      - agent/eaglegate-shadow-sdk
+  push:
+    branches:
+      - agent/eaglegate-shadow-attestation
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eaglegate-shadow-attestation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  attestation-contract:
+    name: Shadow attestation (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            python: '3.10'
+          - os: ubuntu-24.04
+            python: '3.13'
+          - os: macos-14
+            python: '3.13'
+          - os: windows-2022
+            python: '3.13'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install focused test dependencies
+        run: python -m pip install -e .[test]
+      - name: Compile the complete Eaglegate package
+        run: python -m compileall -q src/staqtapp_tds/eaglegate
+      - name: Run foundation through attestation contracts
+        run: >-
+          python -m pytest -q
+          tests/test_v380_eaglegate_lossless_foundation.py
+          tests/test_v380_eaglegate_workflow_contract.py
+          tests/test_v380_eaglegate_exactness_laboratory.py
+          tests/test_v380_eaglegate_exactness_workflow_contract.py
+          tests/test_v380_eaglegate_adapter_conformance.py
+          tests/test_v380_eaglegate_adapter_workflow_contract.py
+          tests/test_v380_eaglegate_shadow_sdk.py
+          tests/test_v380_eaglegate_shadow_workflow_contract.py
+          tests/test_v380_eaglegate_shadow_attestation.py
+          tests/test_v380_eaglegate_attestation_workflow_contract.py
+          tests/test_install_contract.py
+      - name: Generate deterministic corroboration evidence twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m staqtapp_tds.eaglegate.attestation reference --json > attestation-a.json
+          python -m staqtapp_tds.eaglegate.attestation reference --json > attestation-b.json
+          cmp attestation-a.json attestation-b.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("attestation-a.json").read_text(encoding="utf-8"))
+          if report.get("passed") is not True:
+              raise SystemExit("attestation report did not pass")
+          if report.get("check_count") != 10:
+              raise SystemExit("attestation case catalog changed unexpectedly")
+          expected_false = (
+              "runtime_imported",
+              "network_connection_created",
+              "request_submitted",
+              "model_loaded",
+              "tokens_generated",
+              "cryptographic_signature_verified",
+              "witness_independence_proven",
+              "metadata_truth_claimed",
+              "real_runtime_qualified",
+              "activation_authority",
+          )
+          for field in expected_false:
+              if report.get(field) is not False:
+                  raise SystemExit(f"attestation report widened {field}")
+          forbidden = {
+              "prompt", "prompt_text", "tokens", "token_sequence", "logits",
+              "logits_payload", "hidden_states", "kv_tensor", "kv_tensors",
+              "signature", "public_key", "private_key",
+          }
+
+          def keys(value):
+              if isinstance(value, dict):
+                  for key, item in value.items():
+                      yield key
+                      yield from keys(item)
+              elif isinstance(value, list):
+                  for item in value:
+                      yield from keys(item)
+
+          leaked = sorted(forbidden.intersection(keys(report)))
+          if leaked:
+              raise SystemExit(f"content/crypto material present: {leaked}")
+          print(report["report_root"])
+          PY
+      - name: Archive attestation qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: eaglegate-attestation-${{ matrix.os }}-py${{ matrix.python }}
+          path: |
+            attestation-a.json
+            attestation-b.json
+          if-no-files-found: warn
+
+  attestation-gates-complete:
+    name: Eaglegate shadow attestation gates complete
+    if: always()
+    needs:
+      - attestation-contract
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require every attestation lane
+        env:
+          ATTESTATION_RESULT: ${{ needs.attestation-contract.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$ATTESTATION_RESULT" = "success"
