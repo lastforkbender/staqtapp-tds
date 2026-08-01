@@ -96,7 +96,6 @@ jobs:
           git apply --whitespace=nowarn /tmp/closure.patch
           rm -f .github/v360-foundation-closure.patch.part-*
           rm -f .github/v360-foundation-closure-clean.trigger*
-          rm -f .github/workflows/materialize-v360-foundation-closure-clean.yml
           git diff --check
           python -S tools/foundation_closure_v360.py --root . --json > /tmp/foundation.json
           python - <<'PY'
@@ -119,6 +118,7 @@ jobs:
           python scripts/check_release.py
           find . -type d -name __pycache__ -prune -exec rm -rf {} +
           find . -type f -name '*.pyc' -delete
+          mv .github/workflows/foundation-closure.yml .github/foundation-closure.yml.staged
       - name: Commit the clean Foundation Closure source
         shell: bash
         run: |
