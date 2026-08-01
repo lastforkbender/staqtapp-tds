@@ -62,6 +62,8 @@ staqtapp-tds-eaglegate-capture = "staqtapp_tds.eaglegate.offline_capture:main"
 staqtapp-tds-eaglegate-capture-lab = "staqtapp_tds.eaglegate.offline_capture_suite:main"
 staqtapp-tds-eaglegate-capture-witness = "staqtapp_tds.eaglegate.capture_attestation:main"
 staqtapp-tds-eaglegate-capture-witness-lab = "staqtapp_tds.eaglegate.capture_attestation_suite:main"
+staqtapp-tds-eaglegate-capture-produce = "staqtapp_tds.eaglegate.capture_producer:main"
+staqtapp-tds-eaglegate-capture-producer-lab = "staqtapp_tds.eaglegate.capture_producer_suite:main"
 
 [tool.setuptools.package-data]
 "staqtapp_tds.admin" = ["templates/*.html", "static/css/*.css", "static/js/*.js", "static/icons/*.svg", "static/i18n/*.json"]

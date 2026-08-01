@@ -67,6 +67,32 @@ from .capture_attestation_suite import (
     reference_capture_status,
     run_reference_capture_attestation_suite,
 )
+from .capture_producer import (
+    EAGLEGATE_CAPTURE_PRODUCER_AUTHORITY,
+    EAGLEGATE_CAPTURE_PRODUCER_CONTRACT_ID,
+    EAGLEGATE_CAPTURE_PRODUCER_DISTRIBUTION,
+    EAGLEGATE_CAPTURE_PRODUCER_FORMAT_VERSION,
+    EAGLEGATE_CAPTURE_PRODUCER_PROFILE_ID,
+    CaptureProducerAuthorityBoundary,
+    CaptureProducerLimits,
+    CaptureProducerProfile,
+    CaptureProducerResult,
+    DistributionFileDigest,
+    InstalledDistributionInspection,
+    capture_environment_root,
+    capture_producer_tool_root,
+    inspect_distribution_object,
+    inspect_installed_distribution,
+    normalize_distribution_name,
+    produce_offline_capture,
+    validate_distribution_member_path,
+)
+from .capture_producer_suite import (
+    EAGLEGATE_CAPTURE_PRODUCER_SUITE_ID,
+    CaptureProducerCheck,
+    CaptureProducerReport,
+    run_reference_capture_producer_suite,
+)
 from .config import (
     EAGLEGATE_CONFIG_FILENAME,
     EAGLEGATE_LOCK_FILENAME,
@@ -178,6 +204,8 @@ from .vllm_shadow_suite import (
 
 __all__ = [name for name in globals() if name.startswith("Eaglegate")]
 __all__ += [name for name in globals() if name.startswith("Capture")]
+__all__ += [name for name in globals() if name.startswith("Distribution")]
+__all__ += [name for name in globals() if name.startswith("Installed")]
 __all__ += [name for name in globals() if name.startswith("Offline")]
 __all__ += [name for name in globals() if name.startswith("Vllm")]
 __all__ += [
@@ -204,6 +232,12 @@ __all__ += [
     "EAGLEGATE_CAPTURE_ATTESTATION_FORMAT_VERSION",
     "EAGLEGATE_CAPTURE_ATTESTATION_MIN_WITNESSES",
     "EAGLEGATE_CAPTURE_ATTESTATION_SUITE_ID",
+    "EAGLEGATE_CAPTURE_PRODUCER_AUTHORITY",
+    "EAGLEGATE_CAPTURE_PRODUCER_CONTRACT_ID",
+    "EAGLEGATE_CAPTURE_PRODUCER_DISTRIBUTION",
+    "EAGLEGATE_CAPTURE_PRODUCER_FORMAT_VERSION",
+    "EAGLEGATE_CAPTURE_PRODUCER_PROFILE_ID",
+    "EAGLEGATE_CAPTURE_PRODUCER_SUITE_ID",
     "EAGLEGATE_CONFIG_FILENAME",
     "EAGLEGATE_CONTRACT_ID",
     "EAGLEGATE_EXACTNESS_CONTRACT_ID",
@@ -234,7 +268,9 @@ __all__ += [
     "authority_snapshot",
     "canonicalize_observations",
     "capture_bundle_to_mapping",
+    "capture_environment_root",
     "capture_envelope_to_mapping",
+    "capture_producer_tool_root",
     "committed_state_root",
     "compare_capture_status",
     "compile_project",
@@ -243,10 +279,14 @@ __all__ += [
     "evaluate_vllm_shadow",
     "initial_observation_receipt",
     "initialize_project",
+    "inspect_distribution_object",
+    "inspect_installed_distribution",
     "load_configuration",
     "load_lock",
     "load_project",
     "next_observation_receipt",
+    "normalize_distribution_name",
+    "produce_offline_capture",
     "profile_configuration",
     "prove_lossless_one_step_distribution",
     "provider_snapshot_payload_root",
@@ -266,6 +306,7 @@ __all__ += [
     "run_adapter_conformance_reference",
     "run_reference_adapter_conformance_suite",
     "run_reference_capture_attestation_suite",
+    "run_reference_capture_producer_suite",
     "run_reference_exactness_suite",
     "run_reference_offline_capture_suite",
     "run_reference_vllm_shadow_suite",
@@ -273,6 +314,7 @@ __all__ += [
     "run_target_only",
     "snapshot_to_mapping",
     "token_sequence_root",
+    "validate_distribution_member_path",
     "validate_epoch_transition",
     "validate_observation_chain",
     "validate_offline_capability_capture",

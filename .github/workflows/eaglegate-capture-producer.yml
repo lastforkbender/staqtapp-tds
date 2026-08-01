@@ -1,0 +1,181 @@
+name: Staqtapp-TDS Eaglegate isolated capture producer
+
+on:
+  pull_request:
+    branches:
+      - agent/eaglegate-capture-witness-receipts
+  push:
+    branches:
+      - agent/eaglegate-isolated-capture-producer
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eaglegate-capture-producer-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  capture-producer-contract:
+    name: Capture producer contract (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            python: '3.10'
+          - os: ubuntu-24.04
+            python: '3.13'
+          - os: macos-14
+            python: '3.13'
+          - os: windows-2022
+            python: '3.13'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install focused test dependencies
+        run: python -m pip install -e .[test]
+      - name: Compile the complete Eaglegate package
+        run: python -m compileall -q src/staqtapp_tds/eaglegate
+      - name: Run accumulated Eaglegate and install contracts
+        run: >-
+          python -m pytest -q
+          tests/test_v380_eaglegate_lossless_foundation.py
+          tests/test_v380_eaglegate_workflow_contract.py
+          tests/test_v380_eaglegate_exactness_laboratory.py
+          tests/test_v380_eaglegate_exactness_workflow_contract.py
+          tests/test_v380_eaglegate_adapter_conformance.py
+          tests/test_v380_eaglegate_adapter_workflow_contract.py
+          tests/test_v380_eaglegate_vllm_shadow.py
+          tests/test_v380_eaglegate_vllm_shadow_workflow_contract.py
+          tests/test_v380_eaglegate_offline_capture.py
+          tests/test_v380_eaglegate_offline_capture_workflow_contract.py
+          tests/test_v380_eaglegate_capture_attestation.py
+          tests/test_v380_eaglegate_capture_attestation_workflow_contract.py
+          tests/test_v380_eaglegate_capture_producer.py
+          tests/test_v380_eaglegate_capture_producer_workflow_contract.py
+          tests/test_install_contract.py
+      - name: Generate deterministic content-free producer evidence twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m staqtapp_tds.eaglegate.capture_producer_suite --json > producer-a.json
+          python -m staqtapp_tds.eaglegate.capture_producer_suite --json > producer-b.json
+          cmp producer-a.json producer-b.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("producer-a.json").read_text(encoding="utf-8"))
+          if report.get("passed") is not True:
+              raise SystemExit("capture producer report did not pass")
+          if report.get("check_count") != 10:
+              raise SystemExit("capture producer catalog changed unexpectedly")
+          expected_false = (
+              "source_commit_verified",
+              "provider_runtime_imported",
+              "model_artifact_read",
+              "model_loaded",
+              "accelerator_probed",
+              "network_used",
+              "subprocess_used",
+              "dynamic_code_executed",
+              "inference_performed",
+              "token_acceptance_authority",
+              "kv_commit_authority",
+              "activation_authority",
+              "real_runtime_qualified",
+          )
+          widened = [name for name in expected_false if report.get(name) is not False]
+          if widened:
+              raise SystemExit(f"capture producer authority widened: {widened}")
+          forbidden = {
+              "prompt", "prompt_text", "tokens", "token_sequence", "logits",
+              "logits_payload", "hidden_states", "kv_tensor", "kv_tensors",
+              "private_key", "secret_key",
+          }
+
+          def keys(value):
+              if isinstance(value, dict):
+                  for key, item in value.items():
+                      yield key
+                      yield from keys(item)
+              elif isinstance(value, list):
+                  for item in value:
+                      yield from keys(item)
+
+          leaked = sorted(forbidden.intersection(keys(report)))
+          if leaked:
+              raise SystemExit(f"content-bearing evidence keys present: {leaked}")
+          print(report["report_root"])
+          PY
+      - name: Prove producer has no runtime or execution imports
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          source = Path("src/staqtapp_tds/eaglegate/capture_producer.py").read_text(
+              encoding="utf-8"
+          )
+          tree = ast.parse(source)
+          forbidden = {
+              "vllm", "torch", "requests", "urllib", "socket", "subprocess",
+              "http", "http.client", "pynvml", "cuda", "cryptography", "nacl",
+          }
+          found = []
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Import):
+                  found.extend(alias.name for alias in node.names if alias.name in forbidden)
+              elif isinstance(node, ast.ImportFrom) and node.module in forbidden:
+                  found.append(node.module)
+          dynamic = []
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Call):
+                  if isinstance(node.func, ast.Name) and node.func.id in {
+                      "eval", "exec", "__import__"
+                  }:
+                      dynamic.append(node.func.id)
+                  elif (
+                      isinstance(node.func, ast.Attribute)
+                      and isinstance(node.func.value, ast.Name)
+                      and node.func.value.id == "importlib"
+                      and node.func.attr == "import_module"
+                  ):
+                      dynamic.append("importlib.import_module")
+          if found or dynamic:
+              raise SystemExit(
+                  "forbidden runtime or execution imports: "
+                  f"imports={sorted(set(found))}, dynamic={sorted(set(dynamic))}"
+              )
+          PY
+      - name: Archive capture producer evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: eaglegate-capture-producer-${{ matrix.os }}-py${{ matrix.python }}
+          path: |
+            producer-a.json
+            producer-b.json
+          if-no-files-found: warn
+
+  capture-producer-gates-complete:
+    name: Eaglegate capture producer gates complete
+    if: always()
+    needs:
+      - capture-producer-contract
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require every capture producer lane
+        env:
+          PRODUCER_RESULT: ${{ needs.capture-producer-contract.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$PRODUCER_RESULT" = "success"
