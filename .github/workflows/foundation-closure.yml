@@ -6,6 +6,7 @@ on:
       - main
   push:
     branches:
+      - main
       - agent/v360-foundation-closure-clean
   workflow_dispatch:
 
