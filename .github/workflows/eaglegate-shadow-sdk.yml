@@ -1,0 +1,189 @@
+name: Staqtapp-TDS Eaglegate shadow SDK
+
+on:
+  pull_request:
+    branches:
+      - agent/eaglegate-adapter-conformance
+  push:
+    branches:
+      - agent/eaglegate-shadow-sdk
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eaglegate-shadow-sdk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  shadow-contract:
+    name: Shadow SDK (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            python: '3.10'
+          - os: ubuntu-24.04
+            python: '3.13'
+          - os: macos-14
+            python: '3.13'
+          - os: windows-2022
+            python: '3.13'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install focused test dependencies
+        run: python -m pip install -e .[test]
+      - name: Compile the complete Eaglegate package
+        run: python -m compileall -q src/staqtapp_tds/eaglegate
+      - name: Run foundation through shadow contracts
+        run: >-
+          python -m pytest -q
+          tests/test_v380_eaglegate_lossless_foundation.py
+          tests/test_v380_eaglegate_workflow_contract.py
+          tests/test_v380_eaglegate_exactness_laboratory.py
+          tests/test_v380_eaglegate_exactness_workflow_contract.py
+          tests/test_v380_eaglegate_adapter_conformance.py
+          tests/test_v380_eaglegate_adapter_workflow_contract.py
+          tests/test_v380_eaglegate_shadow_sdk.py
+          tests/test_v380_eaglegate_shadow_workflow_contract.py
+          tests/test_install_contract.py
+      - name: Generate deterministic non-executing vLLM shadow evidence twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          def root(label):
+              return "sha256:" + hashlib.sha256(label.encode("ascii")).hexdigest()
+
+          metadata = {
+              "runtime_version": "0.22.0",
+              "method": "eagle",
+              "foundation_identity_root": root("foundation"),
+              "target_model_root": root("target-model"),
+              "tokenizer_root": root("tokenizer"),
+              "draft_model_root": root("draft-model"),
+              "adapter_build_root": root("adapter-build"),
+              "target_verifier_root": root("target-verifier"),
+              "rng_contract_root": root("rng"),
+              "sampler_order_root": root("sampler"),
+              "logits_processor_order_root": root("logits"),
+              "termination_contract_root": root("termination"),
+              "kv_allocator_root": root("kv"),
+              "numerical_kernel_root": root("kernel"),
+              "deadline_contract_root": root("deadline"),
+              "capability_source_root": root("capability-source"),
+              "metadata_attestation_root": root("attestation"),
+              "num_speculative_tokens": 3,
+              "draft_tensor_parallel_size": 1,
+              "target_tensor_parallel_size": 4,
+              "max_model_len": 32768,
+              "parallel_drafting": False,
+              "rejection_sample_method": "strict",
+          }
+          Path("vllm-shadow-metadata.json").write_text(
+              json.dumps(metadata, sort_keys=True, indent=2) + "\n",
+              encoding="utf-8",
+              newline="\n",
+          )
+          Path("shadow-roots.json").write_text(
+              json.dumps(
+                  {
+                      "exactness": root("exactness-report"),
+                      "adapter": root("adapter-report"),
+                  },
+                  sort_keys=True,
+              ),
+              encoding="utf-8",
+          )
+          PY
+          EXACTNESS_ROOT="$(python -c 'import json; print(json.load(open("shadow-roots.json"))["exactness"])')"
+          ADAPTER_ROOT="$(python -c 'import json; print(json.load(open("shadow-roots.json"))["adapter"])')"
+          python -m staqtapp_tds.eaglegate.shadow inspect \
+            --metadata vllm-shadow-metadata.json \
+            --exactness-root "$EXACTNESS_ROOT" \
+            --adapter-root "$ADAPTER_ROOT" \
+            --json > shadow-a.json
+          python -m staqtapp_tds.eaglegate.shadow inspect \
+            --metadata vllm-shadow-metadata.json \
+            --exactness-root "$EXACTNESS_ROOT" \
+            --adapter-root "$ADAPTER_ROOT" \
+            --json > shadow-b.json
+          cmp shadow-a.json shadow-b.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("shadow-a.json").read_text(encoding="utf-8"))
+          expected_false = (
+              "runtime_imported",
+              "server_started",
+              "model_loaded",
+              "kv_allocated",
+              "tokens_generated",
+              "tokens_verified",
+              "tokens_committed",
+              "executable_command_emitted",
+              "activation_authority",
+              "production_execution_authority",
+              "real_runtime_qualified",
+          )
+          for field in expected_false:
+              if report.get(field) is not False:
+                  raise SystemExit(f"shadow report widened {field}")
+          if report.get("decision") != "observe":
+              raise SystemExit("valid metadata did not remain observe-only")
+          forbidden = {
+              "prompt", "prompt_text", "tokens", "token_sequence", "logits",
+              "logits_payload", "hidden_states", "kv_tensor", "kv_tensors",
+              "executable_command",
+          }
+
+          def keys(value):
+              if isinstance(value, dict):
+                  for key, item in value.items():
+                      yield key
+                      yield from keys(item)
+              elif isinstance(value, list):
+                  for item in value:
+                      yield from keys(item)
+
+          leaked = sorted(forbidden.intersection(keys(report)))
+          if leaked:
+              raise SystemExit(f"content/execution fields present: {leaked}")
+          print(report["report_root"])
+          PY
+      - name: Archive shadow compilation evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: eaglegate-shadow-${{ matrix.os }}-py${{ matrix.python }}
+          path: |
+            vllm-shadow-metadata.json
+            shadow-a.json
+            shadow-b.json
+          if-no-files-found: warn
+
+  shadow-gates-complete:
+    name: Eaglegate shadow SDK gates complete
+    if: always()
+    needs:
+      - shadow-contract
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require every shadow SDK lane
+        env:
+          SHADOW_RESULT: ${{ needs.shadow-contract.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$SHADOW_RESULT" = "success"
