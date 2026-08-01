@@ -5,7 +5,10 @@ from dataclasses import asdict, dataclass, replace
 import json
 from typing import Any, Mapping, Sequence
 
-from .adapter_suite import run_reference_adapter_conformance_suite
+from .adapter_suite import (
+    reference_adapter_identity,
+    run_reference_adapter_conformance_suite,
+)
 from .contract import EaglegateSamplerClass
 from .exactness_common import (
     EaglegateExactnessError,
@@ -34,15 +37,17 @@ def _root(label: str) -> str:
 
 
 def reference_vllm_eagle_snapshot() -> VllmEagleCapabilitySnapshot:
+    adapter_identity = reference_adapter_identity()
+    adapter_report = run_reference_adapter_conformance_suite()
     return VllmEagleCapabilitySnapshot(
         runtime_version="0.0.0-fixture.1",
         runtime_build_root=_root("runtime-build"),
         engine_api_root=_root("engine-api"),
-        foundation_identity_root=_root("foundation"),
-        exactness_qualification_root=_root("exactness"),
-        adapter_conformance_root=(
-            run_reference_adapter_conformance_suite().report_root
+        foundation_identity_root=adapter_identity.foundation_identity_root,
+        exactness_qualification_root=(
+            adapter_identity.exactness_qualification_root
         ),
+        adapter_conformance_root=adapter_report.report_root,
         shadow_adapter_build_root=_root("shadow-adapter"),
         target_model_root=_root("target-model"),
         tokenizer_root=_root("tokenizer"),
