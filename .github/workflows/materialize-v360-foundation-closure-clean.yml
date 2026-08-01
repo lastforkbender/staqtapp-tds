@@ -1,6 +1,9 @@
 name: Materialize clean v3.6 Foundation Closure
 
 on:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - agent/v360-foundation-closure-clean
@@ -89,6 +92,7 @@ jobs:
           git apply --check --whitespace=nowarn /tmp/closure.patch
           git apply --whitespace=nowarn /tmp/closure.patch
           rm -f .github/v360-foundation-closure.patch.part-*
+          rm -f .github/v360-foundation-closure-clean.trigger
           rm -f .github/workflows/materialize-v360-foundation-closure-clean.yml
           git diff --check
           python -S tools/foundation_closure_v360.py --root . --json > /tmp/foundation.json
