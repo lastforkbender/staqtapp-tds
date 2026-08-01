@@ -99,7 +99,7 @@ v3.6.0 deliberately makes the narrow claim supported by the evidence:
 deterministic native correctness:             qualified
 shared-runner aggregate no-regression floor:  1.00x
 x86-64/AArch64 covered semantic parity:       qualified
-named-reference-CPU scaling claim:            false
+named-reference-CPU scaling claim:           false
 universal scaling claim:                      false
 ```
 
