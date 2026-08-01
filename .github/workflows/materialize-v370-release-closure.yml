@@ -1,0 +1,448 @@
+name: Materialize v3.7 release closure
+
+on:
+  push:
+    branches:
+      - agent/v370-release-closure
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-v370-release-closure
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: agent/v370-release-closure
+      - name: Require the merged Atomic Generation base
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f src/staqtapp_tds/generation/authority.py
+          test -f src/staqtapp_tds/csv_layer/generation_contract.py
+          test -f src/staqtapp_tds/csv_layer/generation_store.py
+          test -f docs/README_ASSET_CONTRACT_V370.json
+          grep -F 'v3.7.0 Atomic Generation Authority candidate' README.md
+          grep -F '__version__ = "3.6.0"' src/staqtapp_tds/version.py
+      - name: Advance source, compatibility, and release contracts to 3.7.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          version = Path('src/staqtapp_tds/version.py')
+          text = version.read_text(encoding='utf-8')
+          old = '__version__ = "3.6.0"'
+          new = '__version__ = "3.7.0"'
+          if old not in text:
+              raise SystemExit('source version is not the qualified 3.6.0 base')
+          version.write_text(text.replace(old, new, 1), encoding='utf-8', newline='\n')
+
+          compatibility_files = (
+              'src/staqtapp_tds/csv_layer/semantic_ir.py',
+              'src/staqtapp_tds/csv_layer/semantic_ir_lifecycle.py',
+              'src/staqtapp_tds/csv_layer/semantic_ir_lifecycle_batch.py',
+              'src/staqtapp_tds/csv_layer/semantic_handoff.py',
+          )
+          for filename in compatibility_files:
+              path = Path(filename)
+              if not path.exists():
+                  continue
+              source = path.read_text(encoding='utf-8')
+              if '3.7.0' in source:
+                  continue
+              if '"3.6.0",' not in source:
+                  continue
+              source = source.replace(
+                  '"3.6.0",',
+                  '"3.6.0",\n    "3.7.0",',
+              )
+              path.write_text(source, encoding='utf-8', newline='\n')
+
+          checker = Path('scripts/check_release.py')
+          source = checker.read_text(encoding='utf-8')
+          pattern = re.compile(
+              r'    if closure_report\.get\("release_identity"\) != expected_version:\n'
+              r'        return fail\("v3\.6 Foundation Closure release identity mismatch"\)\n'
+          )
+          replacement = (
+              '    if closure_report.get("release_identity") != "3.6.0":\n'
+              '        return fail("v3.6 Foundation Closure identity changed")\n'
+              '    try:\n'
+              '        current_version_info = tuple(int(part) for part in expected_version.split("."))\n'
+              '    except ValueError:\n'
+              '        return fail("current source version is not numeric MAJOR.MINOR.PATCH")\n'
+              '    if current_version_info < (3, 6, 0):\n'
+              '        return fail("current source predates the closed v3.6 Foundation")\n'
+          )
+          source, count = pattern.subn(replacement, source, count=1)
+          if count != 1 and 'v3.6 Foundation Closure identity changed' not in source:
+              raise SystemExit('Foundation release/source identity boundary was not found')
+          checker.write_text(source, encoding='utf-8', newline='\n')
+
+          release_test = Path('tests/test_v353_release_qualification.py')
+          source = release_test.read_text(encoding='utf-8')
+          source = source.replace(
+              'assert __version__ == "3.6.0"',
+              'assert __version__ == "3.7.0"',
+          ).replace(
+              'assert VERSION_INFO == (3, 6, 0)',
+              'assert VERSION_INFO == (3, 7, 0)',
+          )
+          release_test.write_text(source, encoding='utf-8', newline='\n')
+
+          convergence_test = Path('tests/test_v370_generation_convergence.py')
+          source = convergence_test.read_text(encoding='utf-8')
+          source = source.replace(
+              'assert __version__ == "3.6.0"',
+              'assert __version__ == "3.7.0"',
+          )
+          convergence_test.write_text(source, encoding='utf-8', newline='\n')
+          PY
+      - name: Update both README files without changing any screenshot or important link
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          import re
+
+          root = Path('.')
+          contract = json.loads(
+              (root / 'docs' / 'README_ASSET_CONTRACT_V370.json').read_text(
+                  encoding='utf-8'
+              )
+          )
+
+          def assets(text: str) -> dict[str, list[str]]:
+              return {
+                  'images': re.findall(
+                      r'<img\b[^>]*?\bsrc="([^"]+)"', text, flags=re.IGNORECASE
+                  ),
+                  'links': re.findall(r'(?<!!)\[[^]]+\]\(([^)\s]+)', text),
+              }
+
+          for name in ('README.md', 'README_ja.md'):
+              actual = assets((root / name).read_text(encoding='utf-8'))
+              if actual != contract['readmes'][name]:
+                  raise SystemExit(f'{name} already violates the v3.7 asset contract')
+
+          path = root / 'README.md'
+          text = path.read_text(encoding='utf-8')
+          text = text.replace(
+              '> **v3.7.0 Atomic Generation Authority candidate**',
+              '> **v3.7.0 Atomic Generation Authority**',
+              1,
+          )
+          text = text.replace(
+              '> TDS now includes the contract-first Atomic Generation Plane: original bytes remain authoritative, complete immutable generations are content-addressed, publication uses verified append-only receipts and compare-and-swap current-head replacement, readers pin one generation, and recovery remains deterministic. This source line retains the `3.6.0` package identity until the v3.7 release gate closes. Eaglegate execution, learned serving, semantic authority, and Browser publication authority remain absent.',
+              '> TDS now includes the contract-first Atomic Generation Plane: original bytes remain authoritative, complete immutable generations are content-addressed, publication uses verified append-only receipts and compare-and-swap current-head replacement, readers pin one generation, and recovery remains deterministic. The package identity is `3.7.0`. Eaglegate execution, learned serving, semantic authority, and Browser publication authority remain absent.',
+              1,
+          )
+          text = re.sub(
+              r'^# Staqtapp-TDS v3\.6\.0$',
+              '# Staqtapp-TDS v3.7.0',
+              text,
+              count=1,
+              flags=re.MULTILINE,
+          )
+          text = text.replace(
+              'python -m pip install staqtapp-tds==3.6.0',
+              'python -m pip install staqtapp-tds==3.7.0',
+          )
+          text = text.replace(
+              'The v3.7 Atomic Generation candidate is implemented above the closed v3.6 Foundation: the CSV contract and deterministic reference store are converged onto current `main`; temporary native-repair transfer files are excluded; the domain-neutral `staqtapp_tds.generation` authority surface is available; and README screenshot/link preservation is machine-checked by `docs/README_ASSET_CONTRACT_V370.json`. The package remains `3.6.0` until the v3.7 release gate, tag, and publication complete.',
+              'The v3.7 Atomic Generation Authority is implemented above the closed v3.6 Foundation: the CSV contract and deterministic reference store are converged onto current `main`; the domain-neutral `staqtapp_tds.generation` authority surface is available; Atomic Generation is part of the aggregate release gate; and README screenshot/link preservation is machine-checked by `docs/README_ASSET_CONTRACT_V370.json`. The source and package identity is `3.7.0`; publication remains restricted to the exact `v3.7.0` tag after every release gate succeeds.',
+              1,
+          )
+          path.write_text(text, encoding='utf-8', newline='\n')
+
+          path = root / 'README_ja.md'
+          text = path.read_text(encoding='utf-8')
+          text = re.sub(
+              r'^# Staqtapp-TDS v3\.6\.0$',
+              '# Staqtapp-TDS v3.7.0',
+              text,
+              count=1,
+              flags=re.MULTILINE,
+          )
+          text = text.replace(
+              '> **v3.7.0 Atomic Generation Authority candidate:**',
+              '> **v3.7.0 Atomic Generation Authority:**',
+              1,
+          )
+          text = text.replace(
+              'Current package identity は v3.7 release gate が閉じるまで `3.6.0` のままです。',
+              'Current package identity は `3.7.0` です。',
+              1,
+          )
+          text = text.replace(
+              'python -m pip install staqtapp-tds==3.6.0',
+              'python -m pip install staqtapp-tds==3.7.0',
+          )
+          text = text.replace(
+              'v3.7 Atomic Generation candidate は closed v3.6 Foundation 上に実装されています。CSV contract / deterministic reference store を current `main` に convergence し、domain-neutral `staqtapp_tds.generation` authority surface と README asset-preservation contract を追加しました。Package identity は release gate が閉じるまで `3.6.0` です。',
+              'v3.7 Atomic Generation Authority は closed v3.6 Foundation 上に実装されています。CSV contract / deterministic reference store を current `main` に convergence し、domain-neutral `staqtapp_tds.generation` authority surface、aggregate release gate、README asset-preservation contract を追加しました。Source / package identity は `3.7.0` です。Publication は全 release gate 成功後の exact `v3.7.0` tag に限定されます。',
+              1,
+          )
+          path.write_text(text, encoding='utf-8', newline='\n')
+
+          for name in ('README.md', 'README_ja.md'):
+              actual = assets((root / name).read_text(encoding='utf-8'))
+              if actual != contract['readmes'][name]:
+                  raise SystemExit(f'{name} image/link targets changed during release closure')
+              if len(actual['images']) != 19:
+                  raise SystemExit(f'{name} no longer contains all 19 screenshots')
+          PY
+      - name: Close v3.7 documentation and status
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          status = Path('DEV20_V370_ATOMIC_GENERATION_STATUS.txt')
+          text = status.read_text(encoding='utf-8')
+          text = text.replace(
+              'STATUS: CONVERGENCE CANDIDATE IMPLEMENTED; REMOTE RELEASE GATES REQUIRED',
+              'STATUS: RELEASE CLOSURE CANDIDATE IMPLEMENTED; EXACT REMOTE TAG GATES REQUIRED',
+              1,
+          ).replace(
+              'Package identity during candidate qualification: 3.6.0',
+              'Package identity: 3.7.0',
+              1,
+          )
+          status.write_text(text, encoding='utf-8', newline='\n')
+
+          changelog = Path('CHANGELOG.md')
+          text = changelog.read_text(encoding='utf-8')
+          text = text.replace(
+              '# v3.7.0 — Atomic Generation Authority (candidate)',
+              '# v3.7.0 — Atomic Generation Authority',
+              1,
+          )
+          changelog.write_text(text, encoding='utf-8', newline='\n')
+
+          doc = Path('docs/130_v370_Atomic_Generation_Convergence.md')
+          text = doc.read_text(encoding='utf-8')
+          text = text.replace(
+              'The candidate retains package identity `3.6.0` while qualification runs. A separate release-closing commit advances the identity to `3.7.0` only after the complete generation, repository, distribution, and README-preservation gates pass.',
+              'The release-closing source identity is `3.7.0`. Production publication is permitted only from the exact `v3.7.0` tag after the complete generation, repository, distribution, and README-preservation gates pass.',
+              1,
+          )
+          doc.write_text(text, encoding='utf-8', newline='\n')
+
+          versioning = Path('docs/VERSIONING.md')
+          text = versioning.read_text(encoding='utf-8')
+          text = text.replace(
+              'The closed Foundation source is `3.6.0`. The active candidate is **v3.7.0 Atomic Generation Authority**; its package identity remains `3.6.0` until release closure.',
+              'The closed Foundation release is `3.6.0`. The current release-closing source is **v3.7.0 Atomic Generation Authority**.',
+              1,
+          )
+          versioning.write_text(text, encoding='utf-8', newline='\n')
+          PY
+          cat > docs/131_v370_Release_Closure.md <<'EOF'
+          # v3.7.0 Atomic Generation Authority release closure
+
+          ## Identity
+
+          ```text
+          source package: 3.7.0
+          production tag: v3.7.0
+          correction policy: 3.7.1, 3.7.2, ...
+          ```
+
+          The v3.6 Foundation identity remains an immutable predecessor. The Foundation audit continues to report `3.6.0` as the release that closed its native-state and lifecycle contract; the current package identity is independently `3.7.0`.
+
+          ## Release authority
+
+          The source identity alone cannot publish. The exact tag must pass Atomic Generation, Foundation, complete repository, native, sanitizer, architecture, distribution, README preservation, and trusted-publishing gates.
+
+          ## README contract
+
+          Both README files identify v3.7.0 and preserve every screenshot and important-link target recorded by `docs/README_ASSET_CONTRACT_V370.json`.
+
+          ## Exclusions
+
+          v3.7.0 contains no Eaglegate execution, speculative decoding, learned routing, random forest, agent pool, semantic authority, model authority, or Browser/Studio publication authority.
+          EOF
+          cat > tests/test_v370_release_closure.py <<'PY'
+          from __future__ import annotations
+
+          import json
+          from pathlib import Path
+          import re
+
+          from staqtapp_tds.generation import generation_authority_snapshot
+          from staqtapp_tds.version import VERSION_INFO, __version__
+
+          ROOT = Path(__file__).resolve().parents[1]
+
+
+          def _assets(text: str) -> dict[str, list[str]]:
+              return {
+                  "images": re.findall(
+                      r'<img\b[^>]*?\bsrc="([^"]+)"', text, flags=re.IGNORECASE
+                  ),
+                  "links": re.findall(r'(?<!!)\[[^]]+\]\(([^)\s]+)', text),
+              }
+
+
+          def test_v370_source_identity_and_generation_authority() -> None:
+              assert __version__ == "3.7.0"
+              assert VERSION_INFO == (3, 7, 0)
+              snapshot = generation_authority_snapshot()
+              assert snapshot["atomic_generation_plane_present"] is True
+              assert snapshot["eaglegate_present"] is False
+              assert snapshot["activation_authority"] is False
+
+
+          def test_v370_readmes_are_current_without_asset_loss() -> None:
+              contract = json.loads(
+                  (ROOT / "docs" / "README_ASSET_CONTRACT_V370.json").read_text(
+                      encoding="utf-8"
+                  )
+              )
+              for filename in ("README.md", "README_ja.md"):
+                  text = (ROOT / filename).read_text(encoding="utf-8")
+                  assert _assets(text) == contract["readmes"][filename]
+                  assert len(_assets(text)["images"]) == 19
+                  assert "3.7.0" in text
+                  assert "python -m pip install staqtapp-tds==3.7.0" in text
+              assert "# Staqtapp-TDS v3.7.0" in (ROOT / "README.md").read_text(
+                  encoding="utf-8"
+              )
+
+
+          def test_v370_release_boundary_is_complete_and_non_eaglegate() -> None:
+              status = (ROOT / "DEV20_V370_ATOMIC_GENERATION_STATUS.txt").read_text(
+                  encoding="utf-8"
+              )
+              assert "Package identity: 3.7.0" in status
+              assert (ROOT / "docs" / "131_v370_Release_Closure.md").is_file()
+              assert not (ROOT / "src" / "staqtapp_tds" / "eaglegate").exists()
+          PY
+          cat > .github/workflows/v370-release-closure.yml <<'YAML'
+          name: Staqtapp-TDS v3.7 release closure
+
+          on:
+            pull_request:
+              branches: [main]
+            push:
+              branches: [main, agent/v370-release-closure]
+              tags: ['v3.7.0']
+            workflow_dispatch:
+
+          permissions:
+            contents: read
+
+          concurrency:
+            group: v370-release-closure-${{ github.ref }}
+            cancel-in-progress: false
+
+          jobs:
+            release-contract:
+              name: v3.7 release contract (${{ matrix.os }}, Python ${{ matrix.python }})
+              runs-on: ${{ matrix.os }}
+              strategy:
+                fail-fast: false
+                matrix:
+                  include:
+                    - os: ubuntu-24.04
+                      python: '3.10'
+                    - os: ubuntu-24.04
+                      python: '3.13'
+                    - os: macos-14
+                      python: '3.13'
+                    - os: windows-2022
+                      python: '3.13'
+              steps:
+                - uses: actions/checkout@v7
+                - uses: actions/setup-python@v6
+                  with:
+                    python-version: ${{ matrix.python }}
+                - name: Install release candidate
+                  run: python -m pip install -e ".[test]"
+                - name: Run release, generation, Foundation, and README contracts
+                  run: >-
+                    python -m pytest -q
+                    tests/test_v370_release_closure.py
+                    tests/test_v370_generation_convergence.py
+                    tests/test_v370_csv_generation_contract.py
+                    tests/test_v370_csv_generation_store.py
+                    tests/test_v360_foundation_closure.py
+                    tests/test_release_version_policy.py
+                    tests/test_install_contract.py
+                - name: Verify source release hygiene
+                  run: python scripts/check_release.py
+
+            release-closure-complete:
+              name: v3.7 release closure gates complete
+              if: always()
+              needs: release-contract
+              runs-on: ubuntu-24.04
+              steps:
+                - name: Require every release-closure lane
+                  env:
+                    RESULT: ${{ needs.release-contract.result }}
+                  run: test "$RESULT" = success
+          YAML
+      - name: Require release documentation in source hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('scripts/check_release.py')
+          text = path.read_text(encoding='utf-8')
+          marker = '        ROOT / "docs" / "130_v370_Atomic_Generation_Convergence.md",\n'
+          addition = '        ROOT / "docs" / "131_v370_Release_Closure.md",\n'
+          if addition not in text:
+              if marker not in text:
+                  raise SystemExit('v3.7 convergence evidence marker missing')
+              text = text.replace(marker, marker + addition, 1)
+          path.write_text(text, encoding='utf-8', newline='\n')
+          PY
+      - name: Remove materializer and qualify the release-closing source
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+          NUMBA_DISABLE_JIT: '1'
+        run: |
+          set -euo pipefail
+          rm -f .github/v370-release-closure.trigger
+          rm -f .github/workflows/materialize-v370-release-closure.yml
+          git diff --check
+          python -m pip install -e ".[test]"
+          python -m compileall -q src/staqtapp_tds/generation src/staqtapp_tds/csv_layer src/staqtapp_tds/native
+          python -m pytest -q \
+            tests/test_v370_release_closure.py \
+            tests/test_v370_generation_convergence.py \
+            tests/test_v370_csv_generation_contract.py \
+            tests/test_v370_csv_generation_store.py \
+            tests/test_v360_foundation_closure.py \
+            tests/test_release_version_policy.py \
+            tests/test_v353_release_qualification.py \
+            tests/test_install_contract.py
+          python scripts/check_release.py
+          python scripts/release_version.py --check 3.7.0
+          python scripts/release_version.py --print-tag | grep -Fx v3.7.0
+      - name: Commit the clean v3.7 release closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Close v3.7 Atomic Generation release'
+          git push origin HEAD:agent/v370-release-closure
