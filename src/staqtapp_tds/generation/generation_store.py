@@ -202,6 +202,11 @@ class AtomicGenerationStore:
         self._mutex = threading.RLock()
         self._pins: dict[str, int] = {}
         self._pin_locks: dict[str, tuple[int, int]] = {}
+        # This is deliberately construction-time configuration validation only.
+        # It prevents an operator from opening a store whose managed roots are
+        # already links, reparse points, or files.  It does not pin directory
+        # descriptors or defend against hostile concurrent replacement after
+        # initialization.
         for directory in (
             self.root,
             self.objects_dir,
@@ -210,7 +215,62 @@ class AtomicGenerationStore:
             self.staging_dir,
             self.pins_dir,
         ):
-            directory.mkdir(parents=True, exist_ok=True)
+            self._ensure_initialization_directory(directory)
+
+    @staticmethod
+    def _inspect_initialization_directory(path: Path) -> bool:
+        """Return whether ``path`` exists and reject unsafe existing entries.
+
+        This check is limited to store construction.  Runtime operations must
+        not treat it as protection against a concurrently replaced directory.
+        """
+        try:
+            metadata = path.lstat()
+        except FileNotFoundError:
+            return False
+        except OSError as exc:
+            raise GenerationStoreError(
+                f"cannot inspect generation-store initialization path: {path}",
+                fault=GenerationFault.INTEGRITY_FAILURE,
+            ) from exc
+
+        reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+        if (
+            stat.S_ISLNK(metadata.st_mode)
+            or bool(getattr(metadata, "st_file_attributes", 0) & reparse_flag)
+        ):
+            raise GenerationStoreError(
+                f"generation-store initialization path is a symlink or reparse point: {path}",
+                fault=GenerationFault.INTEGRITY_FAILURE,
+            )
+        if not stat.S_ISDIR(metadata.st_mode):
+            raise GenerationStoreError(
+                f"generation-store initialization path is not a directory: {path}",
+                fault=GenerationFault.INTEGRITY_FAILURE,
+            )
+        return True
+
+    @classmethod
+    def _ensure_initialization_directory(cls, path: Path) -> None:
+        """Create one absent managed directory and immediately revalidate it."""
+        if cls._inspect_initialization_directory(path):
+            return
+        try:
+            path.mkdir(parents=True, exist_ok=False, mode=0o700)
+        except FileExistsError:
+            # A path appearing between inspection and mkdir is accepted only if
+            # the same initialization validation proves it is a real directory.
+            pass
+        except OSError as exc:
+            raise GenerationStoreError(
+                f"cannot create generation-store initialization directory: {path}",
+                fault=GenerationFault.IO_FAILURE,
+            ) from exc
+        if not cls._inspect_initialization_directory(path):
+            raise GenerationStoreError(
+                f"generation-store initialization directory disappeared after creation: {path}",
+                fault=GenerationFault.INTEGRITY_FAILURE,
+            )
 
     def _hit(self, boundary: str) -> None:
         if boundary not in FAILURE_BOUNDARIES:

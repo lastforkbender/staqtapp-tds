@@ -4,6 +4,8 @@ from dataclasses import replace
 import multiprocessing
 import os
 from pathlib import Path
+import stat
+from types import SimpleNamespace
 
 import pytest
 
@@ -19,6 +21,20 @@ from staqtapp_tds.generation.generation_store import (
     GenerationPublicationConflict,
     GenerationStoreError,
 )
+
+
+_INITIALIZATION_MANAGED_PATHS = (
+    None,
+    "objects",
+    "generations",
+    "namespaces",
+    ".staging",
+    "pins",
+)
+
+
+def _initialization_managed_path(root: Path, name: str | None) -> Path:
+    return root if name is None else root / name
 
 
 def _candidate(
@@ -62,6 +78,114 @@ def _hold_cross_process_pin(
     if not release.wait(30):
         os._exit(3)
     lease.close()
+
+
+@pytest.mark.parametrize(
+    "managed_name",
+    _INITIALIZATION_MANAGED_PATHS,
+    ids=("root", "objects", "generations", "namespaces", "staging", "pins"),
+)
+def test_initialization_configuration_rejects_each_preexisting_managed_symlink_without_external_writes(
+    tmp_path: Path,
+    managed_name: str | None,
+) -> None:
+    """This is store-construction validation, not a runtime swap guarantee."""
+    if not hasattr(os, "symlink"):
+        pytest.skip("platform does not expose symlinks")
+    root = tmp_path / "authority"
+    external = tmp_path / "external"
+    external.mkdir()
+    if managed_name is not None:
+        root.mkdir()
+    unsafe_path = _initialization_managed_path(root, managed_name)
+    try:
+        unsafe_path.symlink_to(external, target_is_directory=True)
+    except OSError:
+        pytest.skip("symlink creation is not permitted")
+
+    with pytest.raises(GenerationStoreError, match="symlink or reparse point") as error:
+        AtomicGenerationStore(root)
+    assert error.value.fault is GenerationFault.INTEGRITY_FAILURE
+    assert list(external.iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    "managed_name",
+    _INITIALIZATION_MANAGED_PATHS,
+    ids=("root", "objects", "generations", "namespaces", "staging", "pins"),
+)
+def test_initialization_configuration_rejects_each_preexisting_managed_non_directory(
+    tmp_path: Path,
+    managed_name: str | None,
+) -> None:
+    """This checks startup configuration only, not hostile runtime replacement."""
+    root = tmp_path / "authority"
+    if managed_name is not None:
+        root.mkdir()
+    unsafe_path = _initialization_managed_path(root, managed_name)
+    unsafe_path.write_bytes(b"not-a-directory")
+
+    with pytest.raises(GenerationStoreError, match="not a directory") as error:
+        AtomicGenerationStore(root)
+    assert error.value.fault is GenerationFault.INTEGRITY_FAILURE
+
+
+@pytest.mark.parametrize(
+    "managed_name",
+    _INITIALIZATION_MANAGED_PATHS,
+    ids=("root", "objects", "generations", "namespaces", "staging", "pins"),
+)
+def test_initialization_configuration_rejects_each_preexisting_managed_windows_reparse_point(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    managed_name: str | None,
+) -> None:
+    """Simulate Windows metadata; this does not model a post-init directory swap."""
+    root = tmp_path / "authority"
+    root.mkdir()
+    unsafe_path = _initialization_managed_path(root, managed_name)
+    if unsafe_path != root:
+        unsafe_path.mkdir()
+
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    monkeypatch.setattr(
+        stat,
+        "FILE_ATTRIBUTE_REPARSE_POINT",
+        reparse_flag,
+        raising=False,
+    )
+    real_lstat = Path.lstat
+
+    def simulated_reparse_lstat(path: Path):
+        if path == unsafe_path:
+            return SimpleNamespace(
+                st_mode=stat.S_IFDIR | 0o700,
+                st_file_attributes=reparse_flag,
+            )
+        return real_lstat(path)
+
+    monkeypatch.setattr(Path, "lstat", simulated_reparse_lstat)
+    with pytest.raises(GenerationStoreError, match="symlink or reparse point") as error:
+        AtomicGenerationStore(root)
+    assert error.value.fault is GenerationFault.INTEGRITY_FAILURE
+
+
+def test_initialization_configuration_creates_real_directories_and_normal_store_operates(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "new-parent" / "authority"
+    store = AtomicGenerationStore(root)
+    for managed_name in _INITIALIZATION_MANAGED_PATHS:
+        path = _initialization_managed_path(root, managed_name)
+        assert path.is_dir()
+        assert not path.is_symlink()
+
+    published = _publish_first(store, "dataset:initialization-configuration")
+    with store.pin(
+        "dataset:initialization-configuration",
+        published.manifest.generation_root,
+    ) as lease:
+        assert lease.read_payload("source") == b"generation-a\n"
 
 
 def test_generation_descriptors_request_binary_mode_for_canonical_records(

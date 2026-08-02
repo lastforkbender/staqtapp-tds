@@ -202,17 +202,24 @@ def test_admission_is_deterministic_and_only_selects_plans():
     decision = evaluate_admission(target, request(target), health(target))
     assert decision.kind is EaglegateDecisionKind.FALLBACK
     assert decision.reason == "policy_target_only"
-    canary = epoch(
-        mode=EaglegateMode.CANARY,
-        canary_basis_points=100,
-        qualification_root=root("qualification"),
-    )
-    assert evaluate_admission(
-        canary, request(canary, request_bucket=99), health(canary)
-    ).kind is EaglegateDecisionKind.ADMIT
-    assert evaluate_admission(
-        canary, request(canary, request_bucket=100), health(canary)
-    ).reason == "outside_canary"
+    for mode, basis_points in (
+        (EaglegateMode.CANARY, 100),
+        (EaglegateMode.ACTIVE, 10_000),
+    ):
+        unauthorized = epoch(
+            mode=mode,
+            canary_basis_points=basis_points,
+            qualification_root=root("self-asserted-qualification"),
+        )
+        decision = evaluate_admission(
+            unauthorized,
+            request(unauthorized, request_bucket=99),
+            health(unauthorized),
+        )
+        assert decision.kind is EaglegateDecisionKind.FAULT
+        assert decision.fault is EaglegateFault.AUTHORITY_REJECTED
+        assert decision.reason == "policy_mode_not_authorized"
+        assert decision.plan_id == ""
 
 
 def test_identity_and_resource_failures_are_contained():
