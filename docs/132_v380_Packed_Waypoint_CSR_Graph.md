@@ -35,8 +35,9 @@ decode and re-encode byte-identically.
 exact byte and row spans, predecessor, feature block, and provenance record.
 `FeatureBlock` binds fixed-point values, missingness, quantization, and privacy
 class. `Edge` binds a permitted operation, destination, deterministic base
-cost, signed bounded learned delta, evidence gain, and an immutable hard
-eligibility mask. Learned values cannot weaken provenance policy.
+cost, non-negative bounded learned delta (`uint32`), evidence gain, and an
+immutable hard eligibility mask. Learned values cannot weaken provenance
+policy.
 
 The CSR representation consists of generation and provenance tables, feature
 pages, `waypoints[]`, monotonic `edge_offsets[]`, and `edges[]`. Local indices
@@ -57,6 +58,9 @@ span under the generation/source/offset roots recorded in the graph.
 
 ## Deferred work
 
-Fixed-point shortest-path search belongs to the next phase. Learned ranking,
-sentinel isolation, model training, composite production epochs, canarying, and
-activation are not present here.
+Phase 5 adds an off-path Python reference oracle that consumes this format for
+bounded fixed-point shortest-path search and replayable receipts. It does not
+change the Phase 4 graph's data-only authority. Legal-edge generation, native
+hot-path search and execution, a bounded scratch-byte contract, learned forest
+ranking, sentinel isolation, model training, production ServingEpoch
+publication, canarying, and activation remain deferred.

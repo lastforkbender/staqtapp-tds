@@ -180,6 +180,14 @@ def evaluate_admission(
             reason="target_unavailable",
             fault=EaglegateFault.TARGET_UNAVAILABLE,
         )
+    if epoch.policy.mode in {EaglegateMode.CANARY, EaglegateMode.ACTIVE}:
+        return EaglegateDecision(
+            EaglegateDecisionKind.FAULT,
+            epoch_root,
+            request_root,
+            reason="policy_mode_not_authorized",
+            fault=EaglegateFault.AUTHORITY_REJECTED,
+        )
     if epoch.policy.mode is EaglegateMode.TARGET_ONLY:
         return EaglegateDecision(
             EaglegateDecisionKind.FALLBACK,
@@ -219,22 +227,12 @@ def evaluate_admission(
             plan_id=selected.plan_id,
             reason="shadow_only",
         )
-    if (
-        epoch.policy.mode is EaglegateMode.CANARY
-        and request.request_bucket >= epoch.policy.canary_basis_points
-    ):
-        return EaglegateDecision(
-            EaglegateDecisionKind.FALLBACK,
-            epoch_root,
-            request_root,
-            reason="outside_canary",
-        )
     return EaglegateDecision(
-        EaglegateDecisionKind.ADMIT,
+        EaglegateDecisionKind.FAULT,
         epoch_root,
         request_root,
-        plan_id=selected.plan_id,
-        reason="qualified_plan",
+        reason="policy_mode_not_authorized",
+        fault=EaglegateFault.AUTHORITY_REJECTED,
     )
 
 

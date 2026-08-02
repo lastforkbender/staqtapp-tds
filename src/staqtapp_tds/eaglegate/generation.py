@@ -28,13 +28,12 @@ from .adapter_suite import (
     run_reference_adapter_conformance_suite,
 )
 from .contract import (
-    EAGLEGATE_CONTRACT_ID,
-    EAGLEGATE_FORMAT_VERSION,
     EaglegateContractError,
     EaglegateEpochState,
     EaglegateFault,
+    EaglegateIdentity,
     EaglegateMode,
-    _canonical_root as _eaglegate_root,
+    EaglegateSamplerClass,
 )
 from .evidence import EaglegateEpochReceipt, validate_epoch_transition
 from .exactness_common import canonical_root as _exactness_root
@@ -43,6 +42,8 @@ from .exactness_suite import (
     run_reference_exactness_suite,
 )
 from .plans import (
+    EaglegateAdmissionPolicy,
+    EaglegatePlan,
     EaglegateQualificationSummary,
     EaglegateSpeculationEpoch,
     validate_qualification_for_epoch,
@@ -70,6 +71,7 @@ _PAYLOAD_NAMES = frozenset(
     }
 )
 _ALLOWED_MODES = frozenset({EaglegateMode.TARGET_ONLY, EaglegateMode.SHADOW})
+_MAX_AUTHORITY_LINEAGE_HOPS = 256
 
 
 def _required_root(name: str, value: str) -> str:
@@ -102,6 +104,218 @@ def _canonical_sequence(data: bytes, description: str) -> list[Any]:
             fault=GenerationFault.NONCANONICAL,
         )
     return value
+
+
+def _close_generation_leases(
+    leases: tuple[GenerationLease, ...],
+) -> None:
+    """Close every lease even when one release reports a failure."""
+
+    first_error: BaseException | None = None
+    for lease in leases:
+        try:
+            lease.close()
+        except BaseException as exc:
+            if first_error is None:
+                first_error = exc
+    if first_error is not None:
+        raise first_error
+
+
+def _pin_eaglegate_authority_lineage(
+    store: AtomicGenerationStore,
+    *,
+    namespace: str,
+    parent_generation_root: str | None,
+    previous_epoch_root: str,
+) -> tuple[GenerationLease, ...]:
+    """Pin and validate the complete authority ancestry, nearest parent first."""
+
+    if parent_generation_root is None:
+        if previous_epoch_root:
+            raise GenerationContractError(
+                "first authority generation cannot cite a previous Eaglegate epoch",
+                fault=GenerationFault.IDENTITY_MISMATCH,
+            )
+        return ()
+    if not previous_epoch_root:
+        raise GenerationContractError(
+            "Eaglegate authority parent requires an epoch predecessor",
+            fault=GenerationFault.IDENTITY_MISMATCH,
+        )
+
+    generation_root = _required_root(
+        "parent_authority_generation_root", parent_generation_root
+    )
+    expected_epoch_root = _required_root(
+        "previous_epoch_root", previous_epoch_root
+    )
+    hop_limit = min(
+        _MAX_AUTHORITY_LINEAGE_HOPS,
+        store.limits.max_publication_records,
+    )
+    seen: set[str] = set()
+    leases: list[GenerationLease] = []
+    try:
+        for _ in range(hop_limit):
+            if generation_root in seen:
+                raise GenerationContractError(
+                    "Eaglegate authority lineage contains a cycle",
+                    fault=GenerationFault.NONCANONICAL,
+                )
+            seen.add(generation_root)
+            lease = store.pin(namespace, generation_root)
+            leases.append(lease)
+            ancestor = load_eaglegate_serving_generation(lease)
+            if (
+                ancestor.generation_root != generation_root
+                or ancestor.binding.namespace != namespace
+                or ancestor.binding.eaglegate_epoch_root != expected_epoch_root
+            ):
+                raise GenerationContractError(
+                    "Eaglegate epoch predecessor does not match authority parent",
+                    fault=GenerationFault.IDENTITY_MISMATCH,
+                )
+
+            generation_root = ancestor.binding.parent_authority_generation_root
+            expected_epoch_root = ancestor.epoch["previous_epoch_root"]
+            if generation_root is None:
+                if expected_epoch_root:
+                    raise GenerationContractError(
+                        "Eaglegate authority lineage has no root generation",
+                        fault=GenerationFault.IDENTITY_MISMATCH,
+                    )
+                return tuple(leases)
+            if not expected_epoch_root:
+                raise GenerationContractError(
+                    "Eaglegate authority ancestor has no epoch predecessor",
+                    fault=GenerationFault.IDENTITY_MISMATCH,
+                )
+
+        raise GenerationContractError(
+            "Eaglegate authority lineage exceeds the qualified hop limit",
+            fault=GenerationFault.BOUND_EXCEEDED,
+        )
+    except BaseException:
+        _close_generation_leases(tuple(reversed(leases)))
+        raise
+
+
+def _load_epoch_contract(value: Mapping[str, Any]) -> EaglegateSpeculationEpoch:
+    """Reconstruct an epoch so nested payloads must reproduce every stored root."""
+
+    try:
+        identity_value = value["identity"]
+        plan_values = value["plans"]
+        policy_value = value["policy"]
+        if not isinstance(identity_value, Mapping):
+            raise TypeError("identity is not a mapping")
+        if not isinstance(plan_values, list):
+            raise TypeError("plans are not a list")
+        if not isinstance(policy_value, Mapping):
+            raise TypeError("policy is not a mapping")
+        identity = EaglegateIdentity(
+            target_model_root=identity_value["target_model_root"],
+            tokenizer_root=identity_value["tokenizer_root"],
+            proposer_root=identity_value["proposer_root"],
+            target_runtime_root=identity_value["target_runtime_root"],
+            sampler_contract_root=identity_value["sampler_contract_root"],
+            logits_processor_root=identity_value["logits_processor_root"],
+            kv_contract_root=identity_value["kv_contract_root"],
+            kernel_capability_root=identity_value["kernel_capability_root"],
+            numerical_mode=identity_value["numerical_mode"],
+            tenant_scope=identity_value["tenant_scope"],
+            proposer_family=identity_value["proposer_family"],
+        )
+        plans: list[EaglegatePlan] = []
+        for plan_value in plan_values:
+            if not isinstance(plan_value, Mapping):
+                raise TypeError("plan is not a mapping")
+            sampler_values = plan_value["sampler_classes"]
+            if not isinstance(sampler_values, list):
+                raise TypeError("sampler classes are not a list")
+            plans.append(
+                EaglegatePlan(
+                    plan_id=plan_value["plan_id"],
+                    candidate_tokens=plan_value["candidate_tokens"],
+                    max_tree_nodes=plan_value["max_tree_nodes"],
+                    workspace_budget_bytes=plan_value["workspace_budget_bytes"],
+                    max_batch=plan_value["max_batch"],
+                    max_concurrency=plan_value["max_concurrency"],
+                    max_context_tokens=plan_value["max_context_tokens"],
+                    max_kv_pressure_ppm=plan_value["max_kv_pressure_ppm"],
+                    sampler_classes=tuple(
+                        EaglegateSamplerClass(item) for item in sampler_values
+                    ),
+                )
+            )
+        plan_order = policy_value["plan_order"]
+        if not isinstance(plan_order, list):
+            raise TypeError("plan order is not a list")
+        policy = EaglegateAdmissionPolicy(
+            policy_id=policy_value["policy_id"],
+            mode=EaglegateMode(policy_value["mode"]),
+            plan_order=tuple(plan_order),
+            canary_basis_points=policy_value["canary_basis_points"],
+            selection_contract_id=policy_value["selection_contract_id"],
+        )
+        loaded = EaglegateSpeculationEpoch(
+            generation=value["generation"],
+            identity=identity,
+            plans=tuple(plans),
+            policy=policy,
+            qualification_root=value["qualification_root"],
+            previous_epoch_root=value["previous_epoch_root"],
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise GenerationContractError(
+            "Eaglegate epoch contract is malformed",
+            fault=GenerationFault.NONCANONICAL,
+        ) from exc
+    if loaded.canonical_dict() != value:
+        raise GenerationContractError(
+            "Eaglegate epoch nested roots are inconsistent",
+            fault=GenerationFault.IDENTITY_MISMATCH,
+        )
+    return loaded
+
+
+def _load_qualification_contract(
+    value: Mapping[str, Any],
+) -> EaglegateQualificationSummary:
+    """Reconstruct a qualification so its claimed root is not self-asserted."""
+
+    try:
+        plan_roots = value["plan_roots"]
+        if not isinstance(plan_roots, list):
+            raise TypeError("qualification plan roots are not a list")
+        loaded = EaglegateQualificationSummary(
+            suite_id=value["suite_id"],
+            identity_root=value["identity_root"],
+            plan_roots=tuple(plan_roots),
+            sampling_required=value["sampling_required"],
+            greedy_exact_cases=value["greedy_exact_cases"],
+            sampled_distribution_cases=value["sampled_distribution_cases"],
+            kv_lifecycle_cases=value["kv_lifecycle_cases"],
+            failure_containment_cases=value["failure_containment_cases"],
+            greedy_exact=value["greedy_exact"],
+            sampled_distribution_preserved=value[
+                "sampled_distribution_preserved"
+            ],
+            kv_state_equivalent=value["kv_state_equivalent"],
+            failure_fallback_preserved=value["failure_fallback_preserved"],
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise GenerationContractError(
+            "Eaglegate qualification contract is malformed",
+            fault=GenerationFault.NONCANONICAL,
+        ) from exc
+    if loaded.canonical_dict() != value:
+        raise GenerationContractError(
+            "Eaglegate qualification contract is inconsistent",
+            fault=GenerationFault.IDENTITY_MISMATCH,
+        )
+    return loaded
 
 
 @dataclass(frozen=True, slots=True)
@@ -412,18 +626,13 @@ def build_eaglegate_serving_candidate(
     )):
         pass
 
-    if parent_authority_generation_root is None:
-        if epoch.previous_epoch_root:
-            raise EaglegateContractError(
-                "first authority generation cannot cite a previous Eaglegate epoch"
-            )
-    else:
-        with store.pin(namespace, parent_authority_generation_root) as prior_lease:
-            prior = load_eaglegate_serving_generation(prior_lease)
-        if epoch.previous_epoch_root != prior.binding.eaglegate_epoch_root:
-            raise EaglegateContractError(
-                "Eaglegate epoch predecessor does not match authority lineage"
-            )
+    lineage = _pin_eaglegate_authority_lineage(
+        store,
+        namespace=namespace,
+        parent_generation_root=parent_authority_generation_root,
+        previous_epoch_root=epoch.previous_epoch_root,
+    )
+    _close_generation_leases(tuple(reversed(lineage)))
 
     receipts = _receipt_chain(epoch, qualification.qualification_root)
     receipt_values = [item.canonical_dict() for item in receipts]
@@ -568,29 +777,46 @@ def load_eaglegate_serving_generation(
     receipt_values = _canonical_sequence(
         raw[EAGLEGATE_RECEIPTS_PAYLOAD], "Eaglegate receipts"
     )
-    if (
-        epoch.get("contract_id") != EAGLEGATE_CONTRACT_ID
-        or epoch.get("format_version") != EAGLEGATE_FORMAT_VERSION
-        or _eaglegate_root("epoch", epoch) != binding.eaglegate_epoch_root
-        or canonical_root(
-            "eaglegate-policy-plans",
-            {
-                "policy_root": epoch.get("policy_root"),
-                "plan_roots": epoch.get("plan_roots"),
-            },
+    epoch_contract = _load_epoch_contract(epoch)
+    qualification_contract = _load_qualification_contract(qualification)
+    expected_serving_effect = (
+        "shadow-only"
+        if binding.serving_mode == EaglegateMode.SHADOW.value
+        else "target-only"
+    )
+    if metadata.get("serving-effect") != expected_serving_effect:
+        raise GenerationContractError(
+            "Eaglegate serving-effect metadata mismatch",
+            fault=GenerationFault.IDENTITY_MISMATCH,
         )
-        != binding.eaglegate_policy_root
-        or epoch.get("identity_root") != binding.target_runtime_identity_root
-        or epoch.get("qualification_root") != binding.qualification_summary_root
+    if (
+        epoch_contract.epoch_root != binding.eaglegate_epoch_root
+        or _policy_plan_root(epoch_contract) != binding.eaglegate_policy_root
+        or epoch_contract.identity.identity_root
+        != binding.target_runtime_identity_root
+        or epoch_contract.qualification_root
+        != binding.qualification_summary_root
+        or epoch_contract.policy.mode.value != binding.serving_mode
     ):
         raise GenerationContractError(
             "Eaglegate epoch binding mismatch",
             fault=GenerationFault.IDENTITY_MISMATCH,
         )
+    has_authority_parent = binding.parent_authority_generation_root is not None
+    has_epoch_predecessor = bool(epoch_contract.previous_epoch_root)
+    if has_authority_parent != has_epoch_predecessor:
+        raise GenerationContractError(
+            "Eaglegate epoch predecessor does not match authority lineage",
+            fault=GenerationFault.IDENTITY_MISMATCH,
+        )
     if (
-        qualification.get("qualified") is not True
-        or _eaglegate_root("qualification", qualification)
+        not qualification_contract.qualified
+        or qualification_contract.qualification_root
         != binding.qualification_summary_root
+        or qualification_contract.identity_root
+        != epoch_contract.identity.identity_root
+        or qualification_contract.plan_roots
+        != tuple(item.plan_root for item in epoch_contract.plans)
     ):
         raise GenerationContractError(
             "Eaglegate exactness qualification mismatch",
@@ -601,7 +827,8 @@ def load_eaglegate_serving_generation(
             "Eaglegate exactness report mismatch",
             fault=GenerationFault.IDENTITY_MISMATCH,
         )
-    if binding.exactness_report_root != run_reference_exactness_suite().report_root:
+    reference_exactness = run_reference_exactness_suite()
+    if binding.exactness_report_root != reference_exactness.report_root:
         raise GenerationContractError("Eaglegate exactness suite is not the fixed core suite")
     if (
         adapter.get("passed") is not True
@@ -612,15 +839,32 @@ def load_eaglegate_serving_generation(
             "Eaglegate adapter conformance mismatch",
             fault=GenerationFault.IDENTITY_MISMATCH,
         )
-    if binding.adapter_conformance_root != (
-        run_reference_adapter_conformance_suite().report_root
-    ):
+    reference_adapter = run_reference_adapter_conformance_suite()
+    if binding.adapter_conformance_root != reference_adapter.report_root:
         raise GenerationContractError("Eaglegate adapter suite is not the fixed core suite")
+    expected_qualification = derive_core_qualification(
+        replace(epoch_contract, qualification_root=""),
+        reference_exactness,
+        reference_adapter,
+    )
+    if qualification_contract != expected_qualification:
+        raise GenerationContractError(
+            "Eaglegate qualification was not derived from the bound epoch",
+            fault=GenerationFault.IDENTITY_MISMATCH,
+        )
+    try:
+        validate_qualification_for_epoch(epoch_contract, qualification_contract)
+    except EaglegateContractError as exc:
+        raise GenerationContractError(
+            "Eaglegate qualification is not valid for the bound epoch",
+            fault=GenerationFault.IDENTITY_MISMATCH,
+        ) from exc
     if (
         bridge.bridge_root != binding.exactness_qualification_root
         or bridge.eaglegate_epoch_root != binding.eaglegate_epoch_root
         or bridge.identity_root != binding.target_runtime_identity_root
-        or bridge.plan_roots != tuple(epoch.get("plan_roots", ()))
+        or bridge.plan_roots
+        != tuple(item.plan_root for item in epoch_contract.plans)
         or bridge.qualification_summary_root != binding.qualification_summary_root
         or bridge.exactness_report_root != binding.exactness_report_root
         or bridge.adapter_conformance_root != binding.adapter_conformance_root
@@ -661,13 +905,24 @@ def load_eaglegate_serving_generation(
         if receipt.reason_code:
             raise GenerationContractError("persisted core receipts cannot carry free text")
         if receipts:
+            if receipt.qualification_root != binding.qualification_summary_root:
+                raise GenerationContractError(
+                    "Eaglegate receipt qualification mismatch",
+                    fault=GenerationFault.IDENTITY_MISMATCH,
+                )
             validate_epoch_transition(receipts[-1], receipt)
-        elif receipt.state is not EaglegateEpochState.DRAFT:
-            raise GenerationContractError("Eaglegate receipt chain must start draft")
+        else:
+            if receipt.state is not EaglegateEpochState.DRAFT:
+                raise GenerationContractError("Eaglegate receipt chain must start draft")
+            if receipt.qualification_root or receipt.previous_receipt_root:
+                raise GenerationContractError(
+                    "Eaglegate draft receipt must start an empty lineage",
+                    fault=GenerationFault.IDENTITY_MISMATCH,
+                )
         receipts.append(receipt)
     expected_terminal = (
         EaglegateEpochState.SHADOW
-        if binding.serving_mode == EaglegateMode.SHADOW.value
+        if epoch_contract.policy.mode is EaglegateMode.SHADOW
         else EaglegateEpochState.STAGED
     )
     if not receipts or receipts[-1].state is not expected_terminal:
@@ -686,16 +941,18 @@ def load_eaglegate_serving_generation(
 
 
 class EaglegateServingGenerationLease:
-    """Pins both the ServingEpoch generation and its storage dependency."""
+    """Pins the ServingEpoch, its authority ancestry, and storage dependency."""
 
     def __init__(
         self,
         serving_lease: GenerationLease,
         storage_lease: GenerationLease,
         loaded: LoadedEaglegateServingGeneration,
+        ancestor_leases: tuple[GenerationLease, ...] = (),
     ) -> None:
         self._serving_lease = serving_lease
         self._storage_lease = storage_lease
+        self._ancestor_leases = ancestor_leases
         self.loaded = loaded
 
     @property
@@ -711,10 +968,13 @@ class EaglegateServingGenerationLease:
         return self._serving_lease.closed
 
     def close(self) -> None:
-        try:
-            self._storage_lease.close()
-        finally:
-            self._serving_lease.close()
+        _close_generation_leases(
+            (
+                self._storage_lease,
+                *reversed(self._ancestor_leases),
+                self._serving_lease,
+            )
+        )
 
     def __enter__(self) -> "EaglegateServingGenerationLease":
         if self.closed:
@@ -732,17 +992,34 @@ def open_eaglegate_serving_generation(
 ) -> EaglegateServingGenerationLease:
     serving = store.pin(namespace, generation_root)
     storage: GenerationLease | None = None
+    ancestors: tuple[GenerationLease, ...] = ()
     try:
         loaded = load_eaglegate_serving_generation(serving)
+        ancestors = _pin_eaglegate_authority_lineage(
+            store,
+            namespace=namespace,
+            parent_generation_root=(
+                loaded.binding.parent_authority_generation_root
+            ),
+            previous_epoch_root=loaded.epoch["previous_epoch_root"],
+        )
         storage = store.pin(
             loaded.binding.storage_namespace,
             loaded.binding.storage_generation_root,
         )
-        return EaglegateServingGenerationLease(serving, storage, loaded)
+        return EaglegateServingGenerationLease(
+            serving,
+            storage,
+            loaded,
+            ancestors,
+        )
     except BaseException:
-        if storage is not None:
-            storage.close()
-        serving.close()
+        cleanup = (
+            *((storage,) if storage is not None else ()),
+            *reversed(ancestors),
+            serving,
+        )
+        _close_generation_leases(cleanup)
         raise
 
 

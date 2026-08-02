@@ -44,9 +44,8 @@ compute capability `(9, 0)`, and PyTorch BF16 support.
 
 The target constructor pins the model, code revision, target tokenizer and
 tokenizer revision, BF16, target tensor parallel size 1, `max_num_seqs=1`, the
-request seed, KV-cache dtype `auto` (resolved from the pinned BF16 model dtype),
-KV block size 16, and disabled prefix caching. The three shadow constructors add
-this exact configuration:
+request seed, explicit KV-cache dtype `bfloat16`, KV block size 16, and disabled
+prefix caching. The three shadow constructors add this exact configuration:
 
 ```json
 {

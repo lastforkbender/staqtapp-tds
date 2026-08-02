@@ -301,6 +301,15 @@ def test_matrix_rejects_eagle3_or_any_widened_plan() -> None:
     assert PINNED_VLLM_SHADOW_MATRIX.vllm_build_commit == VLLM_BUILD_COMMIT
 
 
+def test_real_shadow_documentation_pins_explicit_bfloat16_kv_cache() -> None:
+    documentation = (
+        ROOT / "docs" / "131_v380_Eaglegate_Real_vLLM_Shadow.md"
+    ).read_text(encoding="utf-8")
+    assert "KV-cache dtype `auto`" not in documentation
+    assert "explicit KV-cache dtype `bfloat16`" in documentation
+    assert 'kv_cache_dtype="bfloat16"' in documentation
+
+
 def test_content_free_report_uses_only_atomic_generation_authority(
     monkeypatch: pytest.MonkeyPatch,
     serving: tuple[AtomicGenerationStore, str, str],
