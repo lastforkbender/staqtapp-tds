@@ -23,7 +23,7 @@
       </div>
       <nav class="nav-list diagnostic-nav">
         <div class="nav-section-label">Overview</div>
-        <a class="nav-pill active" href="#overview" aria-label="Dashboard" title="Dashboard"><img src="/static/icons/overview.svg" alt="">Dashboard</a>
+        <a class="nav-pill active" href="#overview" aria-label="Dashboard" aria-current="page" title="Dashboard"><img src="/static/icons/overview.svg" alt="">Dashboard</a>
         <a class="nav-pill" href="#architecture" aria-label="Engine Health" title="Engine Health"><img src="/static/icons/architecture.svg" alt="">Engine Health</a>
         <a class="nav-pill" href="#performance" aria-label="Real-time Metrics" title="Real-time Metrics"><img src="/static/icons/performance.svg" alt="">Real-time Metrics</a>
         <div class="nav-section-label">Diagnostics</div>
@@ -65,12 +65,13 @@
         <div class="top-actions">
           <span class="chip"><span class="pulse-dot"></span>Connected</span>
           <span class="chip">Snapshot-only</span>
+          <span class="chip workspace-mount-chip" id="workspace-mount-chip" aria-live="polite" hidden><img src="/static/icons/storage.svg" alt="">Workspace <b id="workspace-mount-state">—</b></span>
           <span class="chip">Updated <b id="last-update">—</b></span>
           <a class="api-link" href="/status.json">status.json</a>
         </div>
       </header>
 
-      <section id="overview" class="hero-grid">
+      <section id="overview" class="hero-grid dashboard-page" data-dashboard-page="overview">
         <article class="hero-card glass">
           <div class="hero-copy">
             <p class="eyebrow">STAQTAPP-TDS CONTROL CENTER</p>
@@ -91,7 +92,7 @@
         </article>
       </section>
 
-      <section class="metric-row">
+      <section class="metric-row dashboard-page" data-dashboard-page="overview">
         <article class="metric-card glass"><img src="/static/icons/runtime.svg" alt=""><span>Active RuntimeConfig</span><b id="runtime-config">rc-000</b><small id="runtime-gen">Generation 0</small></article>
         <article class="metric-card glass"><img src="/static/icons/reads.svg" alt=""><span>Reads / sec</span><b id="reads-sec">0</b><small class="positive">snapshot counter</small></article>
         <article class="metric-card glass"><img src="/static/icons/writes.svg" alt=""><span>Writes / sec</span><b id="writes-sec">0</b><small class="orange-text">write pressure</small></article>
@@ -100,7 +101,7 @@
         <article class="metric-card glass"><img src="/static/icons/pressure.svg" alt=""><span>ASI Pressure</span><b><span id="pressure-score">0</span>%</b><small id="pressure-mode">NORMAL</small></article>
       </section>
 
-      <section id="architecture" class="architecture-card glass">
+      <section id="architecture" class="architecture-card glass dashboard-page" data-dashboard-page="architecture" hidden>
         <div class="section-head"><div><p class="eyebrow">LIVE ARCHITECTURE</p><h2>Snapshot-driven engine map</h2></div><span class="chip blue-chip">observer only</span></div>
         <div class="arch-map">
           <div class="arch-node" data-component="api"><img src="/static/icons/about.svg" alt=""><b>TDS API</b><small id="api-status">Healthy</small></div>
@@ -119,7 +120,7 @@
         </div>
       </section>
 
-      <section class="dashboard-grid">
+      <section class="dashboard-grid dashboard-page" data-dashboard-page="behavior" hidden>
         <article id="behavior" class="panel-card glass workload-card">
           <div class="section-head"><h2>Current Workload</h2><span class="chip" id="workload-mode">idle</span></div>
           <div class="workload-wrap"><div class="donut" id="donut"><span><b id="workload-word">Idle</b><em id="workload-pct">0%</em></span></div><div class="legend" id="workload-legend"><p><i class="blue"></i>Reads <b id="read-pct">0%</b></p><p><i class="orange"></i>Writes <b id="write-pct">0%</b></p><p><i class="purple"></i>Maintenance <b id="maintenance-pct">0%</b></p><p><i class="green"></i>Idle <b id="idle-pct">100%</b></p></div></div>
@@ -147,7 +148,7 @@
       </section>
 
 
-      <section id="pressure" class="pressure-grid pressure-diagnostics-page">
+      <section id="pressure" class="pressure-grid pressure-diagnostics-page dashboard-page" data-dashboard-page="pressure" hidden>
         <article class="panel-card glass pressure-card">
           <div class="section-head"><div><p class="eyebrow">ASI STORM READINESS</p><h2>Adaptive pressure monitor</h2></div><span class="chip orange-chip" id="pressure-chip">NORMAL</span></div>
           <div class="pressure-gauge"><img src="/static/icons/storm.svg" alt=""><div><b><span id="pressure-score-large">0</span>%</b><p id="vfs-state">active</p></div></div>
@@ -195,8 +196,8 @@
         </article>
       </section>
 
-      <section class="quad-grid">
-        <article id="performance" class="panel-card glass">
+      <section class="quad-grid dashboard-page-shell" data-dashboard-page-shell="performance indexes storage" hidden>
+        <article id="performance" class="panel-card glass dashboard-page" data-dashboard-page="performance">
           <div class="section-head"><h2>Performance</h2><span class="chip">live snapshot</span></div>
           <div class="kv-list">
             <p><span>Reads / sec</span><b id="read-count">0</b><i class="sparkline"></i></p>
@@ -209,7 +210,7 @@
             <p><span>Compression Ratio</span><b id="compression-ratio">1x</b><i class="sparkline orange"></i></p>
           </div>
         </article>
-        <article id="indexes" class="panel-card glass">
+        <article id="indexes" class="panel-card glass dashboard-page" data-dashboard-page="indexes" hidden>
           <div class="section-head"><h2>Indexes</h2><span class="chip blue-chip">Swiss + Radix</span></div>
           <div class="kv-list">
             <p><span>Swiss Entries</span><b id="swiss-entries">0</b></p>
@@ -222,7 +223,7 @@
             <p><span>Radix Max Depth</span><b id="radix-max-depth">0</b></p>
           </div>
         </article>
-        <article id="storage" class="panel-card glass">
+        <article id="storage" class="panel-card glass dashboard-page" data-dashboard-page="storage" hidden>
           <div class="section-head"><h2>Storage</h2><span class="chip orange-chip">chunked</span></div>
           <div class="kv-list">
             <p><span>Entries</span><b id="storage-entries">0</b></p>
@@ -235,7 +236,7 @@
             <p><span>On-Disk Size</span><b id="on-disk-size">—</b></p>
           </div>
         </article>
-        <article class="panel-card glass">
+        <article class="panel-card glass dashboard-page" data-dashboard-page="performance">
           <div class="section-head"><h2>System</h2><span class="chip">runtime</span></div>
           <div class="kv-list">
             <p><span>Uptime</span><b id="uptime">00:00:00</b></p>
@@ -257,7 +258,7 @@
         </article>
       </section>
 
-      <section id="diagnostics" class="diagnostics-grid">
+      <section id="diagnostics" class="diagnostics-grid dashboard-page" data-dashboard-page="diagnostics" hidden>
         <article class="panel-card glass">
           <div class="section-head"><div><p class="eyebrow">NATIVE DIAGNOSTICS ENGINE</p><h2>Observer subsystem</h2></div><span class="chip blue-chip" id="native-diag-status">DISABLED</span></div>
           <div class="kv-list">
@@ -282,7 +283,7 @@
 
 
 
-      <section id="csv-interpole" class="csv-interpole-page console-page-grid telemetry-page" aria-label="CSV Interpole Monitor">
+      <section id="csv-interpole" class="csv-interpole-page console-page-grid telemetry-page dashboard-page" data-dashboard-page="csv-interpole" aria-label="CSV Interpole Monitor" hidden>
         <article class="panel-card glass wide-panel csv-interpole-hero">
           <div class="section-head"><div><p class="eyebrow">CSV INTERPOLE MONITOR</p><h2>Evidence-fixed semantic-readiness telemetry</h2></div><span class="chip blue-chip" id="csv-interpole-status">WAITING</span></div>
           <div class="csv-monitor-strip">
@@ -324,7 +325,7 @@
         </article>
       </section>
 
-      <section id="spiral-rank" class="console-page-grid telemetry-page spiral-rank-page" aria-label="Analytics Spiral Rank telemetry">
+      <section id="spiral-rank" class="console-page-grid telemetry-page spiral-rank-page dashboard-page" data-dashboard-page="spiral-rank" aria-label="Analytics Spiral Rank telemetry" hidden>
         <article class="panel-card glass wide-panel telemetry-card spiral-rank-card">
           <div class="section-head"><div><p class="eyebrow">ANALYTICS · NATIVE SPIRAL RANK ENGINE</p><h2>Ranking feedback telemetry</h2></div><span class="chip blue-chip" id="spiral-rank-status">WAITING</span></div>
           <div class="telemetry-summary-grid spiral-rank-summary">
@@ -355,8 +356,8 @@
         </article>
       </section>
 
-      <section id="snapshots" class="console-page-grid telemetry-page telemetry-snapshots-page">
-        <article class="panel-card glass wide-panel telemetry-card">
+      <section id="snapshots" class="console-page-grid telemetry-page telemetry-snapshots-page dashboard-page-shell" data-dashboard-page-shell="snapshots locks" hidden>
+        <article class="panel-card glass wide-panel telemetry-card dashboard-page" data-dashboard-page="snapshots">
           <div class="section-head"><div><p class="eyebrow">SNAPSHOT EXPLORER</p><h2>Immutable telemetry snapshots</h2></div><span class="chip blue-chip">observer-safe</span></div>
           <div class="telemetry-summary-grid">
             <div class="telemetry-command-card"><img src="/static/icons/snapshot.svg" alt=""><div><span>Snapshot sequence</span><b id="snapshot-sequence">0</b><small id="snapshot-created">waiting for cached status</small></div></div>
@@ -370,7 +371,7 @@
           </div>
           <p class="panel-note">Snapshot Explorer shows copied status payloads only. It never walks native storage state from the browser.</p>
         </article>
-        <article id="locks" class="panel-card glass wide-panel telemetry-card">
+        <article id="locks" class="panel-card glass wide-panel telemetry-card dashboard-page" data-dashboard-page="locks" hidden>
           <div class="section-head"><div><p class="eyebrow">LOCK CONTENTION</p><h2>Native wait-state diagnostics</h2></div><span class="chip" id="lock-contention-chip">transition-fed</span></div>
           <div class="pressure-breakdown compact-breakdown">
             <p><span>Lock pressure</span><b><em class="bar"><i id="lock-page-pressure-bar" style="width:0%"></i></em><span id="lock-page-pressure">0%</span></b></p>
@@ -386,8 +387,8 @@
         </article>
       </section>
 
-      <section id="comparison" class="console-page-grid telemetry-page comparison-page">
-        <article class="panel-card glass wide-panel telemetry-card"><div class="section-head"><div><p class="eyebrow">COMPARATIVE VIEWS</p><h2>Radix, Swiss, storage, and bridge comparison</h2></div><span class="chip orange-chip">trend-ready</span></div>
+      <section id="comparison" class="console-page-grid telemetry-page comparison-page dashboard-page-shell" data-dashboard-page-shell="comparison recovery" hidden>
+        <article class="panel-card glass wide-panel telemetry-card dashboard-page" data-dashboard-page="comparison"><div class="section-head"><div><p class="eyebrow">COMPARATIVE VIEWS</p><h2>Radix, Swiss, storage, and bridge comparison</h2></div><span class="chip orange-chip">trend-ready</span></div>
           <div class="comparison-grid">
             <div class="comparison-tile"><img src="/static/icons/swiss.svg" alt=""><span>Swiss index</span><b id="compare-swiss-load">0%</b><small>load factor</small></div>
             <div class="comparison-tile"><img src="/static/icons/radix.svg" alt=""><span>Radix router</span><b id="compare-radix-depth">0</b><small>avg steps</small></div>
@@ -401,7 +402,7 @@
             <p><span>Dashboard pressure</span><b id="compare-dashboard-pressure">0%</b></p>
           </div>
         </article>
-        <article id="recovery" class="panel-card glass wide-panel recovery-planner-page">
+        <article id="recovery" class="panel-card glass wide-panel recovery-planner-page dashboard-page" data-dashboard-page="recovery" hidden>
           <div class="section-head"><div><p class="eyebrow">RECOVERY PLANNER</p><h2>Advisory recovery state</h2></div><span class="chip orange-chip" id="recovery-status">Stable</span></div>
           <div class="recovery-summary-grid">
             <div class="recovery-command-card"><img src="/static/icons/recovery.svg" alt=""><div><span>Primary subsystem</span><b id="recovery-primary">System</b><small id="recovery-summary">Recovery Planner is observing pressure snapshots and no action is currently required.</small></div></div>
@@ -412,19 +413,19 @@
         </article>
       </section>
 
-      <section id="alerts" class="console-page-grid telemetry-page alerts-page">
+      <section id="alerts" class="console-page-grid telemetry-page alerts-page dashboard-page" data-dashboard-page="alerts" hidden>
         <article class="panel-card glass wide-panel telemetry-card"><div class="section-head"><div><p class="eyebrow">ALERTS &amp; EVENTS</p><h2>Operational event stream</h2></div><span class="chip" id="alerts-chip">ring-buffer aware</span></div>
           <div id="alerts-list" class="diag-event-list alerts-list"></div>
           <p class="panel-note">Alerts are derived from pressure, native diagnostics, recovery planner, and dropped-event counters. They are informational and do not mutate TDS state.</p>
         </article>
       </section>
 
-      <section class="lower-grid">
-        <article id="recommendations" class="panel-card glass recommendations-card">
+      <section class="lower-grid dashboard-page-shell" data-dashboard-page-shell="recommendations security" hidden>
+        <article id="recommendations" class="panel-card glass recommendations-card dashboard-page" data-dashboard-page="recommendations">
           <div class="section-head"><h2>Recommendations</h2><span class="chip">measured only</span></div>
           <div id="recommendations-list"></div>
         </article>
-        <article id="security" class="panel-card glass security-card">
+        <article id="security" class="panel-card glass security-card dashboard-page" data-dashboard-page="security" hidden>
           <div class="section-head"><h2>Security</h2><span class="chip blue-chip">local admin</span></div>
           <div class="security-list">
             <p><img src="/static/icons/security.svg" alt="">Local-only browser binding</p>
@@ -435,7 +436,7 @@
         </article>
       </section>
 
-      <section id="configuration" class="config-card glass settings-page">
+      <section id="configuration" class="config-card glass settings-page dashboard-page" data-dashboard-page="configuration" hidden>
         <div class="section-head"><div><p class="eyebrow" data-i18n="settings.eyebrow">BROWSER SETTINGS</p><h2 data-i18n="settings.title">General Settings</h2></div><span class="chip blue-chip" data-i18n="settings.localOnly">browser local</span></div>
         <div class="settings-form" aria-label="TDS Browser Settings">
           <label class="setting-field" for="tds-language-select"><span data-i18n="settings.language">Language</span><select id="tds-language-select" autocomplete="off"></select></label>
@@ -478,7 +479,7 @@
         </div>
       </div>
 
-      <section id="timeline" class="timeline-card glass">
+      <section id="timeline" class="timeline-card glass dashboard-page" data-dashboard-page="timeline" hidden>
         <div class="section-head"><div><p class="eyebrow">TIMELINE</p><h2>Operational storyline</h2></div><span class="chip">recent events</span></div>
         <div id="timeline-list" class="timeline-list"></div>
       </section>

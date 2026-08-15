@@ -1,4 +1,4 @@
-name: Staqtapp-TDS v3.8.1 candidate Phase 5 fixed-point path reference oracle
+name: Staqtapp-TDS v3.8.1 Phase 5 fixed-point path reference oracle
 
 on:
   pull_request:
@@ -56,7 +56,7 @@ jobs:
           tests/test_install_contract.py
 
   fixed-point-path-gates-complete:
-    name: TDS v3.8.1 candidate Phase 5 fixed-point path gates complete
+    name: TDS v3.8.1 Phase 5 fixed-point path gates complete
     if: always()
     needs:
       - fixed-point-path-reference

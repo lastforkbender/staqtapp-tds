@@ -68,7 +68,9 @@ class AdminPanelServer:
         snap = self.control.status()
         obs = snap.get("observation") if isinstance(snap, dict) else None
         if isinstance(obs, dict) and "health" in obs:
-            snap["system_health"] = str(obs.get("system_health") or obs["health"].get("state", "healthy")).upper()
+            health = obs.get("health")
+            health_state = health.get("state", "healthy") if isinstance(health, dict) else "healthy"
+            snap["system_health"] = str(obs.get("system_health") or health_state).upper()
         else:
             snap["system_health"] = "HEALTHY"
         snap["panel"] = {

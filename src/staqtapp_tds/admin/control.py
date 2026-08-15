@@ -20,7 +20,14 @@ class AdminControl:
             source = self.observation_source
             if hasattr(source, "storage_status"):
                 snap["storage_mode"] = source.storage_status()
-            if hasattr(source, "observation_snapshot"):
+            if hasattr(source, "admin_status_snapshot"):
+                # WorkspaceTelemetrySource crosses only the immutable local
+                # snapshot boundary and converts missing/invalid input into an
+                # explicit, non-throwing Browser state.
+                mounted = source.admin_status_snapshot()
+                snap["observation"] = mounted["observation"]
+                snap["workspace_mount"] = mounted["workspace_mount"]
+            elif hasattr(source, "observation_snapshot"):
                 snap["observation"] = source.observation_snapshot()
             elif hasattr(source, "snapshot"):
                 snap["observation"] = source.snapshot()

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import math
 import time
 from collections import deque
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from enum import IntEnum
 from typing import Callable, Deque, Dict, List
@@ -263,6 +265,7 @@ class TelemetryManager:
         self._last_publish_duration_ns = 0
         self._snapshot_epoch = 0
         self._last_pressure_snapshot: Dict[str, object] | None = None
+        self._snapshot_publisher_owner: object | None = None
 
     def set_level(self, level: TelemetryLevel | str | int) -> None:
         with self._lock:
@@ -275,23 +278,54 @@ class TelemetryManager:
 
         Dashboard and exporter endpoints should call this instead of directly
         walking engine internals. When a TelemetryPublisherThread is active, this
-        method is simply a cheap dictionary copy from the latest publication.
+        method returns an independent copy of the latest publication.
         """
         with self._lock:
             if self._published_snapshot is not None:
-                return dict(self._published_snapshot)
+                return deepcopy(self._published_snapshot)
         return self.snapshot(force=True)
+
+    def published_snapshot(self) -> Dict[str, object] | None:
+        """Return the published immutable snapshot without building one.
+
+        Export sinks use this non-building accessor so they never trigger TDS
+        samplers from a consumer or file-publication path.
+        """
+
+        with self._lock:
+            if self._published_snapshot is None:
+                return None
+            return deepcopy(self._published_snapshot)
+
+    def _claim_snapshot_publisher(self, owner: object) -> bool:
+        """Claim the one snapshot-assembly cadence for this manager."""
+
+        with self._lock:
+            if (
+                self._snapshot_publisher_owner is not None
+                and self._snapshot_publisher_owner is not owner
+            ):
+                return False
+            self._snapshot_publisher_owner = owner
+            return True
+
+    def _release_snapshot_publisher(self, owner: object) -> None:
+        with self._lock:
+            if self._snapshot_publisher_owner is owner:
+                self._snapshot_publisher_owner = None
 
     def publish_snapshot(self, snapshot: Dict[str, object], *, duration_ns: int = 0) -> None:
         with self._lock:
             self._publisher_updates += 1
             self._last_publish_duration_ns = max(0, int(duration_ns))
-            snap = dict(snapshot)
+            snap = deepcopy(snapshot)
             self._snapshot_epoch += 1
             snap["snapshot_epoch"] = self._snapshot_epoch
             health = self.health_state(snapshot_age_seconds=0.0)
             snap["health"] = health
             snap["system_health"] = str(health.get("state", "healthy")).upper()
+            # ``snap`` was already detached from the caller above and is not
+            # returned, so it can become the manager-owned immutable value.
             self._published_snapshot = snap
 
     def health_state(self, *, snapshot_age_seconds: float | None = None, counters: Dict[str, int] | None = None, components: Dict[str, Dict[str, object]] | None = None) -> Dict[str, object]:
@@ -566,7 +600,7 @@ class TelemetryManager:
         with self._lock:
             if (not force and self._last_snapshot is not None and
                     (now - self._last_snapshot_at) < self.snapshot_interval_seconds):
-                return dict(self._last_snapshot)
+                return deepcopy(self._last_snapshot)
             counters = dict(self._counters)
             timer_counts = dict(self._timer_counts)
             uptime = max(0.001, now - self._created_at)
@@ -725,10 +759,10 @@ class TelemetryManager:
             ).to_dict()
             snap["snapshot_epoch"] = self._snapshot_epoch
             self._last_snapshot_at = now
-            self._last_snapshot = snap
+            self._last_snapshot = deepcopy(snap)
             if self._published_snapshot is None:
-                self._published_snapshot = dict(snap)
-            return dict(snap)
+                self._published_snapshot = deepcopy(snap)
+            return deepcopy(snap)
 
 
 class TelemetryPublisherThread:
@@ -739,11 +773,30 @@ class TelemetryPublisherThread:
     never invoke storage-engine samplers directly.
     """
 
-    def __init__(self, manager: TelemetryManager, *, interval_seconds: float | None = None, name: str = "staqtapp-tds-telemetry"):
+    def __init__(
+        self,
+        manager: TelemetryManager,
+        *,
+        interval_seconds: float | None = None,
+        name: str = "staqtapp-tds-telemetry",
+        sinks: tuple[Callable[[Dict[str, object]], None], ...] = (),
+    ):
         import threading
         self.manager = manager
-        self.interval_seconds = max(0.25, float(interval_seconds if interval_seconds is not None else manager.snapshot_interval_seconds))
+        interval = float(
+            interval_seconds
+            if interval_seconds is not None
+            else manager.snapshot_interval_seconds
+        )
+        if not math.isfinite(interval):
+            raise ValueError("telemetry publish interval must be finite")
+        self.interval_seconds = max(0.25, interval)
         self.name = name
+        self._sinks = list(sinks)
+        if not all(callable(sink) for sink in self._sinks):
+            raise TypeError("telemetry publisher sinks must be callable")
+        self._lifecycle_lock = threading.Lock()
+        self._sink_lock = threading.Lock()
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, name=name, daemon=True)
 
@@ -752,22 +805,82 @@ class TelemetryPublisherThread:
         return self._thread.is_alive()
 
     def start(self) -> "TelemetryPublisherThread":
-        if not self._thread.is_alive():
-            self._thread.start()
+        with self._lifecycle_lock:
+            if self._thread.is_alive():
+                return self
+            if self._thread.ident is not None:
+                raise RuntimeError("telemetry publisher threads are one-shot; create a new publisher")
+            if not self.manager._claim_snapshot_publisher(self):
+                raise RuntimeError("a telemetry snapshot publisher is already active for this manager")
+            try:
+                self._thread.start()
+            except BaseException:
+                self.manager._release_snapshot_publisher(self)
+                raise
         return self
 
     def stop(self, timeout: float | None = 2.0) -> None:
+        if timeout is not None:
+            timeout = float(timeout)
+            if not math.isfinite(timeout) or timeout < 0:
+                raise ValueError("telemetry publisher stop timeout must be finite and non-negative")
         self._stop.set()
         if self._thread.is_alive():
             self._thread.join(timeout=timeout)
 
+    def add_sink(self, sink: Callable[[Dict[str, object]], None]) -> "TelemetryPublisherThread":
+        """Attach a loss-tolerant post-publication snapshot sink."""
+
+        if not callable(sink):
+            raise TypeError("telemetry publisher sink must be callable")
+        with self._sink_lock:
+            if not any(self._same_sink(existing, sink) for existing in self._sinks):
+                self._sinks.append(sink)
+        return self
+
+    def remove_sink(self, sink: Callable[[Dict[str, object]], None]) -> None:
+        with self._sink_lock:
+            self._sinks = [
+                existing
+                for existing in self._sinks
+                if not self._same_sink(existing, sink)
+            ]
+
+    @staticmethod
+    def _same_sink(
+        left: Callable[[Dict[str, object]], None],
+        right: Callable[[Dict[str, object]], None],
+    ) -> bool:
+        if left is right:
+            return True
+        left_function = getattr(left, "__func__", None)
+        right_function = getattr(right, "__func__", None)
+        return (
+            left_function is not None
+            and left_function is right_function
+            and getattr(left, "__self__", None) is getattr(right, "__self__", None)
+        )
+
     def _run(self) -> None:
-        while not self._stop.is_set():
-            started = time.perf_counter_ns()
-            try:
-                snap = self.manager.snapshot(force=True)
-                elapsed = time.perf_counter_ns() - started
-                self.manager.publish_snapshot(snap, duration_ns=elapsed)
-            except Exception:
-                self.manager.record_error()
-            self._stop.wait(self.interval_seconds)
+        try:
+            while not self._stop.is_set():
+                started = time.perf_counter_ns()
+                try:
+                    snap = self.manager.snapshot(force=True)
+                    elapsed = time.perf_counter_ns() - started
+                    self.manager.publish_snapshot(snap, duration_ns=elapsed)
+                    published = self.manager.published_snapshot()
+                    with self._sink_lock:
+                        sinks = tuple(self._sinks)
+                    for sink in sinks:
+                        try:
+                            sink(deepcopy(published or {}))
+                        except Exception:
+                            # Exporters are loss-tolerant observers. A failed
+                            # sink must not stop publication or the TDS engine.
+                            self.manager.record_telemetry_drop()
+                except Exception:
+                    self.manager.record_error()
+                self._stop.wait(self.interval_seconds)
+        finally:
+            self.manager._release_snapshot_publisher(self)

@@ -10,7 +10,7 @@ def test_phase5_reference_workflow_is_cross_platform_and_complete() -> None:
     source = WORKFLOW.read_text(encoding="utf-8")
 
     assert (
-        "Staqtapp-TDS v3.8.1 candidate Phase 5 fixed-point path reference oracle"
+        "Staqtapp-TDS v3.8.1 Phase 5 fixed-point path reference oracle"
         in source
     )
     assert "      - main" in source
@@ -33,7 +33,7 @@ def test_phase5_reference_workflow_is_cross_platform_and_complete() -> None:
 
     assert "src/staqtapp_tds/generation" in source
     assert "src/staqtapp_tds/trace_rank" in source
-    assert "TDS v3.8.1 candidate Phase 5 fixed-point path gates complete" in source
+    assert "TDS v3.8.1 Phase 5 fixed-point path gates complete" in source
 
 
 def test_phase5_workflow_has_read_only_evidence_authority() -> None:
@@ -56,7 +56,7 @@ def test_phase5_note_preserves_reference_only_claim_boundary() -> None:
 
     for required in (
         "off-path Python reference oracle",
-        "candidate branch evidence",
+        "included in the `v3.8.1` package identity",
         "not a native hot path or production-serving completion",
         "does not implement a legal-edge generator",
         "no fixed scratch-byte bound",

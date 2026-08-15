@@ -4,6 +4,7 @@ from staqtapp_tds import TDSFileSystem
 from staqtapp_tds.admin.control import AdminControl
 from staqtapp_tds.tds_json import dumps_pretty
 from staqtapp_tds.admin.panel import AdminPanelServer
+from staqtapp_tds.admin.workspace import WorkspaceMountError, WorkspaceTelemetrySource
 from staqtapp_tds.verify import verify
 
 
@@ -16,8 +17,19 @@ def main(argv=None):
     serve = sub.add_parser("serve-panel")
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8765)
+    serve.add_argument(
+        "--workspace-mount",
+        metavar="PATH",
+        help="read observer-only telemetry snapshots from a local workspace directory",
+    )
     args = p.parse_args(argv)
-    control = AdminControl()
+    observation_source = None
+    if args.cmd == "serve-panel" and args.workspace_mount is not None:
+        try:
+            observation_source = WorkspaceTelemetrySource(args.workspace_mount)
+        except WorkspaceMountError as exc:
+            p.error(str(exc))
+    control = AdminControl(observation_source=observation_source)
     if args.cmd == "status":
         print(dumps_pretty(control.status())[0], end="")
     elif args.cmd == "verify":

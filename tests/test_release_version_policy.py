@@ -90,8 +90,8 @@ def test_versioning_policy_requires_patch_increments_after_v353_post2() -> None:
     policy = (ROOT / "docs" / "VERSIONING.md").read_text(encoding="utf-8")
     normalized = " ".join(policy.split())
     assert "The completed Foundation source identity is **v3.6.0**" in normalized
-    assert "current published architecture line is **v3.8.0**" in normalized
-    assert "current production PyPI identity is `3.8.0`" in normalized
+    assert "current published architecture line is **v3.8.1**" in normalized
+    assert "current production PyPI identity is `3.8.1`" in normalized
     assert "publication grants no Eaglegate canary" in normalized
     assert "Staqtapp-TDS will not publish another `.postN` release" in normalized
     assert "v3.6.0 -> v3.6.1 -> v3.6.2" in normalized

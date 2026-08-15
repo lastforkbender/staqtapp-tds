@@ -55,7 +55,7 @@ EXPECTED_IMAGE_URLS = tuple(
 )
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 EXPECTED_DIMENSIONS = (1280, 800)
-USER_AGENT = "staqtapp-tds-pypi-readme-check/3.8.0"
+USER_AGENT = "staqtapp-tds-pypi-readme-check/3.8.1"
 IMAGE_PATTERN = re.compile(
     r"<img\b[^>]*?\bsrc\s*=\s*([\"'])(.*?)\1",
     flags=re.IGNORECASE | re.DOTALL,
