@@ -1,8 +1,8 @@
-# Staqtapp-TDS v3.8.0
+# Staqtapp-TDS v3.8.1
 
-> **Release status:** v3.8.0 は current production PyPI release です。Publication は complete aggregate release gate を通過した exact `v3.8.0` tag からのみ許可されます。v3.6 Foundation、v3.7 Generation Authority、v3.8 Eaglegate / packed graph transition を含みます。Manual credentialed H100 workflow は未実行であり hardware evidence に引き続き必要です。Eaglegate は shadow / target-only のままで、production activation authority を持ちません。
+> **Release status:** v3.8.1 は current production PyPI release です。Publication は complete aggregate release gate を通過した exact `v3.8.1` tag からのみ許可されます。v3.6 Foundation、v3.7 Generation Authority、v3.8 Eaglegate / packed graph、Phase 5 fixed-point reference oracle、Browser idle-performance 修正、workspace telemetry mount を含みます。Manual credentialed H100 workflow は未実行であり hardware evidence に引き続き必要です。Eaglegate は shadow / target-only のままで、production activation authority を持ちません。
 
-> **v3.8.0 Phase 1–4 convergence:** Phase 1 は v3.6 Foundation、Phase 2 は v3.7 Generation Authority と exact CSV consumer、Phase 3 は単一 authority に bind された lossless Eaglegate Core、Phase 4 は canonical packed waypoint / CSR graph と exact pin された real vLLM EAGLE shadow qualification path です。Production request、canary、promotion、activation、token acceptance、KV commit authority は含みません。
+> **v3.8.1 reference / telemetry release:** Phase 1–4 convergence を保持し、deterministic off-path Phase 5 fixed-point path reference oracle を追加します。Browser は 19 page のうち 1 page だけを active rendering し、polling は serialized / visibility-aware になりました。Detached Browser 向けに atomic workspace telemetry mount も追加します。Production request、canary、promotion、activation、execution、token acceptance、KV commit authority は含みません。
 
 > **v3.6.0 Foundation substrate:** fail-closed native ABI / lifecycle、strict checksum / UTF-8 truth、generation-bound handle、bounded C11 diagnostics、immutable packed read、x86-64 / AArch64 semantic parity を保持します。
 
@@ -102,7 +102,7 @@ TDS は storage hot path を狭く保つ設計です。Native index、lookup、p
 
 ```bash
 # Current production PyPI release（両方の UI を含む）
-python -m pip install staqtapp-tds==3.8.0
+python -m pip install staqtapp-tds==3.8.1
 
 # main TDS telemetry UI を起動
 staqtapp-tds
@@ -258,7 +258,7 @@ TDS は preparation、evidence、review、authority を明確に分離します�
 
 ## Validation status
 
-v3.8.0 release は 4 boundary を実装します。v3.7 Generation
+v3.8.1 release は Phase 1–4 の 4 boundary を保持します。v3.7 Generation
 Authority は exact CSV と composite Eaglegate generation を head-root CAS、
 cross-process pin、deterministic recovery、rollback、retirement で publish
 します。Eaglegate は target verification を固定した constitution、
@@ -277,6 +277,16 @@ cancellation は claim しません。詳細は
 `docs/126_v380_Eaglegate_Generation_Authority.md`、
 `docs/131_v380_Eaglegate_Real_vLLM_Shadow.md`、
 `docs/132_v380_Packed_Waypoint_CSR_Graph.md` を参照してください。
+
+Phase 5 は admitted packed graph 上の bounded deterministic Python Dijkstra
+reference を追加し、integer cost、hard exclusion、tie order、receipt、replay
+の truth を固定します。Legal-edge authority、learned model、native hot path、
+execution grant、ServingEpoch activation は追加しません。Browser は 19 page
+のうち 1 page のみを active にし、serialized visibility-aware polling と
+change-only rendering を行います。Workspace mount は bounded atomic snapshot
+のみを交換し、Browser process は TDS directory や storage lock を walk
+しません。詳細は `docs/133_v381_Fixed_Point_Path_Reference_Oracle.md` と
+`docs/134_v381_Browser_Performance_Workspace_Telemetry.md` を参照してください。
 
 v3.6.0 Foundation source は process-state ledger、deterministic closure
 report、x86-64 / AArch64 semantic parity、fail-closed lifecycle、sanitizer、
@@ -301,17 +311,23 @@ v3.5.3.post2 は standard installation に main telemetry Browser と PyQt5 Driv
 
 v3.8.0 は Eaglegate の production boundary を変更せずに Phase 1–4 convergence を提供します。Trusted publication 前に built wheel の PyPI long description と、不変の Browser screenshot URL 19 件すべての PNG byte を release gate で検証します。
 
+v3.8.1 は reference-only Phase 5 fixed-point path oracle と Browser / workspace
+telemetry correction を追加します。Frontier execution または Eaglegate
+activation authority は追加しません。Local qualification は 1,159 passed、
+45 skipped、HTTP workspace smoke、distribution artifact check を完了し、
+production publication は complete tag matrix によって gate されます。
+
 ## Repository map
 
 ```text
 src/staqtapp_tds/          core storage, persistence, telemetry, native management
 src/staqtapp_tds/generation/ generic immutable generations, CAS, pinning, recovery
 src/staqtapp_tds/eaglegate/ lossless core、ServingEpoch authority、real shadow adapter
-src/staqtapp_tds/trace_rank/ ABI v2 contract と packed waypoint / CSR graph
+src/staqtapp_tds/trace_rank/ ABI v2 graph と fixed-point path reference oracle
 src/staqtapp_tds/csv_layer CSV evidence, transactions, Interpole, Semantic IR
 src/staqtapp_tds/drivers/  TDDL, bytecode, VM, Foundry, review and evidence
 src/staqtapp_tds/studio_pyqt5/ Driver Studio cockpit
-src/staqtapp_tds/admin/    centralized Browser and local admin control
+src/staqtapp_tds/admin/    Browser、local admin control、workspace telemetry
 examples/                  runnable examples
 docs/                      architecture and release contract documents
 tds_api_docs/              programmer guide と historical API-surface PDF

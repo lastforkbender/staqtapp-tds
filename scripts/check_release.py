@@ -59,7 +59,7 @@ PYPI_README_REQUIRED_LINKS = (
     "https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf",
     "https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf",
 )
-CURRENT_PRODUCTION_VERSION = "3.8.0"
+CURRENT_PRODUCTION_VERSION = "3.8.1"
 SOURCE_CANDIDATE_MARKER = "source candidate under review, not a published package"
 V370_JAPANESE_CANDIDATE_MARKER = "published package ではありません"
 
@@ -122,10 +122,15 @@ def main() -> int:
         ROOT / "docs" / "126_v380_Eaglegate_Generation_Authority.md",
         ROOT / "docs" / "131_v380_Eaglegate_Real_vLLM_Shadow.md",
         ROOT / "docs" / "132_v380_Packed_Waypoint_CSR_Graph.md",
+        ROOT / "docs" / "133_v381_Fixed_Point_Path_Reference_Oracle.md",
+        ROOT / "docs" / "134_v381_Browser_Performance_Workspace_Telemetry.md",
         ROOT / "src" / "staqtapp_tds" / "eaglegate" / "vllm_shadow.py",
         ROOT / "src" / "staqtapp_tds" / "trace_rank" / "graph.py",
+        ROOT / "src" / "staqtapp_tds" / "trace_rank" / "planner.py",
+        ROOT / "src" / "staqtapp_tds" / "admin" / "workspace.py",
         ROOT / ".github" / "workflows" / "eaglegate-vllm-shadow-real.yml",
         ROOT / ".github" / "workflows" / "packed-waypoint-graph.yml",
+        ROOT / ".github" / "workflows" / "fixed-point-path-reference.yml",
     )
     missing_evidence = [str(path.relative_to(ROOT)) for path in required_evidence if not path.is_file()]
     if missing_evidence:
@@ -181,9 +186,7 @@ def main() -> int:
         f"python -m pip install staqtapp-tds=={CURRENT_PRODUCTION_VERSION}"
     )
     candidate_status = SOURCE_CANDIDATE_MARKER in readme
-    candidate_heading = (
-        f"# Staqtapp-TDS v{expected_version} Phase 1–4 convergence candidate"
-    )
+    candidate_heading = f"# Staqtapp-TDS v{expected_version} release candidate"
     if candidate_status:
         if is_tag:
             return fail("a production tag cannot publish a source-candidate README")

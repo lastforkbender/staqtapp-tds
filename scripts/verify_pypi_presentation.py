@@ -33,7 +33,7 @@ STALE_WORDING = (
     "published package ではありません",
 )
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
-USER_AGENT = "staqtapp-tds-release-verifier/3.8.0"
+USER_AGENT = "staqtapp-tds-release-verifier/3.8.1"
 
 
 def presentation_targets(description: str) -> tuple[list[str], list[str]]:

@@ -88,10 +88,10 @@ def links(text: str):
 
 def test_english_readme_reports_exact_current_release_status():
     text = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert "# Staqtapp-TDS v3.8.0" in text
-    assert "v3.8.0 is the current production PyPI release" in text
+    assert "# Staqtapp-TDS v3.8.1" in text
+    assert "v3.8.1 is the current production PyPI release" in text
     assert "python -m pip install staqtapp-tds==3.6.0" not in text
-    assert "python -m pip install staqtapp-tds==3.8.0" in text
+    assert "python -m pip install staqtapp-tds==3.8.1" in text
     assert "source candidate under review, not a published package" not in text
     assert "`docs/130_v370_Atomic_Generation_Authority.md`" in text
     assert "src/staqtapp_tds/generation/" in text
@@ -105,10 +105,10 @@ def test_english_readme_reports_exact_current_release_status():
 
 def test_japanese_readme_reports_exact_current_release_status():
     text = (ROOT / "README_ja.md").read_text(encoding="utf-8")
-    assert "# Staqtapp-TDS v3.8.0" in text
-    assert "v3.8.0 は current production PyPI release" in text
+    assert "# Staqtapp-TDS v3.8.1" in text
+    assert "v3.8.1 は current production PyPI release" in text
     assert "python -m pip install staqtapp-tds==3.6.0" not in text
-    assert "python -m pip install staqtapp-tds==3.8.0" in text
+    assert "python -m pip install staqtapp-tds==3.8.1" in text
     assert "published package ではありません" not in text
     assert "`docs/130_v370_Atomic_Generation_Authority.md`" in text
     assert "src/staqtapp_tds/generation/" in text

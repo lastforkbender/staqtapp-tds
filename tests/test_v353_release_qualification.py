@@ -16,8 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_v360_identity_preserves_v353_phase_evidence() -> None:
-    assert __version__ == "3.8.0"
-    assert VERSION_INFO == (3, 8, 0)
+    assert __version__ == "3.8.1"
+    assert VERSION_INFO == (3, 8, 1)
     assert StorageMode.LEGACY.value == "legacy"
     assert StorageMode.GUARANTEED_SEGMENTED.value == "guaranteed-segmented"
     assert ControlledStorage.ACTIVATE_ACKNOWLEDGEMENT == "activate-guaranteed-segmented"

@@ -1,4 +1,4 @@
-# v3.8.1 Candidate — Phase 5 Fixed-Point Path Reference Oracle
+# v3.8.1 — Phase 5 Fixed-Point Path Reference Oracle
 
 ## Status and claim boundary
 
@@ -12,8 +12,9 @@ execute an edge, mutate source data, publish or promote a ServingEpoch, route a
 request, activate a model, or commit output. It is a qualification and replay
 surface only.
 
-This is candidate branch evidence. It does not change the package's published
-`3.8.0` identity or authorize a `v3.8.1` tag.
+This reference-only surface is included in the `v3.8.1` package identity. Its
+release does not widen the authority boundary described above or authorize a
+native serving path, model activation, operation execution, or source mutation.
 
 ## Admitted inputs
 

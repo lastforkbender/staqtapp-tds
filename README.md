@@ -1,11 +1,12 @@
-> **v3.8.0 Phase 1–4 convergence release**
+> **v3.8.1 fixed-point reference and telemetry release**
 >
-> Phase 1 closes the v3.6 Foundation; Phase 2 adds the v3.7 Generation
-> Authority and exact CSV consumer; Phase 3 binds the lossless Eaglegate Core
-> to that sole authority; Phase 4 adds the canonical packed waypoint/CSR graph
-> and an executable, exactly pinned vLLM EAGLE shadow qualification path.
-> Eaglegate remains off the production request path with no canary, promotion,
-> activation, token-acceptance, or KV-commit authority.
+> This patch retains the Phase 1–4 convergence and adds the deterministic,
+> off-path Phase 5 fixed-point path reference oracle. It also makes the Browser
+> render one active page at a time, removes overlapping idle polling and costly
+> compositing, and adds an atomic workspace telemetry mount for a detached
+> Browser process. Eaglegate and Trace Rank remain off the production request
+> path with no canary, promotion, activation, execution, token-acceptance, or
+> KV-commit authority.
 
 > **v3.6.0 Foundation substrate**
 >
@@ -17,9 +18,9 @@
 >
 > At-rest encryption is not implemented. Requests using `DirFlags.ENCRYPTED` fail closed instead of storing plaintext. New v2 persistence files require their integrity sidecar. `.tds` input should be treated as trusted until explicit resource-budget hardening is complete. Native extensions are optional and are built only when `STAQTAPP_TDS_BUILD_NATIVE=1` is set.
 
-# Staqtapp-TDS v3.8.0
+# Staqtapp-TDS v3.8.1
 
-> **Release status:** v3.8.0 is the current production PyPI release. Publication is permitted only from the exact `v3.8.0` tag after the complete aggregate release gate succeeds. The v3.6 Foundation, v3.7 Generation Authority, and v3.8 Eaglegate/packed-graph transitions are included. The manual credentialed H100 workflow has not been executed and remains required for hardware evidence; Eaglegate remains shadow/target-only and has no production activation authority.
+> **Release status:** v3.8.1 is the current production PyPI release. Publication is permitted only from the exact `v3.8.1` tag after the complete aggregate release gate succeeds. The v3.6 Foundation, v3.7 Generation Authority, v3.8 Eaglegate/packed graph, Phase 5 fixed-point reference oracle, Browser idle-performance repair, and workspace telemetry mount are included. The manual credentialed H100 workflow has not been executed and remains required for hardware evidence; Eaglegate remains shadow/target-only and has no production activation authority.
 
 **Temporal Directory System - native-indexed `.tds` storage, controlled variables, trace ranking, CSV evidence operations, semantic review, and centralized observability for AI systems.**
 
@@ -117,7 +118,7 @@ TDS is designed around a narrow storage hot path. Native indexing, lookup, persi
 
 ```bash
 # Current production PyPI release; includes both UIs
-python -m pip install staqtapp-tds==3.8.0
+python -m pip install staqtapp-tds==3.8.1
 
 # Launch the main TDS telemetry UI
 staqtapp-tds
@@ -275,7 +276,7 @@ TDS intentionally distinguishes preparation, evidence, review, and authority:
 
 ## Validation status
 
-The v3.8.0 release completes four explicit boundaries. The v3.7
+The v3.8.1 release retains four explicit convergence boundaries. The v3.7
 Generation Authority publishes exact CSV and composite Eaglegate generations
 with head-root CAS, cross-process pins, deterministic recovery, rollback, and
 retirement. Eaglegate adds a non-widenable target-verification constitution,
@@ -294,6 +295,17 @@ made. See `docs/130_v370_Atomic_Generation_Authority.md`,
 `docs/126_v380_Eaglegate_Generation_Authority.md`,
 `docs/131_v380_Eaglegate_Real_vLLM_Shadow.md`, and
 `docs/132_v380_Packed_Waypoint_CSR_Graph.md`.
+
+Phase 5 adds a bounded, deterministic Python Dijkstra reference over admitted
+packed graphs. It fixes integer cost, exclusion, tie, receipt, and replay truth
+without supplying a legal-edge authority, learned model, native hot path,
+execution grant, or ServingEpoch activation. The Browser now keeps exactly one
+of its 19 pages active, performs serialized visibility-aware polling, and
+avoids continuous blur and motion compositing. A separate Browser can consume
+bounded atomic snapshots from the explicit workspace mount without walking TDS
+directories or taking storage locks. See
+`docs/133_v381_Fixed_Point_Path_Reference_Oracle.md` and
+`docs/134_v381_Browser_Performance_Workspace_Telemetry.md`.
 
 The v3.6.0 Foundation source closes the native and authority repair train with
 a machine-checkable process-state ledger, a deterministic closure report, exact
@@ -333,17 +345,23 @@ production boundary unchanged. Its release path additionally validates the
 PyPI long description from the built wheel and fetches every immutable Browser
 screenshot URL to require the expected PNG bytes before trusted publication.
 
+Version `3.8.1` adds the reference-only Phase 5 fixed-point path oracle and the
+Browser/workspace telemetry correction. It does not add Frontier execution or
+Eaglegate activation authority. Local qualification completed with 1,159 tests
+passed and 45 skipped, plus HTTP workspace and distribution-artifact smoke
+checks; production publication remains gated by the complete tag matrix.
+
 ## Repository map
 
 ```text
 src/staqtapp_tds/          core storage, persistence, telemetry, native management
 src/staqtapp_tds/generation/ generic immutable generations, CAS, pinning, recovery
 src/staqtapp_tds/eaglegate/ lossless core, ServingEpoch authority, real shadow adapter
-src/staqtapp_tds/trace_rank/ ABI v2 contracts and packed waypoint/CSR graph
+src/staqtapp_tds/trace_rank/ ABI v2 graph and fixed-point path reference oracle
 src/staqtapp_tds/csv_layer CSV evidence, transactions, Interpole, Semantic IR
 src/staqtapp_tds/drivers/  TDDL, bytecode, VM, Foundry, review and evidence
 src/staqtapp_tds/studio_pyqt5/ Driver Studio cockpit
-src/staqtapp_tds/admin/    centralized Browser and local admin control
+src/staqtapp_tds/admin/    Browser, local admin control, workspace telemetry
 examples/                  runnable examples
 docs/                      architecture and release contract documents
 tds_api_docs/              programmer guide and historical API-surface PDF

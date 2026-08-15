@@ -8,6 +8,7 @@ from typing import Sequence
 
 from staqtapp_tds.admin.control import AdminControl
 from staqtapp_tds.admin.panel import AdminPanelServer
+from staqtapp_tds.admin.workspace import WorkspaceMountError, WorkspaceTelemetrySource
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -21,9 +22,28 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="serve the telemetry UI without opening a browser window",
     )
+    parser.add_argument(
+        "--workspace-mount",
+        metavar="PATH",
+        help=(
+            "read observer-only telemetry snapshots from a local workspace "
+            "directory produced by WorkspaceTelemetryPublisher"
+        ),
+    )
     args = parser.parse_args(argv)
 
-    panel = AdminPanelServer(AdminControl(), args.host, args.port)
+    observation_source = None
+    if args.workspace_mount is not None:
+        try:
+            observation_source = WorkspaceTelemetrySource(args.workspace_mount)
+        except WorkspaceMountError as exc:
+            parser.error(str(exc))
+
+    panel = AdminPanelServer(
+        AdminControl(observation_source=observation_source),
+        args.host,
+        args.port,
+    )
     server = ThreadingHTTPServer((panel.host, panel.port), panel.make_handler())
     url = f"http://{panel.host}:{server.server_port}/dashboard"
     print(f"Staqtapp-TDS telemetry UI: {url}")

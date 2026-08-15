@@ -30,7 +30,7 @@
   }
   function sanitizeSettings(settings){
     const clean = Object.assign({}, DEFAULTS, settings || {});
-    const allowedRefresh = new Set([0,250,500,1000,2000,5000]);
+    const allowedRefresh = new Set([0,250,500,1000,2000,5000,10000]);
     clean.refreshMs = Number(clean.refreshMs);
     if (!allowedRefresh.has(clean.refreshMs)) clean.refreshMs = DEFAULTS.refreshMs;
     const codes = new Set(languageChoices().map((lang) => lang.code));
@@ -170,9 +170,14 @@
   function getRefreshMS(){ const ms = Number(loadSettings().refreshMs); return ms > 0 ? ms : 0; }
   function goToStartupPage(){
     const startup = loadSettings().startupPage;
-    if (startup && startup !== 'overview') {
-      setTimeout(() => { const el = document.getElementById(startup); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 120);
+    if (!startup) return;
+    if (window.TDSDashboardNavigation) {
+      const direct = window.TDSDashboardNavigation.current();
+      window.TDSDashboardNavigation.activate(direct || startup, { history: direct ? 'none' : 'replace', resetScroll: false });
+      return;
     }
+    const el = document.getElementById(startup);
+    if (el) el.scrollIntoView({ behavior: 'auto', block: 'start' });
   }
 
   window.TDSI18N = { t: translatePattern, applyTranslations, loadPacks, packLoadErrors: () => packLoadErrors.slice() };

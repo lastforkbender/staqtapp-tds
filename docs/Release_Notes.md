@@ -1,5 +1,25 @@
 # TDS Release Notes
 
+## v3.8.1 — Fixed-Point Reference and Live Workspace Telemetry
+
+This patch releases the off-path Phase 5 fixed-point path reference oracle and
+repairs the installed Browser's idle and page-navigation performance. Exactly
+one of the existing 19 telemetry pages is active at a time; polling is
+serialized, visibility-aware, and change-only, and expensive continuous visual
+effects have been removed without changing the screenshot or link contract.
+
+Applications can now publish their already-assembled telemetry through a
+bounded atomic workspace snapshot. A separately launched Browser reads only
+that file and reports ready, stale, unavailable, or invalid state; it never
+walks TDS storage objects. Single-publisher ownership prevents the mount from
+silently adding a second telemetry sampler.
+
+The fixed-point oracle remains a qualification and replay surface. This release
+does not supply a legal-edge authority, learned ranker, native serving path,
+operation executor, canary, promotion, activation, token acceptance, or KV
+commit authority. The manual credentialed H100 workflow remains unexecuted and
+required for any hardware-evidence claim.
+
 ## v3.8.0 — Phase 1–4 Convergence
 
 This release combines the v3.6 Foundation, v3.7 Generation Authority, and

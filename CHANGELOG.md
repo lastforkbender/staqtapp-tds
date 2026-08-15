@@ -1,3 +1,31 @@
+# v3.8.1 — Fixed-point path reference, Browser performance, and workspace telemetry
+
+Released the Phase 5 reference objective and repaired the packaged Browser's
+idle/navigation behavior without widening storage, Eaglegate, or Frontier
+execution authority.
+
+- Added the deterministic bounded Python fixed-point shortest-path oracle over
+  admitted packed waypoint graphs, including hard exclusions, total tie order,
+  content-free receipts, and byte-exact replay.
+- Kept learned delta disabled and retained the absence of legal-edge authority,
+  native serving, execution, canary, promotion, activation, and source mutation.
+- Changed the 19-page Browser to keep one page active at a time while preserving
+  all page IDs, hashes, history, accessibility state, screenshots, and links.
+- Serialized refreshes, aborted and paused polling while hidden, rendered costly
+  dynamic views only for the active page, and eliminated continuous blur/spin/
+  pulse compositing. The 10-second refresh selection now persists correctly.
+- Added an explicit cross-process workspace telemetry mount using one bounded,
+  canonical, atomically replaced JSON snapshot and visible ready/stale/
+  unavailable/invalid Browser states.
+- Integrated the workspace writer as a loss-tolerant post-publication sink on a
+  single TelemetryPublisherThread so a detached Browser never causes a second
+  directory/lock sampler pass.
+- Hardened snapshot reads against normal atomic-replacement races, non-finite
+  cadence values, nested sink mutation, inherited wrapper locks after fork,
+  malformed/noncanonical input, symlinks/reparse points, and oversized data.
+- Added `--workspace-mount` to both Browser launch paths and documented producer,
+  consumer, trust-boundary, and existing-publisher integration.
+
 # v3.8.0 — Eaglegate Core, real vLLM shadow, and packed waypoint graph
 
 Released the Phase 1–4 convergence line while keeping Eaglegate production
