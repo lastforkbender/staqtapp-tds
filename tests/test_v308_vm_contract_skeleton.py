@@ -1,8 +1,5 @@
-import json
-
 import pytest
 
-from staqtapp_tds import __version__
 from staqtapp_tds.drivers import (
     BytecodeInstruction,
     BytecodePackage,
@@ -82,10 +79,6 @@ evolution:
   deny external_io
   max_delta = 1
 '''
-
-
-def test_v308_version():
-    assert __version__ == "3.8.2"
 
 
 def test_vm_contract_table_has_complete_metadata_for_each_opcode():

@@ -1,10 +1,5 @@
-from staqtapp_tds import __version__
 from staqtapp_tds.pressure import calculate_pressure_snapshot
 from staqtapp_tds.telemetry import TelemetryManager
-
-
-def test_v272_version():
-    assert __version__ == "3.8.2"
 
 
 def test_pressure_engine_exposes_component_scores_without_hot_path_state():

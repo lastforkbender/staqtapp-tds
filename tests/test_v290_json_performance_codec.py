@@ -1,4 +1,3 @@
-from staqtapp_tds import __version__
 from staqtapp_tds.tds_json import (
     backend_probe,
     codec_stats,
@@ -9,10 +8,6 @@ from staqtapp_tds.tds_json import (
     preferred_loads_backend,
     reset_codec_stats,
 )
-
-
-def test_v290_version():
-    assert __version__ == "3.8.2"
 
 
 def test_v290_json_backends_are_selected_without_hot_path_import_probe():

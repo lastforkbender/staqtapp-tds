@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from staqtapp_tds import TDSFileSystem, __version__
+from staqtapp_tds import TDSFileSystem
 from staqtapp_tds.csv_layer import (
     artifact_keys,
     csv_storage_bridge_plan,
@@ -9,10 +9,6 @@ from staqtapp_tds.csv_layer import (
     materialize_csv_scan_artifacts,
     validate_csv_storage_bridge_preflight,
 )
-
-
-def test_version_336_csv_storage_bridge_preflight():
-    assert __version__ == "3.8.2"
 
 
 def test_csv_storage_bridge_plan_is_six_core_artifacts_by_default():

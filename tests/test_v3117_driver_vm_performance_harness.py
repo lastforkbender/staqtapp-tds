@@ -1,6 +1,5 @@
 import copy
 
-from staqtapp_tds import __version__
 from staqtapp_tds.drivers import (
     DriverVMPerformanceBackend,
     DriverVMPerformanceHarness,
@@ -80,10 +79,6 @@ def _native_runner_alias(package, snapshot, policy):
     vm = DriverVMRuntime(max_instructions=policy.max_instructions, max_cost=policy.max_cost)
     vm.load(package)
     return vm.execute(copy.deepcopy(snapshot))
-
-
-def test_v3117_version():
-    assert __version__ == "3.8.2"
 
 
 def test_performance_harness_is_opt_in_and_not_a_hot_path_hook():

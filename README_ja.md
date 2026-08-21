@@ -1,36 +1,20 @@
-# Staqtapp-TDS v3.8.2
+# Staqtapp-TDS v3.8.3
 
-## v3.8.2 の測定済み performance correction
+## v3.8.3 PCSDQR — Paper Ceiling Software Development Quagmire Removal
 
-以下の representative paired measurement は v3.8.1 と v3.8.2 を比較し、
-semantic result の完全一致を必須としています。
+v3.8.3 は TDS の behavior を保護しない process / repository の負荷を
+除去します。Runtime behavior、declared dependency、supported platform、
+package build、installed artifact の direct check は維持します。Repeated
+validation chain、historical status ledger / implementation journal、
+meta / prose test、不要な source-archive bulk は維持しません。
 
-| 対象 | 測定結果 |
-|---|---|
-| Core / observation | 200,000 telemetry call は 4.38 倍高速化し、JSON canonical dump / fast load はそれぞれ 4.12 倍 / 4.90 倍高速化しました。 |
-| Persistence | 64 MiB raw payload で elapsed time は 8.98% 短縮し、traced Python peak allocation は 67,129,697 B から 1,064,702 B に低減しました。 |
-| CSV / Generation | CSV scan + row anchor は 3.15 倍高速化し、row-offset packing の traced Python peak allocation は 88.36% 低減しました。4,096-payload manifest の cached root 8 回 read は 310.724119 ms から 0.006660 ms に短縮しました。 |
-| Driver platform | Direct VM、managed VM、Studio review workload はそれぞれ 33.72%、28.02%、73.41% 高速化しました。 |
-| Trace Rank | Graph admission、byte admission、public fail-closed materialization はそれぞれ 3.57 倍、2.05 倍、1.63 倍高速化しました。 |
-| Eaglegate | 測定した 1 / 3 / 128 plan fixture の warmed public admission は 13.79 倍～14.45 倍高速化しました。 |
+PCSDQR は stored format と public API を変更せず、authority boundary を拡大しません。
+v3.8.2 の performance record はここで繰り返さず、`benchmarks/README.md` と
+`CHANGELOG.md` に保持します。
 
-これらは Linux x86-64、CPython 3.12.13、GCC `-O3` における
-workload-specific measurement です。Exact root、hash、byte、counter の一致を
-必須としています。`tracemalloc` は process RSS ではなく traced Python
-allocation を示します。Retained allocator speedup は claim しません。
-306-process research qualifier は operationally infeasible であることが判明した
-ため廃止され、performance decision は生成されませんでした。Allocator の
-correctness、ABI、lifecycle は normal test、sanitizer、compatibility matrix、
-distribution build、installed-package smoke test で検証します。完全な method と result は
-`docs/135_v382_System_Performance_Corrections.md` に記録しています。
-
-> **Release status:** v3.8.2 は production release です。Stored format、
-> canonical CSV byte、public authority boundary、Browser capture、important
-> link は変更しません。この correction は新しい Driver、Eaglegate、
-> execution、canary、promotion、activation、token acceptance、KV commit
-> authority を付与しません。Manual credentialed H100 workflow は未実行で、
-> hardware evidence には引き続き必要です。Eaglegate は shadow / target-only
-> のままです。
+> **Release status:** v3.8.3 は production release です。Eaglegate は
+> shadow / target-only のままです。PCSDQR は execution、canary、
+> promotion、activation、token acceptance、KV commit authority を付与しません。
 
 > **v3.6.0 Foundation substrate:** fail-closed native ABI / lifecycle、strict checksum / UTF-8 truth、generation-bound handle、bounded C11 diagnostics、immutable packed read、x86-64 / AArch64 semantic parity を保持します。
 
@@ -40,7 +24,7 @@ distribution build、installed-package smoke test で検証します。完全な
 
 ## Browser Operations Console — 全 19 ページ
 
-以下は packaged local-only TDS Browser から取得した、個別の 1280×800 viewport capture 19 枚です。Release qualification 用の実データ observer snapshot に対して、各 navigation control を選択してから capture しました。07 は `Monitor Ready` 状態の実際の CSV Interpole Monitor です。Dashboard の結合画像や UI mock ではなく、Browser の navigation 順に縦並びで表示しています。PyPI で確実に表示するため capture は不変の image target を維持し、release CI は publication 前に 19 枚すべての remote PNG byte と built wheel metadata 内の URL を検証します。
+以下は packaged local-only TDS Browser から取得した、個別の 1280×800 viewport capture 19 枚です。実データ observer snapshot に対して各 navigation control を選択してから capture しました。07 は `Monitor Ready` 状態の実際の CSV Interpole Monitor です。Dashboard の結合画像や UI mock ではなく、Browser の navigation 順に縦並びで表示しています。19 枚の local capture と path は `docs/screenshots/browser_pages/` にそのまま保持しています。
 
 <p align="center"><strong>01 — Dashboard</strong><br>
   <img src="docs/screenshots/browser_pages/01-dashboard-1280x800.png" alt="Staqtapp-TDS Browser 01、navigation で選択された Dashboard" width="100%">
@@ -130,7 +114,7 @@ TDS は storage hot path を狭く保つ設計です。Native index、lookup、p
 
 ```bash
 # Current production PyPI release（両方の UI を含む）
-python -m pip install staqtapp-tds==3.8.2
+python -m pip install staqtapp-tds==3.8.3
 
 # main TDS telemetry UI を起動
 staqtapp-tds
@@ -284,87 +268,29 @@ TDS は preparation、evidence、review、authority を明確に分離します�
 - Driver Studio は observe、explain、proposal preparation、review request routing を行いますが、Registry、Review Board、Runtime Manager、signature policy を bypass しません。
 - Browser telemetry は snapshot-based であり storage control loop ではありません。
 
-## Validation status
+## Engineering validation
 
-v3.8.2 production release は Core、observation、CSV / Generation、Driver、Trace
-Rank、Eaglegate における whole-structure work の重複を修正します。Native
-automatic handle allocation、sidecar lookup、decompression、bounded persistence
-write と atomic reload index publication、exact JSON / telemetry counter と
-sampler compatibility、CSV hash / scan / verified chunk reuse と canonical
-artifact routing、exact immutable Generation manifest identity / logarithmic
-payload lookup、Driver validation / contract table / deep copy、exact-record
-Trace admission と non-exact subclass の canonical normalization、immutable
-Eaglegate admission identity を対象にしています。測定 evidence、変更しない
-contract、deferred high-risk work は
-`docs/135_v382_System_Performance_Corrections.md` を参照してください。
+Production contract は executable code と focused behavioral test によって
+維持します。Storage / generation は integrity、recovery、explicit activation、
+rollback、destructive-operation boundary を検証します。Native contract は ABI
+admission、handle identity、input ownership、bounded diagnostics、exact fallback
+semantics を対象とします。Browser、telemetry、Studio は copied state の observer
+であり、storage または release authority ではありません。
 
-v3.8.1 release は Phase 1–4 の 4 boundary を保持します。v3.7 Generation
-Authority は exact CSV と composite Eaglegate generation を head-root CAS、
-cross-process pin、deterministic recovery、rollback、retirement で publish
-します。Eaglegate は target verification を固定した constitution、
-candidate-bound exactness / adapter evidence、単一の Generation-backed
-ServingEpoch lineage を追加し、CANARY / ACTIVE publication を拒否します。
+v3.8.3 PCSDQR release は behavior、dependency、platform、build、
+installed-package の direct check を維持し、status ledger や prose gate で
+連結しません。Stored format、public API、canonical identity、result
+code、authority boundary は変更しません。Performance history と再現可能な
+command は `benchmarks/README.md`、current architecture と observer boundary は
+`docs/architecture/Architecture_Reference.md` および
+`docs/NATIVE_DIAGNOSTICS_ENGINE.md` に集約しています。
 
-Phase 4 は exact immutable source / row binding と byte-identical rebuild を
-持つ bounded Trace Rank ABI v2 graph を追加します。Named-runtime adapter は
-real vLLM `0.26.0` target-only / EAGLE engine、exact target / draft revision、
-H100 SM90 BF16、standard rejection sampling、batch size 1、fixed seed、1/2/3
-token plan を dynamic に構築します。Injected-runtime local gate は pass
-していますが、hardware evidence には manual credentialed H100 run が必要
-です。Production traffic、activation、direct KV-tensor equivalence、in-flight
-cancellation は claim しません。詳細は
-`docs/130_v370_Atomic_Generation_Authority.md`、
-`docs/126_v380_Eaglegate_Generation_Authority.md`、
-`docs/131_v380_Eaglegate_Real_vLLM_Shadow.md`、
-`docs/132_v380_Packed_Waypoint_CSR_Graph.md` を参照してください。
-
-Phase 5 は admitted packed graph 上の bounded deterministic Python Dijkstra
-reference を追加し、integer cost、hard exclusion、tie order、receipt、replay
-の truth を固定します。Legal-edge authority、learned model、native hot path、
-execution grant、ServingEpoch activation は追加しません。Browser は 19 page
-のうち 1 page のみを active にし、serialized visibility-aware polling と
-change-only rendering を行います。Workspace mount は bounded atomic snapshot
-のみを交換し、Browser process は TDS directory や storage lock を walk
-しません。詳細は `docs/133_v381_Fixed_Point_Path_Reference_Oracle.md` と
-`docs/134_v381_Browser_Performance_Workspace_Telemetry.md` を参照してください。
-
-v3.6.0 Foundation source は process-state ledger、deterministic closure
-report、x86-64 / AArch64 semantic parity、fail-closed lifecycle、sanitizer、
-fuzz、shared-runner no-regression evidence を閉じます。Named-reference-CPU
-claim と universal scaling claim は false のままです。詳細は
-`DEV19_V360_FOUNDATION_CLOSURE_STATUS.txt` と
-`docs/129_v360_Foundation_Closure.md` を参照してください。
-
-Historical v3.5.3 runtime release qualification は完了しています。
-
-- Phase 10 controlled activation、exact migration proof、lossless rollback test;
-- Phase 11 GC corruption、publication-window、replacement、interruption、concurrency、accounting test;
-- 129-generation incremental/recovery/GC soak;
-- Python 3.10–3.14、Windows、macOS、Linux、native-extension CI gate;
-- PEP 517 wheel/sdist、metadata、isolated install、source-hygiene gate。
-
-Evidence: pure monolithic suite は 832 passed / 11 skipped、native-active monolithic suite は 843 passed、重複する v3.5.3/workflow/Browser/CSV qualification group は 157 passed です。両 distribution artifact は `twine check`、archive content inspection、isolated wheel activation/rollback/GC smoke test に合格しました。Pull request、merged `main`、annotated `v3.5.3` tag の matrix はすべて green となり、v3.5.3 は 2026-07-16 に PyPI trusted publishing で公開されました。正確な run、artifact hash、publication response は `DEV11_RELEASE_QUALIFICATION_STATUS.txt` に記録しています。
-
-v3.5.3.post1 は PyPI long description と source archive の presentation を修正しました。すべての PyPI-facing target は absolute HTTPS URL であり、release hygiene は relative image/document target を distribution build 前に拒否します。
-
-v3.5.3.post2 は standard installation に main telemetry Browser と PyQt5 Driver Studio を含めます。`staqtapp-tds` は telemetry Browser を起動し、native C extension は opt-in のままです。Publication は complete aggregate release gate 通過後の exact annotated `v3.5.3.post2` tag に限定されました。
-
-v3.8.0 は Eaglegate の production boundary を変更せずに Phase 1–4 convergence を提供します。Trusted publication 前に built wheel の PyPI long description と、不変の Browser screenshot URL 19 件すべての PNG byte を release gate で検証します。
-
-v3.8.1 は reference-only Phase 5 fixed-point path oracle と Browser / workspace
-telemetry correction を追加します。Frontier execution または Eaglegate
-activation authority は追加しません。Local qualification は 1,159 passed、
-45 skipped、HTTP workspace smoke、distribution artifact check を完了し、
-production publication は complete tag matrix を通じて完了しました。
-
-v3.8.2 は production system-performance correction です。v3.8.1 の stored
-format、canonical CSV-byte identity、evidence identity、authority boundary を
-保持し、変更 path には regression sentinel があります。報告する measurement
-は workload-specific であり universal hardware claim ではありません。廃止した
-306-process allocator research qualifier は performance decision を生成して
-いないため、v3.8.2 は retained allocator-speedup を claim しません。Allocator
-の correctness、ABI、lifecycle は normal test、sanitizer、compatibility、build、
-installed-smoke gate で検証します。
+Generation Authority は explicit publication CAS、pin、recovery、rollback、
+retirement を保持します。Trace Rank は bounded reference processing のままです。
+Eaglegate は target-only であり、CANARY / ACTIVE publication を拒否します。
+Hardware evidence には manual credentialed H100 run が引き続き必要です。これら
+の surface は production traffic、token acceptance、KV commit authority を
+付与しません。
 
 ## Repository map
 

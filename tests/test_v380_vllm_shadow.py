@@ -32,8 +32,6 @@ from staqtapp_tds.eaglegate.vllm_shadow import (
 )
 from staqtapp_tds.generation.generation_store import AtomicGenerationStore, bytes_root
 
-ROOT = Path(__file__).resolve().parents[1]
-
 
 class _FakeSamplingParams:
     created: ClassVar[list[dict[str, object]]] = []
@@ -301,15 +299,6 @@ def test_matrix_rejects_eagle3_or_any_widened_plan() -> None:
     assert PINNED_VLLM_SHADOW_MATRIX.vllm_build_commit == VLLM_BUILD_COMMIT
 
 
-def test_real_shadow_documentation_pins_explicit_bfloat16_kv_cache() -> None:
-    documentation = (
-        ROOT / "docs" / "131_v380_Eaglegate_Real_vLLM_Shadow.md"
-    ).read_text(encoding="utf-8")
-    assert "KV-cache dtype `auto`" not in documentation
-    assert "explicit KV-cache dtype `bfloat16`" in documentation
-    assert 'kv_cache_dtype="bfloat16"' in documentation
-
-
 def test_content_free_report_uses_only_atomic_generation_authority(
     monkeypatch: pytest.MonkeyPatch,
     serving: tuple[AtomicGenerationStore, str, str],
@@ -470,42 +459,3 @@ def test_persistence_reopens_pins_and_compares_the_exact_serving_generation(
 
     monkeypatch.setattr(store, "publish", checked_publish)
     persist_vllm_shadow_report(store, report)
-
-
-def test_real_workflow_and_claim_document_are_manual_and_exact() -> None:
-    workflow = (
-        ROOT / ".github" / "workflows" / "eaglegate-vllm-shadow-real.yml"
-    ).read_text(encoding="utf-8")
-    document = (
-        ROOT / "docs" / "131_v380_Eaglegate_Real_vLLM_Shadow.md"
-    ).read_text(encoding="utf-8")
-    for value in (
-        VLLM_VERSION,
-        VLLM_BUILD_COMMIT,
-        TARGET_MODEL,
-        TARGET_REVISION,
-        DRAFT_MODEL,
-        DRAFT_REVISION,
-        '"method": "eagle"',
-        '"rejection_sample_method": "standard"',
-        '"draft_tensor_parallel_size": 1',
-    ):
-        assert value in document
-    assert "workflow_dispatch:" in workflow
-    assert "pull_request:" not in workflow
-    assert "push:" not in workflow
-    assert "self-hosted" in workflow
-    assert "h100" in workflow
-    assert "sm90" in workflow
-    assert "HF_TOKEN" in workflow
-    assert VLLM_BUILD_COMMIT in workflow
-    assert "fetch-depth: 0" in workflow
-    assert "--provision-serving-epoch" in workflow
-    assert 'matrix.get("kv_block_size") != 16' in workflow
-    assert '"gpu_name" in report.get("attestation", {})' in workflow
-    assert "confirm_meta_llama_license" in workflow
-    assert "activation" not in workflow.lower()
-    assert "No direct KV tensor equivalence" in document
-    assert "qualification-only" in document
-    assert "complete Phase-3 binding" in document
-    assert "never the raw device name" in document

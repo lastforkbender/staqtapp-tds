@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import replace
-
-from staqtapp_tds import TDSFileSystem, __version__
+from staqtapp_tds import TDSFileSystem
 from staqtapp_tds.csv_layer import (
     CSV_KERNEL_PERFORMANCE_GATE_VERSION,
     artifact_keys,
@@ -60,7 +58,6 @@ def _performance_ready_csv(
 
 
 def test_version_348_csv_kernel_performance_gates():
-    assert __version__ == "3.8.2"
     assert CSV_KERNEL_PERFORMANCE_GATE_VERSION == "1.0"
 
 

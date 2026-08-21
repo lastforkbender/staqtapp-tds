@@ -192,25 +192,3 @@ def test_closure_report_and_cli_are_deterministic_and_content_free() -> None:
                 yield from keys(item)
 
     assert forbidden.isdisjoint(keys(payload))
-
-
-def test_foundation_closure_documents_and_workflow_are_present() -> None:
-    documentation = (ROOT / "docs" / "129_v360_Foundation_Closure.md").read_text(
-        encoding="utf-8"
-    )
-    status = (ROOT / "DEV19_V360_FOUNDATION_CLOSURE_STATUS.txt").read_text(
-        encoding="utf-8"
-    )
-    workflow = (
-        ROOT / ".github" / "workflows" / "foundation-closure.yml"
-    ).read_text(encoding="utf-8")
-    assert "v3.6.0 Foundation Closure" in documentation
-    assert "named-reference-CPU scaling claim:           false" in documentation
-    assert "STATUS: SOURCE CANDIDATE IMPLEMENTED; REMOTE RELEASE GATES REQUIRED" in status
-    assert "name: Staqtapp-TDS v3.6 Foundation Closure" in workflow
-    assert "ubuntu-24.04-arm" in workflow
-    assert "windows-2022" in workflow
-    assert "macos-14" in workflow
-    assert "cmp foundation-a.json foundation-b.json" in workflow
-    assert "Eaglegate inclusion" in status
-    assert "learned serving" in status

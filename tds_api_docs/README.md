@@ -1,36 +1,17 @@
 # TDS API Documentation
 
-Start with the programmer-oriented guide:
+Start with `Staqtapp_TDS_Programmer_Core_API_Guide.pdf`. It provides the broad
+task-oriented API guide and begins with the v3.5.3 Guaranteed Storage
+supplement.
 
-```text
-Staqtapp_TDS_Programmer_Core_API_Guide.pdf
-```
+Use `../docs/reference/Programmers_API_Reference.md` for the Guaranteed Storage
+lookup reference and `../docs/TDS_RESULT_CODES.md` for the current non-halting
+result-code catalog.
 
-Its first three pages are the authoritative v3.5.3 release supplement covering
-Phase 10 controlled activation, Phase 11 GC hardening, the new public storage
-types, and exact local qualification evidence. The broad guide that follows
-organizes the earlier direct operational calls for `.tds` storage, directories,
-entries, variables, serialization, telemetry, trace ranking, CSV operations,
-Semantic IR review, Driver Foundry/VM/Runtime Manager, the centralized Browser,
-and Driver Studio.
+`Staqtapp_TDS_API_Surface_Reference.pdf` is the preserved historical v3.1.23
+Driver/Studio API surface. It is useful for the interfaces it records, but it is
+not an exhaustive inventory of the current package.
 
-The historical guide pages were also layout-corrected: all 634 light-blue API
-signature strips now have clear separation from the method or class heading
-above while retaining the signature text.
-
-The current v3.5.3 Guaranteed Storage lookup is:
-
-```text
-../docs/reference/Programmers_API_Reference.md
-```
-
-The older class-and-function PDF remains available as:
-
-```text
-Staqtapp_TDS_API_Surface_Reference.pdf
-```
-
-`Staqtapp_TDS_API_Surface_Reference.pdf` is a historical v3.1.23
-Driver/Studio reference. It is not an exhaustive v3.5.3 inventory and does not
-contain the new Guaranteed Storage APIs. The Programmer Core API Guide plus the
-current Markdown reference above are the supported v3.5.3 entry points.
+For current behavior outside those preserved references, use the package
+README, public source docstrings, and the task-oriented developer guide at
+`../docs/guides/Developer_Guide.md`.

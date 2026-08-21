@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from staqtapp_tds import TDSFileSystem, __version__
+from staqtapp_tds import TDSFileSystem
 from staqtapp_tds.csv_layer import (
     artifact_keys,
     commit_csv_interpole_determinant_vector_report,
@@ -40,10 +40,6 @@ def _kernel_ready_csv(
     assert determinants.ok is True
     assert ring.ok is True
     return manifest, ring
-
-
-def test_version_345_csv_kernel_readiness_contract():
-    assert __version__ == "3.8.2"
 
 
 def test_csv_kernel_readiness_prepare_builds_contract_without_native_kernel():

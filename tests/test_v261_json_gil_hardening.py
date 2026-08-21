@@ -1,13 +1,7 @@
-from pathlib import Path
-
 import pytest
 
-from staqtapp_tds import TDSFileSystem, __version__
+from staqtapp_tds import TDSFileSystem
 from staqtapp_tds.tds_json import dumps_canonical, dumps_pretty, loads_fast, loads_manifest, loads_snapshot
-
-
-def test_v261_version():
-    assert __version__ == "3.8.2"
 
 
 def test_central_json_round_trip_and_strict_loaders():

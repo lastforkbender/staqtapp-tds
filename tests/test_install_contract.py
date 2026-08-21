@@ -51,6 +51,14 @@ def test_native_extensions_remain_explicitly_opt_in():
     assert "setup(ext_modules=ext_modules if native_enabled else [])" in setup_source
 
 
+def test_python_310_toml_reader_is_a_runtime_dependency():
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    dependency = "tomli>=2; python_version < '3.11'"
+
+    assert dependency in project["dependencies"]
+    assert dependency not in project["optional-dependencies"]["test"]
+
+
 def test_main_launcher_opens_the_telemetry_browser(monkeypatch):
     from staqtapp_tds.admin import app
 

@@ -1,6 +1,5 @@
 import pytest
 
-from staqtapp_tds import __version__
 from staqtapp_tds.drivers import (
     DriverState,
     DriverStudioSession,
@@ -47,10 +46,6 @@ evolution:
   deny external_io
   max_delta = 2
 '''
-
-
-def test_v309_version():
-    assert __version__ == "3.8.2"
 
 
 def test_studio_instruction_reference_is_complete_for_minimal_editor():

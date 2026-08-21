@@ -1,8 +1,7 @@
-from staqtapp_tds import TDSFileSystem, RuntimeConfig, TraceRecord, TraceSetManifest, AggregationRecord, create_spiral_run, __version__
+from staqtapp_tds import TDSFileSystem, RuntimeConfig, TraceRecord, TraceSetManifest, AggregationRecord, create_spiral_run
 
 
 def test_version_and_runtime_config_spiral_flag():
-    assert __version__ == "3.8.2"
     cfg = RuntimeConfig.default().next_generation(spiral_support_enabled=True)
     assert cfg.spiral_support_enabled is True
     assert RuntimeConfig.from_mapping(cfg.to_dict()).spiral_support_enabled is True

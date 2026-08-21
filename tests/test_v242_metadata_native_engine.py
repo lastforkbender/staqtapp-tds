@@ -1,13 +1,8 @@
 import pytest
-import sys
 
-from staqtapp_tds import __version__, EntryIndex, TraceRecord, TraceSetManifest, AggregationRecord
+from staqtapp_tds import EntryIndex, TraceRecord, TraceSetManifest, AggregationRecord
 from staqtapp_tds.metadata import EntryDescriptor, ChunkDescriptor, NamespaceDescriptor, ExecutionCounters, RuntimeSnapshot
 from staqtapp_tds.telemetry import TelemetryManager
-
-
-def test_version_centralized_v242():
-    assert __version__ == "3.8.2"
 
 
 def test_metadata_records_are_slotted_and_immutable():

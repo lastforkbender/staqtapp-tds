@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from staqtapp_tds import TDSFileSystem, __version__
+from staqtapp_tds import TDSFileSystem
 from staqtapp_tds.csv_layer import (
     artifact_keys,
     commit_csv_interpole_timeline_report,
@@ -33,10 +33,6 @@ def _interpole_ready_csv(
     assert native_commit.ok is True
     assert revalidation.ok is True
     return manifest, native_commit, revalidation
-
-
-def test_version_342_csv_interpole_foundation():
-    assert __version__ == "3.8.2"
 
 
 def test_csv_interpole_prepare_builds_no_write_foundation_timeline():

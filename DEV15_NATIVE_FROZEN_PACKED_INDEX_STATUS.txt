@@ -1,1 +1,0 @@
-v3.6.0 candidate: compact immutable rehashed handle snapshots and caller-owned packed lock-free reads with no shared hot-path counter writes; no learned serving or release version bump.

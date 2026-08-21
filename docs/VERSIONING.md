@@ -1,63 +1,49 @@
-# Staqtapp-TDS release version policy
+# Staqtapp-TDS Versioning
 
-## Decision
+The current production identity is `3.8.3`. The authoritative source is
+`src/staqtapp_tds/version.py`. This patch is the PCSDQR repository and
+release-process correction; it changes no stored format or public API and
+widens no authority boundary.
 
-`v3.5.3.post2` remains an immutable historical release identity. It is not
-renamed or rewritten.
+## Format
 
-Beginning with the Frontier Foundation Repair train, every published
-Staqtapp-TDS release uses exactly three numeric components:
+Published releases use three numeric components:
 
 ```text
 MAJOR.MINOR.PATCH
 ```
 
-The completed Foundation source identity is **v3.6.0**. Corrective releases increment the patch number:
+- `MAJOR` changes for an intentionally incompatible public contract.
+- `MINOR` changes for a compatible architecture or capability release.
+- `PATCH` changes for compatible corrections, hardening, or performance work.
 
-```text
-v3.6.0 -> v3.6.1 -> v3.6.2
-```
+Historical `.postN` releases remain immutable history. New corrections use a
+new patch version rather than another post-release suffix.
 
-Staqtapp-TDS will not publish another `.postN` release.
+## Tags and artifacts
 
-The current production architecture and PyPI identity is **v3.8.2**. It adds
-the system performance correction above v3.8.1's fixed-point path reference
-oracle, Browser idle-performance repair, and workspace telemetry mount. The
-retired 306-process allocator research qualifier produced no performance
-decision, so this version makes no retained allocator-speedup claim. Allocator
-correctness, ABI, and lifecycle behavior remain covered by normal tests,
-sanitizers, supported-platform compatibility matrices, distribution builds,
-and installed-package smoke tests.
+A production tag is exactly `vMAJOR.MINOR.PATCH` and must resolve to the source
+commit used to build the published artifacts. The package version, README
+heading, installation pin, artifact metadata, and tag must agree.
 
-The credentialed H100 workflow has not been executed; publication grants no
-Eaglegate execution, canary, promotion, activation, token-acceptance, or
-KV-commit authority. Eaglegate remains shadow/target-only.
+Once published, a tag, wheel, and source distribution are not replaced. A
+follow-up correction increments `PATCH` and produces a new release.
 
-## Operational rules
+## Candidate state
 
-1. A production tag is exactly `vMAJOR.MINOR.PATCH`.
-2. The package version is exactly `MAJOR.MINOR.PATCH`.
-3. A correction after publication receives a new patch version; the prior tag
-   and artifacts remain immutable.
-4. Candidate state belongs to branches, pull requests, qualification evidence,
-   and release-controller state—not to a `.postN` package suffix.
-5. Release workflows must derive artifact and tag checks from the package's
-   single authoritative version source before publication.
-6. Historical `3.5.3.post1` and `3.5.3.post2` references may remain only where
-   they describe those immutable releases.
+Candidate state belongs to branches and pull requests, not to a production
+version string. Documentation must distinguish the currently installable
+release from unreleased source without inventing a second package identity.
 
-## Upgrade sequence
+## Compatibility statements
 
-The architecture labels in the Frontier Evidence Fabric proposal map to clean
-release identities:
+Release notes should state compatibility in terms users can verify:
 
-| Architecture label | Clean release identity |
-|---|---|
-| v3.6 Foundation Repair | `3.6.0` |
-| corrective Foundation Repair | `3.6.1`, `3.6.2`, ... |
-| v3.7 Dataset Generation Plane | `3.7.0` |
-| v3.8 Waypoint Graph Foundation | `3.8.0` |
-| v3.9 Sentinel Shadow | `3.9.0` |
-| v3.10 Ranked Evidence Reads | `3.10.0` |
-| v3.11 Adaptive Server | `3.11.0` |
-| v4.0 Frontier Evidence Fabric | `4.0.0` |
+- public API additions or removals;
+- stored-format changes;
+- minimum Python or dependency changes;
+- migration or rollback requirements; and
+- security or authority-boundary changes.
+
+Test counts, workflow run IDs, and temporary qualification status belong in CI
+logs, not in the version policy.

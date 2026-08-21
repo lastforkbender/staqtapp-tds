@@ -1,11 +1,7 @@
 from __future__ import annotations
 
-from staqtapp_tds import TDSDirectory, TDSFileSystem, __version__
+from staqtapp_tds import TDSDirectory, TDSFileSystem
 from staqtapp_tds.csv_layer import import_csv_bytes, load_csv_artifact, validate_csv_artifacts
-
-
-def test_version_322_csv_artifact_validation_pass():
-    assert __version__ == "3.8.2"
 
 
 def test_csv_artifact_validation_accepts_clean_import():

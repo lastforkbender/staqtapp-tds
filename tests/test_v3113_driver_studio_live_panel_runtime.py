@@ -1,6 +1,5 @@
 import copy
 
-from staqtapp_tds import __version__
 from staqtapp_tds.drivers import (
     DriverBatchReviewBoard,
     DriverFixtureCase,
@@ -110,10 +109,6 @@ def _task() -> StudioManualDriverTask:
 
 def _kinds(state: StudioPanelRuntimeState):
     return {kind.value for kind in state.dirty_panel_kinds}
-
-
-def test_v3113_version():
-    assert __version__ == "3.8.2"
 
 
 def test_live_panel_runtime_capability_matrix_has_no_authority():

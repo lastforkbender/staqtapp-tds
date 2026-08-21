@@ -1,6 +1,5 @@
 import pytest
 
-from staqtapp_tds import __version__
 from staqtapp_tds.drivers import (
     BYTECODE_MAGIC,
     BYTECODE_VERSION,
@@ -50,10 +49,6 @@ evolution:
   deny external_io
   max_delta = 2
 '''
-
-
-def test_v307_version():
-    assert __version__ == "3.8.2"
 
 
 def test_opcode_table_is_stable_for_first_native_vm_mapping():

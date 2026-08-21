@@ -1,6 +1,5 @@
 import json
 
-from staqtapp_tds import __version__
 from staqtapp_tds.studio_pyqt5 import (
     DEFAULT_OPERATIONAL_STRESS_SCENARIOS,
     StudioOperationalStressHarness,
@@ -10,10 +9,6 @@ from staqtapp_tds.studio_pyqt5 import (
     StudioOperationalStressStatus,
     studio_operational_stress_capability_matrix,
 )
-
-
-def test_v3123_version():
-    assert __version__ == "3.8.2"
 
 
 def test_default_operational_stress_scenarios_cover_combined_and_authority_boundaries():

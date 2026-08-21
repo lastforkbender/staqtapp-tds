@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from staqtapp_tds import TDSFileSystem, __version__
+from staqtapp_tds import TDSFileSystem
 from staqtapp_tds.csv_layer import (
     artifact_keys,
     csv_scan_artifact_keys,
@@ -16,10 +16,6 @@ from staqtapp_tds.csv_layer import (
     validate_csv_id,
     validate_materialized_csv_scan_artifacts,
 )
-
-
-def test_version_334_csv_artifact_security_envelope():
-    assert __version__ == "3.8.2"
 
 
 def test_csv_id_validation_accepts_bounded_artifact_safe_ids():

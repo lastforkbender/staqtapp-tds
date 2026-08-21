@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from staqtapp_tds import TDSDirectory, TDSFileSystem, TDSPersistence, __version__
+from staqtapp_tds import TDSDirectory, TDSFileSystem, TDSPersistence
 from staqtapp_tds.csv_layer import (
     artifact_keys,
     import_csv_bytes,
@@ -25,10 +25,6 @@ class CountingDirectory(TDSDirectory):
     def write_json(self, *args, **kwargs):
         self.json_writes += 1
         return super().write_json(*args, **kwargs)
-
-
-def test_version_323_csv_reload_adversarial_pass():
-    assert __version__ == "3.8.2"
 
 
 def test_csv_reload_artifacts_from_persisted_tds_snapshot_without_import_objects(tmp_path: Path):

@@ -1,12 +1,14 @@
-include LICENSE README.md README_ja.md CHANGELOG.md pyproject.toml setup.py
-include AUDIT_REMEDIATION_STATUS.txt DEV*_STATUS.txt
-include V353_POST1_PYPI_PRESENTATION_STATUS.txt
-recursive-include src *.py *.c *.h *.html *.css *.js *.svg *.json
-recursive-include docs *
-recursive-include examples *
-recursive-include benchmarks *.py
-recursive-include scripts *
-recursive-include tools *
-recursive-include tds_api_docs *
-recursive-include tests *.py
-recursive-include .github *.yml *.yaml
+include LICENSE README.md README_ja.md CHANGELOG.md
+recursive-include src/staqtapp_tds *.py *.c *.html *.css *.js *.svg *.json
+recursive-include examples *.py
+
+prune .github
+prune benchmarks
+prune docs
+prune media
+prune scripts
+prune tds_api_docs
+prune tests
+prune tools
+
+global-exclude __pycache__ *.py[cod]

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from staqtapp_tds import TDSFileSystem, __version__
+from staqtapp_tds import TDSFileSystem
 from staqtapp_tds.csv_layer import (
     artifact_keys,
     commit_csv_storage_adapter_replay_report,
@@ -12,10 +12,6 @@ from staqtapp_tds.csv_layer import (
     prepare_csv_storage_adapter_replay,
     validate_csv_storage_adapter_replay,
 )
-
-
-def test_version_339_csv_storage_adapter_commit_replay():
-    assert __version__ == "3.8.2"
 
 
 def test_csv_storage_adapter_replay_requires_binding_contract():

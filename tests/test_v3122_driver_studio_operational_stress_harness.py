@@ -1,18 +1,12 @@
 import json
-from pathlib import Path
 
 import staqtapp_tds.tds_persistence as tds_persistence
-from staqtapp_tds import __version__
 from staqtapp_tds.studio_pyqt5 import (
     StudioOperationalStressHarness,
     StudioOperationalStressReport,
     StudioOperationalStressStatus,
     studio_operational_stress_capability_matrix,
 )
-
-
-def test_v3122_version():
-    assert __version__ == "3.8.2"
 
 
 def test_operational_stress_capability_matrix_preserves_authority_boundaries():
@@ -98,16 +92,3 @@ def test_operational_stress_reports_bounded_event_gap_as_expected_pressure_not_f
     assert overflow.metrics["dropped_event_count"] == 3
     assert overflow.metrics["retained_cursor_floor"] == 4
     assert "bounded Studio event retention gap" in report.warnings[0]
-
-
-def test_v3122_readme_links_api_pdf_and_english_japanese_readmes():
-    root = Path(__file__).resolve().parents[1]
-    pdf = root / "tds_api_docs" / "Staqtapp_TDS_API_Surface_Reference.pdf"
-    readme = (root / "README.md").read_text(encoding="utf-8")
-    readme_ja = (root / "README_ja.md").read_text(encoding="utf-8")
-
-    assert pdf.exists()
-    assert "tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf" in readme
-    assert "tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf" in readme_ja
-    assert "README_ja.md" in readme
-    assert "README.md" in readme_ja

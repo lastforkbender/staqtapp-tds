@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from staqtapp_tds import TDSFileSystem, __version__
+from staqtapp_tds import TDSFileSystem
 from staqtapp_tds.csv_layer import (
     artifact_keys,
     commit_csv_native_storage_artifacts,
@@ -21,10 +21,6 @@ def _ready_csv(fs: TDSFileSystem, payload: bytes = b"id,name\n1,Ada\n2,Grace\n")
     assert bridge.ok is True
     assert replay.ok is True
     return manifest
-
-
-def test_version_340_csv_native_storage_integration():
-    assert __version__ == "3.8.2"
 
 
 def test_csv_native_storage_commit_requires_persisted_replay_proof():

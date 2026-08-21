@@ -1,7 +1,6 @@
 import time
 
 from staqtapp_tds import (
-    __version__,
     TDSFileSystem,
     TelemetryLevel,
     TelemetryManager,
@@ -9,10 +8,6 @@ from staqtapp_tds import (
     verify,
 )
 from staqtapp_tds.config import RuntimeConfig
-
-
-def test_version_v251():
-    assert __version__ == "3.8.2"
 
 
 def test_telemetry_levels_gate_engineering_samplers():

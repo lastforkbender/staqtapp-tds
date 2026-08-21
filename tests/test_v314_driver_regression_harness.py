@@ -1,6 +1,5 @@
 import copy
 
-from staqtapp_tds import __version__
 from staqtapp_tds.drivers import (
     DriverFixtureCase,
     DriverRegressionHarness,
@@ -110,10 +109,6 @@ def _passing_cases():
             tags=("golden", "miss"),
         ),
     )
-
-
-def test_v314_version():
-    assert __version__ == "3.8.2"
 
 
 def test_regression_harness_capability_matrix_denies_trust_authority_and_storage_writes():

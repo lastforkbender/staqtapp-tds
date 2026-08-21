@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from staqtapp_tds import TDSFileSystem, __version__
+from staqtapp_tds import TDSFileSystem
 from staqtapp_tds.csv_layer import (
     artifact_keys,
     commit_csv_interpole_determinant_vector_report,
@@ -40,10 +40,6 @@ def _interpole_ring_ready_csv(
     assert timeline.ok is True
     assert determinants.ok is True
     return manifest, determinants
-
-
-def test_version_344_csv_interpole_timeline_ring_mirror():
-    assert __version__ == "3.8.2"
 
 
 def test_csv_interpole_timeline_ring_prepare_builds_no_write_mirror_feedback():

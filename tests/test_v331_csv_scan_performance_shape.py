@@ -4,7 +4,6 @@ import mmap
 
 import pytest
 
-from staqtapp_tds import __version__
 from staqtapp_tds.csv_layer import (
     logical_record_offsets_bytes,
     pack_csv_row_offsets,
@@ -12,10 +11,6 @@ from staqtapp_tds.csv_layer import (
     unpack_csv_row_offsets,
 )
 from staqtapp_tds.csv_layer.dialect import detect_csv_dialect
-
-
-def test_version_331_csv_scan_performance_shape_pass():
-    assert __version__ == "3.8.2"
 
 
 def test_csv_scan_accepts_buffer_inputs_with_same_profile(tmp_path):

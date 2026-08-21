@@ -1,6 +1,5 @@
 import copy
 
-from staqtapp_tds import __version__
 from staqtapp_tds.drivers import (
     BatchReviewPolicy,
     BatchReviewStatus,
@@ -97,10 +96,6 @@ def _failed_report():
         expected_emitted_count=999,
     )
     return DriverRegressionHarness().run_package(package, (case,))
-
-
-def test_v315_version():
-    assert __version__ == "3.8.2"
 
 
 def test_batch_review_capability_matrix_denies_signing_activation_execution_and_storage():

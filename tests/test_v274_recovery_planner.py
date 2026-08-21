@@ -1,13 +1,8 @@
 from __future__ import annotations
 
-from staqtapp_tds import __version__
 from staqtapp_tds.recovery import build_recovery_plan
 from staqtapp_tds.telemetry import TelemetryManager
 from staqtapp_tds.admin.panel import AdminPanelServer, render_dashboard_html
-
-
-def test_v274_version():
-    assert __version__ == "3.8.2"
 
 
 def test_recovery_planner_generates_advisory_actions_from_pressure_snapshot():

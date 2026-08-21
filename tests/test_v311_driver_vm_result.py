@@ -4,9 +4,7 @@ import inspect
 
 import pytest
 
-from staqtapp_tds import __version__
 from staqtapp_tds.drivers import (
-    DriverVMContext,
     DriverVMResult,
     DriverVMRuntime,
     TDDLValidationError,
@@ -226,10 +224,6 @@ RECORDS = [
         "semantic_score": 0.60,
     },
 ]
-
-
-def test_v311_version():
-    assert __version__ == "3.8.2"
 
 
 def test_successful_execution_returns_driver_vm_result_with_context():

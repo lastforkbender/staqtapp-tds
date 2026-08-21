@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from staqtapp_tds import TDSFileSystem, __version__
+from staqtapp_tds import TDSFileSystem
 from staqtapp_tds.admin.control import AdminControl
 from staqtapp_tds.admin.panel import AdminPanelServer, render_dashboard_html
 from staqtapp_tds.csv_layer import (
@@ -61,7 +61,6 @@ def _monitor_ready_csv(
 
 
 def test_version_349_csv_interpole_browser_monitor():
-    assert __version__ == "3.8.2"
     assert CSV_INTERPOLE_BROWSER_MONITOR_VERSION == "1.0"
     assert "csv-interpole" in CSV_INTERPOLE_MONITOR_ICON_NAMES
     assert "csv-performance-gate" in CSV_INTERPOLE_MONITOR_ICON_NAMES
