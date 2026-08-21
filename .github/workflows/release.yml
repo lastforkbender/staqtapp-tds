@@ -21,13 +21,25 @@ on:
       controller_run_attempt:
         description: Exact successful one-time controller run attempt
         required: true
+      mode:
+        description: Standard release or exact one-time v3.8.2 publication recovery
+        required: true
+        type: choice
+        default: standard
+        options:
+          - standard
+          - v382_publish_recovery
+          - v382_postpublish_resume
+      release_run_id:
+        description: Exact failed tag run, or successful publishing run for no-upload resume
+        required: false
 
 permissions:
   contents: read
 
 concurrency:
   group: >-
-    staqtapp-tds-release-${{ github.ref_type == 'tag' && github.ref_name || github.run_id }}
+    staqtapp-tds-release-${{ (inputs.mode == 'v382_publish_recovery' || inputs.mode == 'v382_postpublish_resume') && 'v382-publication-recovery' || (github.ref_type == 'tag' && github.ref_name || github.run_id) }}
   cancel-in-progress: false
 
 env:
@@ -563,12 +575,19 @@ jobs:
               Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8")
           )
           inputs = event.get("inputs")
-          if not isinstance(inputs, dict) or inputs != {
+          expected_inputs = {
               "qualified_sha": qualified_sha,
               "qualified_run_id": qualified_run_text,
               "controller_run_id": controller_run_text,
               "controller_run_attempt": controller_attempt_text,
-          }:
+          }
+          if (
+              not isinstance(inputs, dict)
+              or set(inputs) - {*expected_inputs, "mode", "release_run_id"}
+              or any(inputs.get(key) != value for key, value in expected_inputs.items())
+              or inputs.get("mode", "standard") != "standard"
+              or inputs.get("release_run_id", "") != ""
+          ):
               raise SystemExit("workflow_dispatch inputs do not exactly match proof")
 
           attestation_root = Path("controller-attestation")
@@ -840,13 +859,20 @@ jobs:
   publish-pypi:
     name: Publish validated distributions to PyPI
     if: >-
-      needs.prepublish-provenance.result == 'success' &&
+      always() &&
       github.event_name == 'workflow_dispatch' &&
-      github.ref_type == 'tag' &&
-      github.ref_name == 'v3.8.2'
+      ((needs.prepublish-provenance.result == 'success' &&
+        github.ref_type == 'tag' &&
+        github.ref_name == 'v3.8.2' &&
+        inputs.mode != 'v382_publish_recovery') ||
+       (needs.v382-recovery-provenance.result == 'success' &&
+        github.ref_type == 'branch' &&
+        github.ref_name == 'main' &&
+        inputs.mode == 'v382_publish_recovery'))
     needs:
       - release-gates-complete
       - prepublish-provenance
+      - v382-recovery-provenance
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -868,6 +894,14 @@ jobs:
       CONTROLLER_ATTESTATION_DIR: controller-attestation
       DISTRIBUTION_DIR: dist
       GH_REPOSITORY: ${{ github.repository }}
+      RECOVERY_MODE: ${{ inputs.mode }}
+      RECOVERY_REF: ${{ github.ref }}
+      RECOVERY_REF_TYPE: ${{ github.ref_type }}
+      RECOVERY_REF_NAME: ${{ github.ref_name }}
+      RECOVERY_SHA: ${{ github.sha }}
+      RECOVERY_RUN_ID: ${{ github.run_id }}
+      RECOVERY_RUN_ATTEMPT: ${{ github.run_attempt }}
+      ORIGINAL_RELEASE_RUN_ID: ${{ inputs.release_run_id }}
     steps:
       # All pre-OIDC actions are immutable and run only after environment approval.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -878,6 +912,7 @@ jobs:
         with:
           python-version: '3.13'
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        if: inputs.mode != 'v382_publish_recovery'
         with:
           name: staqtapp-tds-distributions
           path: dist
@@ -885,19 +920,44 @@ jobs:
           repository: ${{ github.repository }}
           run-id: ${{ github.run_id }}
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        if: inputs.mode == 'v382_publish_recovery'
+        with:
+          artifact-ids: '9447848146'
+          path: dist
+          merge-multiple: true
+          digest-mismatch: error
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: '32485582558'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        if: inputs.mode != 'v382_publish_recovery'
         with:
           name: v382-release-controller-attestation-${{ inputs.controller_run_id }}-${{ inputs.controller_run_attempt }}
           path: controller-attestation
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
           run-id: ${{ inputs.controller_run_id }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        if: inputs.mode == 'v382_publish_recovery'
+        with:
+          artifact-ids: '9447710482'
+          path: controller-attestation
+          merge-multiple: true
+          digest-mismatch: error
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: '32485555450'
       - name: Revalidate all publication proof immediately before OIDC
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          python scripts/v382_release_provenance.py
+          if [[ "$RECOVERY_MODE" == "v382_publish_recovery" ]]; then
+            python scripts/v382_release_recovery.py publish
+          else
+            python scripts/v382_release_provenance.py
+          fi
       - name: Publish with PyPI trusted publishing
         # pypa/gh-action-pypi-publish v1.14.0, pinned for Trusted Publishing.
         uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
@@ -1457,3 +1517,340 @@ jobs:
               raise SystemExit("GitHub returned an unexpected Release identity")
           print("GitHub Release published:", release["html_url"])
           PY
+
+  v382-recovery-provenance:
+    name: Verify one-time v3.8.2 recovery provenance before approval
+    if: >-
+      needs.release-gates-complete.result == 'success' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref_type == 'branch' &&
+      github.ref_name == 'main' &&
+      inputs.mode == 'v382_publish_recovery' &&
+      inputs.qualified_sha == 'f94547a7c2faee1e3ea1b2a3e2c12aa5498b920c' &&
+      inputs.qualified_run_id == '32485115821' &&
+      inputs.controller_run_id == '32485555450' &&
+      inputs.controller_run_attempt == '1' &&
+      inputs.release_run_id == '32485582558'
+    needs: release-gates-complete
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    env:
+      RECOVERY_MODE: ${{ inputs.mode }}
+      RECOVERY_REF: ${{ github.ref }}
+      RECOVERY_REF_TYPE: ${{ github.ref_type }}
+      RECOVERY_REF_NAME: ${{ github.ref_name }}
+      RECOVERY_SHA: ${{ github.sha }}
+      RECOVERY_RUN_ID: ${{ github.run_id }}
+      RECOVERY_RUN_ATTEMPT: ${{ github.run_attempt }}
+      QUALIFIED_SHA: ${{ inputs.qualified_sha }}
+      QUALIFIED_RUN_ID: ${{ inputs.qualified_run_id }}
+      CONTROLLER_RUN_ID: ${{ inputs.controller_run_id }}
+      CONTROLLER_RUN_ATTEMPT: ${{ inputs.controller_run_attempt }}
+      ORIGINAL_RELEASE_RUN_ID: ${{ inputs.release_run_id }}
+      CONTROLLER_ATTESTATION_DIR: controller-attestation
+      DISTRIBUTION_DIR: dist
+      GH_REPOSITORY: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          artifact-ids: '9447848146'
+          path: dist
+          merge-multiple: true
+          digest-mismatch: error
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: '32485582558'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          artifact-ids: '9447710482'
+          path: controller-attestation
+          merge-multiple: true
+          digest-mismatch: error
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: '32485555450'
+      - name: Prove exact failed-before-OIDC recovery identity
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python scripts/v382_release_recovery.py preflight
+
+  v382-resume-provenance:
+    name: Verify already-published v3.8.2 recovery provenance
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref_type == 'branch' &&
+      github.ref_name == 'main' &&
+      inputs.mode == 'v382_postpublish_resume' &&
+      inputs.qualified_sha == 'f94547a7c2faee1e3ea1b2a3e2c12aa5498b920c' &&
+      inputs.qualified_run_id == '32485115821' &&
+      inputs.controller_run_id == '32485555450' &&
+      inputs.controller_run_attempt == '1' &&
+      inputs.release_run_id != ''
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    env:
+      RECOVERY_MODE: ${{ inputs.mode }}
+      RECOVERY_REF: ${{ github.ref }}
+      RECOVERY_REF_TYPE: ${{ github.ref_type }}
+      RECOVERY_REF_NAME: ${{ github.ref_name }}
+      RECOVERY_SHA: ${{ github.sha }}
+      RECOVERY_RUN_ID: ${{ github.run_id }}
+      RECOVERY_RUN_ATTEMPT: ${{ github.run_attempt }}
+      QUALIFIED_SHA: ${{ inputs.qualified_sha }}
+      QUALIFIED_RUN_ID: ${{ inputs.qualified_run_id }}
+      CONTROLLER_RUN_ID: ${{ inputs.controller_run_id }}
+      CONTROLLER_RUN_ATTEMPT: ${{ inputs.controller_run_attempt }}
+      ORIGINAL_RELEASE_RUN_ID: '32485582558'
+      PUBLISHED_RECOVERY_RUN_ID: ${{ inputs.release_run_id }}
+      CONTROLLER_ATTESTATION_DIR: controller-attestation
+      DISTRIBUTION_DIR: dist
+      GH_REPOSITORY: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          artifact-ids: '9447848146'
+          path: dist
+          merge-multiple: true
+          digest-mismatch: error
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: '32485582558'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          artifact-ids: '9447710482'
+          path: controller-attestation
+          merge-multiple: true
+          digest-mismatch: error
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: '32485555450'
+      - name: Prove exact prior Trusted Publisher success without OIDC
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python scripts/v382_release_recovery.py postpublish-preflight
+
+  v382-recovery-verify:
+    name: >-
+      ${{ inputs.mode == 'v382_postpublish_resume' && 'Verify exact already-published v3.8.2 distributions' || 'Verify exact v3.8.2 recovery publication' }}
+    if: >-
+      always() &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref_type == 'branch' &&
+      github.ref_name == 'main' &&
+      ((inputs.mode == 'v382_publish_recovery' &&
+        needs.publish-pypi.result == 'success') ||
+       (inputs.mode == 'v382_postpublish_resume' &&
+        needs.v382-resume-provenance.result == 'success' &&
+        needs.publish-pypi.result == 'skipped'))
+    needs:
+      - publish-pypi
+      - v382-resume-provenance
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    env:
+      DISTRIBUTION_DIR: dist
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          artifact-ids: '9447848146'
+          path: dist
+          merge-multiple: true
+          digest-mismatch: error
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: '32485582558'
+      - name: Hash-verify both public distributions
+        run: python scripts/v382_release_recovery.py verify-public
+      - name: Install and verify the exact production wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install \
+            --disable-pip-version-check \
+            --no-cache-dir \
+            --only-binary=:all: \
+            --index-url https://pypi.org/simple \
+            'staqtapp-tds==3.8.2'
+          python -I - <<'PY'
+          import importlib.metadata as metadata
+
+          from staqtapp_tds import TDSFileSystem, __version__
+
+          assert metadata.version("staqtapp-tds") == "3.8.2"
+          assert __version__ == "3.8.2"
+          fs = TDSFileSystem("v382_recovery_verification")
+          node = fs.makedirs("/release")
+          node.write_text("status", "published")
+          assert node.read_value("status") == "published"
+          PY
+      - name: Verify the live PyPI description and public targets
+        run: python scripts/verify_pypi_presentation.py --version v3.8.2
+
+  v382-recovery-smoke:
+    name: >-
+      ${{ matrix.os }} v3.8.2 ${{ inputs.mode == 'v382_postpublish_resume' && 'no-upload finalization' || 'recovery PyPI' }} smoke
+    if: >-
+      needs.v382-recovery-verify.result == 'success' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref_type == 'branch' &&
+      github.ref_name == 'main' &&
+      (inputs.mode == 'v382_publish_recovery' ||
+       inputs.mode == 'v382_postpublish_resume')
+    needs: v382-recovery-verify
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    steps:
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+      - name: Install exact wheel from production PyPI
+        run: >-
+          python -c "import subprocess, sys; subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--disable-pip-version-check', '--no-cache-dir', '--only-binary=:all:', '--index-url', 'https://pypi.org/simple', 'staqtapp-tds==3.8.2'])"
+      - name: Verify installed identity and core round trip
+        run: >-
+          python -I -c "import importlib.metadata as metadata; from staqtapp_tds import TDSFileSystem, __version__; assert metadata.version('staqtapp-tds') == '3.8.2'; assert __version__ == '3.8.2'; fs = TDSFileSystem('v382_recovery_smoke'); node = fs.makedirs('/release'); node.write_text('status', 'published'); assert node.read_value('status') == 'published'; print('staqtapp-tds 3.8.2 recovery smoke passed')"
+
+  v382-recovery-smoke-complete:
+    name: >-
+      ${{ inputs.mode == 'v382_postpublish_resume' && 'v3.8.2 no-upload finalization smoke complete' || 'v3.8.2 recovery PyPI smoke complete' }}
+    if: >-
+      always() &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref_type == 'branch' &&
+      github.ref_name == 'main' &&
+      (inputs.mode == 'v382_publish_recovery' ||
+       inputs.mode == 'v382_postpublish_resume')
+    needs:
+      - v382-recovery-verify
+      - v382-recovery-smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require public verification and every platform smoke
+        env:
+          VERIFY_RESULT: ${{ needs.v382-recovery-verify.result }}
+          SMOKE_RESULT: ${{ needs.v382-recovery-smoke.result }}
+        run: >-
+          test "$VERIFY_RESULT" = success && test "$SMOKE_RESULT" = success
+
+  v382-recovery-finalize:
+    name: >-
+      ${{ inputs.mode == 'v382_postpublish_resume' && 'Publish the resumed v3.8.2 GitHub Release' || 'Publish the recovered v3.8.2 GitHub Release' }}
+    if: >-
+      always() &&
+      needs.v382-recovery-verify.result == 'success' &&
+      needs.v382-recovery-smoke-complete.result == 'success' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref_type == 'branch' &&
+      github.ref_name == 'main' &&
+      ((inputs.mode == 'v382_publish_recovery' &&
+        needs.v382-recovery-provenance.result == 'success' &&
+        needs.publish-pypi.result == 'success') ||
+       (inputs.mode == 'v382_postpublish_resume' &&
+        needs.v382-resume-provenance.result == 'success' &&
+        needs.publish-pypi.result == 'skipped'))
+    needs:
+      - v382-recovery-provenance
+      - v382-resume-provenance
+      - publish-pypi
+      - v382-recovery-verify
+      - v382-recovery-smoke-complete
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    env:
+      RECOVERY_MODE: ${{ inputs.mode }}
+      RECOVERY_REF: ${{ github.ref }}
+      RECOVERY_REF_TYPE: ${{ github.ref_type }}
+      RECOVERY_REF_NAME: ${{ github.ref_name }}
+      RECOVERY_SHA: ${{ github.sha }}
+      RECOVERY_RUN_ID: ${{ github.run_id }}
+      RECOVERY_RUN_ATTEMPT: ${{ github.run_attempt }}
+      QUALIFIED_SHA: ${{ inputs.qualified_sha }}
+      QUALIFIED_RUN_ID: ${{ inputs.qualified_run_id }}
+      CONTROLLER_RUN_ID: ${{ inputs.controller_run_id }}
+      CONTROLLER_RUN_ATTEMPT: ${{ inputs.controller_run_attempt }}
+      ORIGINAL_RELEASE_RUN_ID: ${{ inputs.mode == 'v382_postpublish_resume' && '32485582558' || inputs.release_run_id }}
+      PUBLISHED_RECOVERY_RUN_ID: ${{ inputs.mode == 'v382_postpublish_resume' && inputs.release_run_id || '' }}
+      CONTROLLER_ATTESTATION_DIR: controller-attestation
+      DISTRIBUTION_DIR: dist
+      GH_REPOSITORY: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          artifact-ids: '9447848146'
+          path: dist
+          merge-multiple: true
+          digest-mismatch: error
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: '32485582558'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          artifact-ids: '9447710482'
+          path: controller-attestation
+          merge-multiple: true
+          digest-mismatch: error
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: '32485555450'
+      - name: Revalidate recovery, public bytes, smoke, and publish Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$RECOVERY_MODE" == "v382_postpublish_resume" ]]; then
+            python scripts/v382_release_recovery.py postpublish-finalize
+          else
+            python scripts/v382_release_recovery.py finalize
+          fi

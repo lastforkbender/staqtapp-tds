@@ -34,6 +34,7 @@ VERIFIED_ACTION_PINS = {
 }
 sys.path.insert(0, str(SCRIPTS))
 import v382_release_provenance as provenance  # noqa: E402
+import v382_release_recovery as recovery  # noqa: E402
 import v382_smoke_provenance as smoke_provenance  # noqa: E402
 
 
@@ -168,6 +169,11 @@ def _write_exact_distributions(root: Path) -> None:
         info = tarfile.TarInfo("staqtapp_tds-3.8.2/PKG-INFO")
         info.size = len(metadata)
         archive.addfile(info, io.BytesIO(metadata))
+        egg_info = tarfile.TarInfo(
+            "staqtapp_tds-3.8.2/src/staqtapp_tds.egg-info/PKG-INFO"
+        )
+        egg_info.size = len(metadata)
+        archive.addfile(egg_info, io.BytesIO(metadata))
 
 
 def _attestation(
@@ -230,15 +236,34 @@ def test_release_dependency_graph_is_fail_closed_and_tag_serialized() -> None:
         "qualified_run_id",
         "controller_run_id",
         "controller_run_attempt",
+        "mode",
+        "release_run_id",
     }
-    assert all(spec["required"] is True for spec in dispatch_inputs.values())
-    assert all("default" not in spec for spec in dispatch_inputs.values())
+    assert all(
+        dispatch_inputs[name]["required"] is True
+        for name in (
+            "qualified_sha",
+            "qualified_run_id",
+            "controller_run_id",
+            "controller_run_attempt",
+            "mode",
+        )
+    )
+    assert dispatch_inputs["release_run_id"]["required"] is False
+    assert dispatch_inputs["mode"]["default"] == "standard"
+    assert dispatch_inputs["mode"]["options"] == [
+        "standard",
+        "v382_publish_recovery",
+        "v382_postpublish_resume",
+    ]
 
     concurrency = workflow["concurrency"]
     assert concurrency["cancel-in-progress"] is False
     assert "github.ref_type == 'tag'" in concurrency["group"]
     assert "github.ref_name" in concurrency["group"]
     assert "github.run_id" in concurrency["group"]
+    assert "v382-publication-recovery" in concurrency["group"]
+    assert "v382_postpublish_resume" in concurrency["group"]
 
     prepublish = _job(workflow, "prepublish-provenance")
     publish = _job(workflow, "publish-pypi")
@@ -248,6 +273,7 @@ def test_release_dependency_graph_is_fail_closed_and_tag_serialized() -> None:
     assert _needs(publish) == {
         "release-gates-complete",
         "prepublish-provenance",
+        "v382-recovery-provenance",
     }
     assert _needs(verify) == {"publish-pypi"}
     assert _needs(finalize) == {
@@ -275,6 +301,275 @@ def test_release_dependency_graph_is_fail_closed_and_tag_serialized() -> None:
     assert publish["environment"]["name"] == "pypi"
     assert "skip-existing" not in str(publish)
     assert "PYPI_TOKEN" not in RELEASE_PATH.read_text(encoding="utf-8")
+
+
+def test_v382_recovery_replays_only_the_original_artifact_set() -> None:
+    workflow = _workflow(RELEASE_PATH)
+    preflight = _job(workflow, "v382-recovery-provenance")
+    publish = _job(workflow, "publish-pypi")
+    verify = _job(workflow, "v382-recovery-verify")
+    smoke = _job(workflow, "v382-recovery-smoke")
+    aggregate = _job(workflow, "v382-recovery-smoke-complete")
+    finalize = _job(workflow, "v382-recovery-finalize")
+
+    assert _needs(preflight) == {"release-gates-complete"}
+    assert preflight["permissions"] == {"actions": "read", "contents": "read"}
+    assert _needs(publish) == {
+        "release-gates-complete",
+        "prepublish-provenance",
+        "v382-recovery-provenance",
+    }
+    assert _needs(verify) == {
+        "publish-pypi",
+        "v382-resume-provenance",
+    }
+    assert _needs(smoke) == {"v382-recovery-verify"}
+    assert _needs(aggregate) == {
+        "v382-recovery-verify",
+        "v382-recovery-smoke",
+    }
+    assert _needs(finalize) == {
+        "v382-recovery-provenance",
+        "v382-resume-provenance",
+        "publish-pypi",
+        "v382-recovery-verify",
+        "v382-recovery-smoke-complete",
+    }
+    for job in (preflight, publish, verify, smoke, aggregate, finalize):
+        condition = job["if"]
+        assert "workflow_dispatch" in condition
+        assert "v382_publish_recovery" in condition
+        assert "github.ref_name == 'main'" in condition
+
+    protected = [
+        name
+        for name, job in workflow["jobs"].items()
+        if job.get("environment", {}).get("name") == "pypi"
+    ]
+    assert protected == ["publish-pypi"]
+    assert publish["permissions"] == {
+        "actions": "read",
+        "contents": "read",
+        "id-token": "write",
+    }
+    assert publish["steps"][-1]["uses"] == (
+        "pypa/gh-action-pypi-publish@"
+        "cef221092ed1bacb1cc03d23a2d87d1d172e277b"
+    )
+
+    expected_artifacts = {"9447848146", "9447710482"}
+    for name, job, expected in (
+        ("preflight", preflight, expected_artifacts),
+        ("publish", publish, expected_artifacts),
+        ("verify", verify, {"9447848146"}),
+        ("finalize", finalize, expected_artifacts),
+    ):
+        downloads = [
+            step
+            for step in job["steps"]
+            if step.get("with", {}).get("artifact-ids") in expected_artifacts
+        ]
+        assert {step["with"]["artifact-ids"] for step in downloads} == expected, name
+        assert all(step["with"]["digest-mismatch"] == "error" for step in downloads)
+        assert all(step["with"]["merge-multiple"] is True for step in downloads)
+
+    source = (SCRIPTS / "v382_release_recovery.py").read_text(encoding="utf-8")
+    numeric_normalized_source = source.replace("_", "")
+    for identity in (
+        recovery.QUALIFIED_SHA,
+        str(recovery.QUALIFIED_RUN_ID),
+        str(recovery.CONTROLLER_RUN_ID),
+        str(recovery.ORIGINAL_RELEASE_RUN_ID),
+        recovery.TAG_OBJECT_SHA,
+        str(recovery.ARTIFACT_ID),
+        recovery.ARTIFACT_DIGEST,
+        str(recovery.ATTESTATION_ARTIFACT_ID),
+        recovery.ATTESTATION_ARTIFACT_DIGEST,
+    ):
+        assert identity in source or identity in numeric_normalized_source
+    assert recovery.EXPECTED_DISTRIBUTION_IDENTITIES == {
+        "staqtapp_tds-3.8.2-py3-none-any.whl": {
+            "sha256": (
+                "a720e2cf8edf5676c9fdb5d49c5fe8325ecea470ace6f4d03d04d30bf04f8162"
+            ),
+            "size": 744_603,
+        },
+        "staqtapp_tds-3.8.2.tar.gz": {
+            "sha256": (
+                "3101b5c2dde70aa4f01188194f7fdc4df0efdfa19537c9de94724ba0a2ac1ffd"
+            ),
+            "size": 8_401_104,
+        },
+    }
+
+
+def test_v382_postpublish_resume_cannot_reenter_the_publisher() -> None:
+    workflow = _workflow(RELEASE_PATH)
+    resume = _job(workflow, "v382-resume-provenance")
+    publish = _job(workflow, "publish-pypi")
+    verify = _job(workflow, "v382-recovery-verify")
+    smoke = _job(workflow, "v382-recovery-smoke")
+    aggregate = _job(workflow, "v382-recovery-smoke-complete")
+    finalize = _job(workflow, "v382-recovery-finalize")
+
+    assert _needs(resume) == set()
+    assert resume["permissions"] == {"actions": "read", "contents": "read"}
+    assert "v382_postpublish_resume" in resume["if"]
+    assert "inputs.release_run_id != ''" in resume["if"]
+    assert "postpublish-preflight" in resume["steps"][-1]["run"]
+    assert "v382_postpublish_resume" not in publish["if"]
+    assert "postpublish-finalize" in finalize["steps"][-1]["run"]
+    assert "v382_postpublish_resume" in verify["if"]
+    assert "needs.publish-pypi.result == 'skipped'" in verify["if"]
+    assert "v382_postpublish_resume" in smoke["if"]
+    assert "v382_postpublish_resume" in aggregate["if"]
+    assert "v382_postpublish_resume" in finalize["if"]
+    assert "needs.publish-pypi.result == 'skipped'" in finalize["if"]
+
+    expected_artifacts = {"9447848146", "9447710482"}
+    downloads = [
+        step
+        for step in resume["steps"]
+        if step.get("with", {}).get("artifact-ids") in expected_artifacts
+    ]
+    assert {step["with"]["artifact-ids"] for step in downloads} == (
+        expected_artifacts
+    )
+    assert all(step["with"]["digest-mismatch"] == "error" for step in downloads)
+    assert all(step["with"]["merge-multiple"] is True for step in downloads)
+
+    privileged = [
+        name
+        for name, job in workflow["jobs"].items()
+        if job.get("permissions", {}).get("id-token") == "write"
+        or job.get("environment", {}).get("name") == "pypi"
+    ]
+    assert privileged == ["publish-pypi"]
+    pypa_steps = [
+        step
+        for job in workflow["jobs"].values()
+        for step in job.get("steps", [])
+        if step.get("uses", "").startswith("pypa/gh-action-pypi-publish@")
+    ]
+    assert len(pypa_steps) == 1
+
+
+def test_postpublish_resume_requires_exact_successful_publisher_steps() -> None:
+    proof = {
+        "name": "Revalidate all publication proof immediately before OIDC",
+        "status": "completed",
+        "conclusion": "success",
+    }
+    trusted_publish = {
+        "name": "Publish with PyPI trusted publishing",
+        "status": "completed",
+        "conclusion": "success",
+    }
+
+    class API:
+        repo = "owner/repo"
+        run = {
+            "id": 400,
+            "run_attempt": 1,
+            "workflow_id": recovery.RELEASE_WORKFLOW_ID,
+            "path": ".github/workflows/release.yml",
+            "event": "workflow_dispatch",
+            "head_branch": "main",
+            "head_sha": "b" * 40,
+            "status": "completed",
+            "conclusion": "failure",
+            "repository": {
+                "id": recovery.REPOSITORY_ID,
+                "full_name": "owner/repo",
+            },
+            "head_repository": {
+                "id": recovery.REPOSITORY_ID,
+                "full_name": "owner/repo",
+            },
+        }
+        job_set = [
+            _successful_job("Release gates complete"),
+            _successful_job(
+                "Verify one-time v3.8.2 recovery provenance before approval"
+            ),
+            {
+                "name": "Publish validated distributions to PyPI",
+                "status": "completed",
+                "conclusion": "success",
+                "steps": [deepcopy(proof), deepcopy(trusted_publish)],
+            },
+        ]
+
+        def get(self, _path: str) -> dict:
+            return deepcopy(self.run)
+
+        def jobs(self, _run_id: int) -> list[dict]:
+            return deepcopy(self.job_set)
+
+    api = API()
+    recovery._require_successful_publishing_recovery(
+        api, run_id=400, recovery_sha="b" * 40
+    )
+    publisher = api.job_set[-1]
+    publisher["steps"].append(deepcopy(proof))
+    with pytest.raises(provenance.ReleaseProvenanceError):
+        recovery._require_successful_publishing_recovery(
+            api, run_id=400, recovery_sha="b" * 40
+        )
+    publisher["steps"] = [deepcopy(proof), deepcopy(trusted_publish)]
+    publisher["steps"][1]["conclusion"] = "failure"
+    with pytest.raises(provenance.ReleaseProvenanceError):
+        recovery._require_successful_publishing_recovery(
+            api, run_id=400, recovery_sha="b" * 40
+        )
+
+
+def test_v382_recovery_failure_step_and_diff_checks_are_unambiguous() -> None:
+    publish = {
+        "id": recovery.ORIGINAL_JOB_IDS["Publish validated distributions to PyPI"],
+        "name": "Publish validated distributions to PyPI",
+        "status": "completed",
+        "conclusion": "failure",
+        "steps": [
+            {
+                "name": "Revalidate all publication proof immediately before OIDC",
+                "status": "completed",
+                "conclusion": "failure",
+            },
+            {
+                "name": "Publish with PyPI trusted publishing",
+                "status": "completed",
+                "conclusion": "skipped",
+            },
+        ],
+    }
+    recovery._require_original_publish_failure([publish])
+    duplicated = deepcopy(publish)
+    duplicated["steps"].append(deepcopy(duplicated["steps"][0]))
+    with pytest.raises(provenance.ReleaseProvenanceError):
+        recovery._require_original_publish_failure([duplicated])
+
+    class API:
+        comparison = {
+            "status": "ahead",
+            "base_commit": {"sha": recovery.QUALIFIED_SHA},
+            "merge_base_commit": {"sha": recovery.QUALIFIED_SHA},
+            "ahead_by": 1,
+            "behind_by": 0,
+            "total_commits": 1,
+            "files": [
+                {"filename": path} for path in sorted(recovery.RECOVERY_PATHS)
+            ],
+        }
+
+        def get(self, _path: str) -> dict:
+            return deepcopy(self.comparison)
+
+    api = API()
+    recovery._require_recovery_diff(api, "b" * 40)
+    api.comparison["files"].append({"filename": "src/staqtapp_tds/version.py"})
+    with pytest.raises(provenance.ReleaseProvenanceError):
+        recovery._require_recovery_diff(api, "b" * 40)
 
 
 def test_release_uses_normal_correctness_gates_without_performance_authority() -> None:
@@ -325,6 +620,11 @@ def test_controller_separates_untrusted_validation_from_mutation_token() -> None
     checkout = validate["steps"][0]
     assert re.fullmatch(r"actions/checkout@[0-9a-f]{40}", checkout["uses"])
     assert checkout["with"]["persist-credentials"] is False
+    eligibility = _step(
+        validate, "Retire safely outside the one-time source identity"
+    )["run"]
+    assert 'git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"' in eligibility
+    assert "controller retired because $RELEASE_TAG already exists" in eligibility
 
     assert mutate["permissions"] == {"contents": "write", "actions": "write"}
     assert _needs(mutate) == {"validate-qualified-source"}
@@ -449,9 +749,15 @@ def test_critical_oidc_actions_are_full_sha_pinned() -> None:
 
     publish = _job(workflow, "publish-pypi")
     uses = [step["uses"] for step in publish["steps"] if "uses" in step]
-    assert len(uses) == 5
+    assert len(uses) == 7
     assert all(re.fullmatch(r"[^@]+@[0-9a-f]{40}", value) for value in uses)
     assert uses[-1].startswith("pypa/gh-action-pypi-publish@")
+    oidc_jobs = [
+        name
+        for name, job in workflow["jobs"].items()
+        if job.get("permissions", {}).get("id-token") == "write"
+    ]
+    assert oidc_jobs == ["publish-pypi"]
 
     finalize = _job(workflow, "finalize-github-release")
     assert all("uses" not in step for step in finalize["steps"])
@@ -508,19 +814,28 @@ def test_publish_revalidates_after_environment_gate_immediately_before_oidc() ->
     )
     publisher_index = names.index("Publish with PyPI trusted publishing")
     assert proof_index + 1 == publisher_index
-    assert publish["steps"][proof_index]["run"] == (
-        "set -euo pipefail\npython scripts/v382_release_provenance.py\n"
-    )
+    proof = publish["steps"][proof_index]["run"]
+    assert "python scripts/v382_release_provenance.py" in proof
+    assert "python scripts/v382_release_recovery.py publish" in proof
     downloads = [
         step for step in publish["steps"][:proof_index]
         if step.get("uses", "").startswith("actions/download-artifact@")
     ]
-    assert len(downloads) == 2
-    assert {step["with"]["name"] for step in downloads} == {
+    assert len(downloads) == 4
+    standard = [step for step in downloads if "name" in step["with"]]
+    exact_recovery = [
+        step for step in downloads if "artifact-ids" in step["with"]
+    ]
+    assert {step["with"]["name"] for step in standard} == {
         "staqtapp-tds-distributions",
         "v382-release-controller-attestation-"
         "${{ inputs.controller_run_id }}-${{ inputs.controller_run_attempt }}",
     }
+    assert {step["with"]["artifact-ids"] for step in exact_recovery} == {
+        "9447848146",
+        "9447710482",
+    }
+    assert all(step["with"]["digest-mismatch"] == "error" for step in exact_recovery)
     assert all("run-id" in step["with"] for step in downloads)
 
 
@@ -720,6 +1035,40 @@ def test_pre_oidc_distribution_set_is_exact_and_typed(tmp_path: Path) -> None:
         provenance.validate_distribution_set(dist)
 
 
+@pytest.mark.parametrize("case", ["missing", "extra", "different"])
+def test_sdist_requires_exact_identical_generated_metadata_copies(
+    tmp_path: Path, case: str
+) -> None:
+    dist = tmp_path / case
+    _write_exact_distributions(dist)
+    metadata = (
+        b"Metadata-Version: 2.4\n"
+        b"Name: staqtapp-tds\n"
+        b"Version: 3.8.2\n\n"
+    )
+    members = [
+        ("staqtapp_tds-3.8.2/PKG-INFO", metadata),
+        (
+            "staqtapp_tds-3.8.2/src/"
+            "staqtapp_tds.egg-info/PKG-INFO",
+            metadata,
+        ),
+    ]
+    if case == "missing":
+        members.pop()
+    elif case == "extra":
+        members.append(("staqtapp_tds-3.8.2/extra/PKG-INFO", metadata))
+    else:
+        members[1] = (members[1][0], metadata + b"X-Rebuilt: yes\n")
+    with tarfile.open(dist / "staqtapp_tds-3.8.2.tar.gz", mode="w:gz") as archive:
+        for name, payload in members:
+            info = tarfile.TarInfo(name)
+            info.size = len(payload)
+            archive.addfile(info, io.BytesIO(payload))
+    with pytest.raises(provenance.ReleaseProvenanceError):
+        provenance.validate_distribution_set(dist)
+
+
 def test_pre_oidc_proof_rejects_stale_main_tag_pypi_and_manual_run(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -736,6 +1085,8 @@ def test_pre_oidc_proof_rejects_stale_main_tag_pypi_and_manual_run(
                     "qualified_run_id": "100",
                     "controller_run_id": "300",
                     "controller_run_attempt": "1",
+                    "mode": "standard",
+                    "release_run_id": "",
                 }
             }
         ),

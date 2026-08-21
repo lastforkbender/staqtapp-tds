@@ -191,21 +191,34 @@ def validate_distribution_set(root: Path) -> dict[str, dict[str, int | str]]:
         _metadata_identity(archive.read(metadata_names[0]), "wheel")
     try:
         with tarfile.open(sdist, mode="r:gz") as archive:
+            expected_metadata_names = {
+                "staqtapp_tds-3.8.2/PKG-INFO",
+                (
+                    "staqtapp_tds-3.8.2/src/"
+                    "staqtapp_tds.egg-info/PKG-INFO"
+                ),
+            }
             metadata_members = [
                 member
                 for member in archive.getmembers()
                 if member.isfile() and member.name.endswith("/PKG-INFO")
             ]
             if (
-                len(metadata_members) != 1
-                or metadata_members[0].name
-                != "staqtapp_tds-3.8.2/PKG-INFO"
+                len(metadata_members) != len(expected_metadata_names)
+                or {member.name for member in metadata_members}
+                != expected_metadata_names
             ):
                 raise ReleaseProvenanceError("sdist metadata path is not exact")
-            extracted = archive.extractfile(metadata_members[0])
-            if extracted is None:
-                raise ReleaseProvenanceError("sdist metadata is unreadable")
-            _metadata_identity(extracted.read(), "sdist")
+            metadata_payloads = []
+            for member in metadata_members:
+                extracted = archive.extractfile(member)
+                if extracted is None:
+                    raise ReleaseProvenanceError("sdist metadata is unreadable")
+                payload = extracted.read()
+                _metadata_identity(payload, f"sdist {member.name}")
+                metadata_payloads.append(payload)
+            if metadata_payloads[0] != metadata_payloads[1]:
+                raise ReleaseProvenanceError("sdist metadata copies differ")
     except (tarfile.TarError, OSError) as exc:
         raise ReleaseProvenanceError("sdist is not a valid gzip tarball") from exc
     return {
@@ -360,7 +373,14 @@ def verify_from_environment() -> dict[str, dict[str, int | str]]:
         "controller_run_id": str(controller_run_id),
         "controller_run_attempt": str(controller_run_attempt),
     }
-    if event.get("inputs") != expected_inputs:
+    inputs = event.get("inputs")
+    if (
+        not isinstance(inputs, dict)
+        or set(inputs) - {*expected_inputs, "mode", "release_run_id"}
+        or any(inputs.get(key) != value for key, value in expected_inputs.items())
+        or inputs.get("mode", "standard") != "standard"
+        or inputs.get("release_run_id", "") != ""
+    ):
         raise ReleaseProvenanceError("workflow_dispatch inputs are not exact")
 
     attestation = load_attestation(

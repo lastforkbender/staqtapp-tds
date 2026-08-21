@@ -48,6 +48,11 @@ jobs:
             echo "controller retired for source version $actual"
             exit 0
           fi
+          if git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            echo "controller retired because $RELEASE_TAG already exists"
+            exit 0
+          fi
           test "$(git rev-parse HEAD)" = "$QUALIFIED_SHA"
           GITHUB_REF_TYPE=tag GITHUB_REF_NAME="$RELEASE_TAG" \
             python scripts/check_release.py
