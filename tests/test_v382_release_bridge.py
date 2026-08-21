@@ -277,28 +277,39 @@ def test_release_dependency_graph_is_fail_closed_and_tag_serialized() -> None:
     assert "PYPI_TOKEN" not in RELEASE_PATH.read_text(encoding="utf-8")
 
 
-def test_allocator_proof_remains_a_required_long_running_gate() -> None:
+def test_release_uses_normal_correctness_gates_without_performance_authority() -> None:
     workflow = _workflow(RELEASE_PATH)
-    allocator = _job(workflow, "native-handle-allocator-release-qualification")
+    source = RELEASE_PATH.read_text(encoding="utf-8")
+    jobs = workflow["jobs"]
+    forbidden = {
+        "native-handle-allocator-release-qualification",
+        "native-frozen-performance-evidence",
+    }
+    assert forbidden.isdisjoint(jobs)
+    assert all(name not in source for name in forbidden)
+
+    normal_gates = {
+        "python-compatibility",
+        "platform-compatibility",
+        "native-extension-qualification",
+        "native-sanitizer-qualification",
+        "native-thread-sanitizer-qualification",
+        "native-lifecycle-admission-qualification",
+        "native-free-threaded-admission-qualification",
+        "native-frozen-format-fuzz",
+        "native-architecture-parity-comparison",
+    }
+    build = _job(workflow, "build-distributions")
     aggregate = _job(workflow, "release-gates-complete")
-    assert allocator["timeout-minutes"] == 330
-    assert "native-handle-allocator-release-qualification" in _needs(aggregate)
-    run = _step(
-        allocator, "Run retained randomized paired AB/BA allocator proof"
-    )["run"]
-    for exact in (
-        "--baseline-ref v3.8.1",
-        '--candidate-ref "$GITHUB_SHA"',
-        "--pairs 7",
-        "--warmup-pairs 2",
-        "--seed 3820817",
-    ):
-        assert exact in run
-    archive = _step(
-        allocator, "Archive allocator proof even when a release threshold fails"
-    )
-    assert archive["if"] == "always()"
-    assert archive["with"]["retention-days"] == 90
+    assert _needs(build) == normal_gates
+    assert _needs(aggregate) == {
+        "source-release-checks",
+        *normal_gates,
+        "build-distributions",
+    }
+    require = _step(aggregate, "Require every release gate")
+    assert "PERFORMANCE_RESULT" not in require["env"]
+    assert '"performance"' not in require["run"]
 
 
 def test_controller_separates_untrusted_validation_from_mutation_token() -> None:

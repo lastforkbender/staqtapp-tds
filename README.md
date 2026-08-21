@@ -1,32 +1,11 @@
-> **v3.8.2 system performance correction candidate — NON-RELEASEABLE**
->
-> The user's system-wide request superseded the attached allocator-only
-> assessment as this audit branch's scope. The candidate corrects confirmed
-> scaling failures across the native handle allocator, persistence and
-> observation, CSV evidence workflows, Generation Authority, Driver
-> Foundry/VM/Studio orchestration, Trace Rank, and Eaglegate admission. Stored
-> formats, canonical CSV bytes, public authority boundaries, Browser captures,
-> and important links are unchanged. Performance evidence remains off the
-> functional and activation authority paths.
-
-> **v3.6.0 Foundation substrate**
->
-> The source line retains fail-closed native ABI/lifecycle admission, strict
-> checksum and UTF-8 truth, generation-bound handles, bounded C11 diagnostics,
-> immutable packed reads, and exact x86-64/AArch64 semantics.
-
-> **Current security contract**
->
-> At-rest encryption is not implemented. Requests using `DirFlags.ENCRYPTED` fail closed instead of storing plaintext. New v2 persistence files require their integrity sidecar. `.tds` input should be treated as trusted until explicit resource-budget hardening is complete. Native extensions are optional and are built only when `STAQTAPP_TDS_BUILD_NATIVE=1` is set.
-
-# Staqtapp-TDS v3.8.2 release candidate
-
-> **Release status:** v3.8.2 is a **NON-RELEASEABLE** source candidate under review, not a published package. v3.8.1 remains the current production PyPI release, so the install command below intentionally stays pinned to 3.8.1. Publication is blocked on retained randomized paired AB/BA native allocator evidence using the full-TDS 32-byte `RAW_BINARY` write path as the primary claim, with wrapper and raw-C controls, telemetry/thread and unaffected-lookup cells, CPU/peak-RSS recording, supported-platform CI, and the complete release gate. The candidate adds performance corrections and regression evidence without granting new Driver, Eaglegate, execution, canary, promotion, activation, token-acceptance, or KV-commit authority. The manual credentialed H100 workflow has not been executed and remains required for hardware evidence; Eaglegate remains shadow/target-only.
+# Staqtapp-TDS v3.8.2
 
 ## v3.8.2 measured performance corrections
 
-Representative paired v3.8.1 to v3.8.2 measurements required identical
-semantic results:
+v3.8.2 corrects confirmed scaling failures across persistence and observation,
+CSV evidence workflows, Generation Authority, Driver Foundry/VM/Studio
+orchestration, Trace Rank, and Eaglegate admission. Representative paired
+v3.8.1-to-v3.8.2 measurements required identical semantic results:
 
 | Area | Measured result |
 |---|---|
@@ -39,9 +18,30 @@ semantic results:
 
 These workload-specific measurements were made on Linux x86-64 with CPython
 3.12.13 and GCC `-O3`; exact roots, hashes, bytes, or counters had to match.
-`tracemalloc` values describe traced Python allocation, not process RSS. Full
-methods and results are recorded in
+`tracemalloc` values describe traced Python allocation, not process RSS. No
+retained allocator speedup is claimed: the 306-process research qualifier was
+retired after proving operationally infeasible and produced no performance
+decision. Allocator correctness, ABI, and lifecycle coverage is provided by
+normal tests, sanitizers, compatibility matrices, distribution builds, and
+installed-package smoke tests. Full methods and results are recorded in
 `docs/135_v382_System_Performance_Corrections.md`.
+
+> **Release status:** v3.8.2 is the production release. It preserves stored
+> formats, canonical CSV bytes, public authority boundaries, Browser captures,
+> and important links. The correction grants no new Driver, Eaglegate,
+> execution, canary, promotion, activation, token-acceptance, or KV-commit
+> authority. The manual credentialed H100 workflow has not been executed and
+> remains required for hardware evidence; Eaglegate remains shadow/target-only.
+
+> **v3.6.0 Foundation substrate**
+>
+> The source line retains fail-closed native ABI/lifecycle admission, strict
+> checksum and UTF-8 truth, generation-bound handles, bounded C11 diagnostics,
+> immutable packed reads, and exact x86-64/AArch64 semantics.
+
+> **Current security contract**
+>
+> At-rest encryption is not implemented. Requests using `DirFlags.ENCRYPTED` fail closed instead of storing plaintext. New v2 persistence files require their integrity sidecar. `.tds` input should be treated as trusted until explicit resource-budget hardening is complete. Native extensions are optional and are built only when `STAQTAPP_TDS_BUILD_NATIVE=1` is set.
 
 **Temporal Directory System - native-indexed `.tds` storage, controlled variables, trace ranking, CSV evidence operations, semantic review, and centralized observability for AI systems.**
 
@@ -139,7 +139,7 @@ TDS is designed around a narrow storage hot path. Native indexing, lookup, persi
 
 ```bash
 # Current production PyPI release; includes both UIs
-python -m pip install staqtapp-tds==3.8.1
+python -m pip install staqtapp-tds==3.8.2
 
 # Launch the main TDS telemetry UI
 staqtapp-tds
@@ -297,7 +297,7 @@ TDS intentionally distinguishes preparation, evidence, review, and authority:
 
 ## Validation status
 
-The v3.8.2 source candidate corrects repeated whole-structure work across Core,
+The v3.8.2 production release corrects repeated whole-structure work across Core,
 observation, CSV/Generation, Driver, Trace Rank, and Eaglegate. Native automatic
 handle allocation uses its locked monotonic high-water invariant instead of
 scanning capacity; persistence indexes immutable sidecars once, decompresses
@@ -386,14 +386,16 @@ Version `3.8.1` adds the reference-only Phase 5 fixed-point path oracle and the
 Browser/workspace telemetry correction. It does not add Frontier execution or
 Eaglegate activation authority. Local qualification completed with 1,159 tests
 passed and 45 skipped, plus HTTP workspace and distribution-artifact smoke
-checks; production publication remains gated by the complete tag matrix.
+checks; production publication completed through the tag matrix.
 
-Version `3.8.2` is the current **NON-RELEASEABLE** source candidate for the
-bounded system performance correction. The correction is designed to preserve
+Version `3.8.2` is the production system-performance correction. It preserves
 the v3.8.1 stored formats, canonical CSV-byte identities, evidence identities,
-and authority boundaries, with regression sentinels for the changed paths. Its
-local results do not constitute publication or a universal hardware-performance
-claim, and the native allocator release proof remains pending.
+and authority boundaries, with regression sentinels for the changed paths.
+The reported measurements are workload-specific, not universal hardware
+claims. The retired 306-process allocator research qualifier produced no
+performance decision, so v3.8.2 makes no retained allocator-speedup claim;
+allocator correctness, ABI, and lifecycle behavior are covered by the normal
+test, sanitizer, compatibility, build, and installed-smoke gates.
 
 ## Repository map
 

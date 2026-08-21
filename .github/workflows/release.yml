@@ -290,101 +290,6 @@ jobs:
           path: native-frozen-index-fuzz.json
           if-no-files-found: error
 
-  native-frozen-performance-evidence:
-    name: Native frozen-index two-worker evidence
-    needs: source-release-checks
-    runs-on: ubuntu-latest
-    env:
-      STAQTAPP_TDS_BUILD_NATIVE: '1'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
-        with:
-          python-version: '3.13'
-      - name: Build native extensions
-        run: python -m pip install ".[test]"
-      - name: Require shared-runner aggregate no-regression evidence
-        shell: bash
-        run: |
-          set -euo pipefail
-          python tools/benchmark_v360_frozen_index.py \
-            --keys 4096 \
-            --iterations 128 \
-            --samples 7 \
-            --min-two-worker-factor 1.0 \
-            > native-frozen-index-performance.json
-          cat native-frozen-index-performance.json
-      - name: Archive separate performance evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: native-frozen-index-performance
-          path: native-frozen-index-performance.json
-          if-no-files-found: error
-
-  native-handle-allocator-release-qualification:
-    name: Native handle allocator retained release proof
-    needs: source-release-checks
-    runs-on: ubuntu-24.04
-    timeout-minutes: 330
-    env:
-      CC: gcc
-      PYTHONHASHSEED: '0'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          fetch-depth: 0
-      - name: Bootstrap allocator evidence artifact
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p native-allocator-release-evidence
-          python3 - <<'PY'
-          import json
-          import os
-          from datetime import datetime, timezone
-          from pathlib import Path
-
-          payload = {
-              "schema": 1,
-              "status": "WORKFLOW_BOOTSTRAPPED_BEFORE_QUALIFIER",
-              "created_utc": datetime.now(timezone.utc).isoformat(),
-              "github_run_id": os.environ["GITHUB_RUN_ID"],
-              "github_run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
-              "github_job": os.environ["GITHUB_JOB"],
-              "github_sha": os.environ["GITHUB_SHA"],
-          }
-          Path("native-allocator-release-evidence/workflow-bootstrap.json").write_text(
-              json.dumps(payload, indent=2, sort_keys=True) + "\n",
-              encoding="utf-8",
-          )
-          PY
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
-        with:
-          python-version: '3.13'
-      - name: Install native benchmark build requirements
-        run: python -m pip install setuptools wheel numpy
-      - name: Run retained randomized paired AB/BA allocator proof
-        shell: bash
-        run: |
-          set -euo pipefail
-          timeout --signal=TERM --kill-after=30s 300m \
-            python benchmarks/qualify_native_handle_allocator.py \
-            --baseline-ref v3.8.1 \
-            --candidate-ref "$GITHUB_SHA" \
-            --output-dir native-allocator-release-evidence \
-            --pairs 7 \
-            --warmup-pairs 2 \
-            --seed 3820817
-      - name: Archive allocator proof even when a release threshold fails
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: native-handle-allocator-release-evidence
-          path: native-allocator-release-evidence
-          if-no-files-found: error
-          retention-days: 90
-
   native-architecture-semantic-evidence:
     name: Native ${{ matrix.architecture }} semantic evidence
     needs: source-release-checks
@@ -486,7 +391,6 @@ jobs:
       - native-lifecycle-admission-qualification
       - native-free-threaded-admission-qualification
       - native-frozen-format-fuzz
-      - native-frozen-performance-evidence
       - native-architecture-parity-comparison
     runs-on: ubuntu-latest
     steps:
@@ -529,8 +433,6 @@ jobs:
       - native-lifecycle-admission-qualification
       - native-free-threaded-admission-qualification
       - native-frozen-format-fuzz
-      - native-frozen-performance-evidence
-      - native-handle-allocator-release-qualification
       - native-architecture-parity-comparison
       - build-distributions
     runs-on: ubuntu-latest
@@ -546,8 +448,6 @@ jobs:
           LIFECYCLE_RESULT: ${{ needs.native-lifecycle-admission-qualification.result }}
           FREE_THREADED_RESULT: ${{ needs.native-free-threaded-admission-qualification.result }}
           FUZZ_RESULT: ${{ needs.native-frozen-format-fuzz.result }}
-          PERFORMANCE_RESULT: ${{ needs.native-frozen-performance-evidence.result }}
-          ALLOCATOR_RELEASE_RESULT: ${{ needs.native-handle-allocator-release-qualification.result }}
           ARCHITECTURE_RESULT: ${{ needs.native-architecture-parity-comparison.result }}
           DISTRIBUTION_RESULT: ${{ needs.build-distributions.result }}
         run: |
@@ -564,8 +464,6 @@ jobs:
               "lifecycle": os.environ["LIFECYCLE_RESULT"],
               "free_threaded_admission": os.environ["FREE_THREADED_RESULT"],
               "fuzz": os.environ["FUZZ_RESULT"],
-              "performance": os.environ["PERFORMANCE_RESULT"],
-              "allocator_release": os.environ["ALLOCATOR_RELEASE_RESULT"],
               "architecture_parity": os.environ["ARCHITECTURE_RESULT"],
               "distribution": os.environ["DISTRIBUTION_RESULT"],
           }

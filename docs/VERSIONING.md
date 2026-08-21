@@ -20,17 +20,18 @@ v3.6.0 -> v3.6.1 -> v3.6.2
 
 Staqtapp-TDS will not publish another `.postN` release.
 
-The current published architecture line is **v3.8.1**, adding the fixed-point
-path reference oracle, Browser idle-performance repair, and workspace telemetry
-mount above the packed Waypoint Graph Foundation. The current production PyPI
-identity is `3.8.1`. The credentialed H100 workflow has not
-been executed; publication grants no Eaglegate canary, promotion, or activation
-authority.
+The current production architecture and PyPI identity is **v3.8.2**. It adds
+the system performance correction above v3.8.1's fixed-point path reference
+oracle, Browser idle-performance repair, and workspace telemetry mount. The
+retired 306-process allocator research qualifier produced no performance
+decision, so this version makes no retained allocator-speedup claim. Allocator
+correctness, ABI, and lifecycle behavior remain covered by normal tests,
+sanitizers, supported-platform compatibility matrices, distribution builds,
+and installed-package smoke tests.
 
-The current source identity is **v3.8.2**, a non-releaseable source candidate
-for the widened system performance correction. Candidate status belongs to its branch and
-qualification evidence; `3.8.2` is not advertised as an installable production
-PyPI version until the complete tag matrix and trusted-publication gates pass.
+The credentialed H100 workflow has not been executed; publication grants no
+Eaglegate execution, canary, promotion, activation, token-acceptance, or
+KV-commit authority. Eaglegate remains shadow/target-only.
 
 ## Operational rules
 
@@ -41,7 +42,7 @@ PyPI version until the complete tag matrix and trusted-publication gates pass.
 4. Candidate state belongs to branches, pull requests, qualification evidence,
    and release-controller state—not to a `.postN` package suffix.
 5. Release workflows must derive artifact and tag checks from the package's
-   single authoritative version source before v3.6.0 publication.
+   single authoritative version source before publication.
 6. Historical `3.5.3.post1` and `3.5.3.post2` references may remain only where
    they describe those immutable releases.
 

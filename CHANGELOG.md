@@ -1,10 +1,10 @@
-# v3.8.2 — System performance corrections (NON-RELEASEABLE source candidate)
+# v3.8.2 — System performance corrections
 
 The user's wider system audit request superseded the attached allocator-only
-assessment as this branch's scope. Prepared a semantics-preserving correction
+assessment as this release's scope. Released a semantics-preserving correction
 across confirmed Core, persistence, observation, CSV, Generation Authority,
-Driver, Trace Rank, and Eaglegate hot paths without relaxing the allocator
-proof gate. v3.8.1 remains the published PyPI release.
+Driver, Trace Rank, and Eaglegate hot paths. Stored formats, canonical CSV-byte
+identities, evidence identities, and authority boundaries remain unchanged.
 
 - Removed the redundant capacity scan from locked monotonic native automatic
   handle allocation while retaining explicit-handle collision checks.
@@ -37,12 +37,16 @@ proof gate. v3.8.1 remains the published PyPI release.
 - Completed the post-review aggregate suite with 1,283 passed / 1 skipped in
   native-active mode and 1,230 passed / 49 skipped in pure-Python mode; release
   sanity, source hygiene, bytecode compilation, and pure-wheel smoke checks pass.
-- Kept the candidate **NON-RELEASEABLE** pending retained randomized paired
-  AB/BA allocator evidence: the full-TDS 32-byte `RAW_BINARY` write primary
-  path with wrapper/raw-C controls, diagnostics/
-  telemetry and thread cells, unaffected lookup, CPU/peak-RSS recording,
-  supported-platform CI, and the complete release gate. The current raw-C
-  result and unretained exploratory JSON do not satisfy that gate.
+- Retired the 306-process allocator research qualifier after it proved
+  operationally infeasible. It produced no performance decision, so v3.8.2
+  makes no retained allocator-speedup claim. Allocator correctness, ABI, and
+  lifecycle coverage instead remains within the normal tests, sanitizers,
+  supported-platform compatibility matrices, distribution builds, and
+  installed-package smoke tests.
+- Preserved Eaglegate as shadow/target-only with no new execution, canary,
+  promotion, activation, token-acceptance, or KV-commit authority. The manual
+  credentialed H100 workflow remains unexecuted and required for hardware
+  evidence.
 
 # v3.8.1 — Fixed-point path reference, Browser performance, and workspace telemetry
 

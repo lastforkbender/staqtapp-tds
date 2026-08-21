@@ -12,6 +12,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 import check_pypi_readme as verifier  # noqa: E402
+import check_release as release_checker  # noqa: E402
 import verify_pypi_presentation as live_verifier  # noqa: E402
 
 
@@ -24,6 +25,17 @@ def _png(width: int = 1280, height: int = 800, *, marker: bytes = b"") -> bytes:
         + b"\x00\x00\x00\x00"
         + marker
     )
+
+
+def test_v382_release_identity_and_future_candidate_sentinels_are_current() -> None:
+    assert release_checker.CURRENT_PRODUCTION_VERSION == "3.8.2"
+    assert release_checker.SOURCE_CANDIDATE_MARKER in live_verifier.STALE_WORDING
+    assert (
+        release_checker.V370_JAPANESE_CANDIDATE_MARKER
+        in live_verifier.STALE_WORDING
+    )
+    assert verifier.USER_AGENT.endswith("/3.8.2")
+    assert live_verifier.USER_AGENT.endswith("/3.8.2")
 
 
 def _description(urls: tuple[str, ...] = verifier.EXPECTED_IMAGE_URLS) -> str:
@@ -79,13 +91,13 @@ def _write_wheel(path: Path, description: str) -> None:
     metadata = (
         "Metadata-Version: 2.4\n"
         "Name: staqtapp-tds\n"
-        "Version: 3.8.0\n"
+        "Version: 3.8.2\n"
         "Description-Content-Type: text/markdown\n"
         "\n"
         f"{description}\n"
     )
     with ZipFile(path, "w") as archive:
-        archive.writestr("staqtapp_tds-3.8.0.dist-info/METADATA", metadata)
+        archive.writestr("staqtapp_tds-3.8.2.dist-info/METADATA", metadata)
 
 
 def test_repository_readme_and_local_captures_match_contract() -> None:
@@ -173,7 +185,7 @@ def test_network_check_requires_http_200_and_png_content_type(
 
 
 def test_wheel_metadata_preserves_exact_urls_and_order(tmp_path: Path) -> None:
-    wheel = tmp_path / "staqtapp_tds-3.8.0-py3-none-any.whl"
+    wheel = tmp_path / "staqtapp_tds-3.8.2-py3-none-any.whl"
     _write_wheel(wheel, _description())
     assert verifier.validate_wheel(wheel) == verifier.EXPECTED_IMAGE_URLS
 
@@ -190,7 +202,7 @@ def test_capture_evidence_hashes_complete_local_files(tmp_path: Path) -> None:
     assert captures[first_url].byte_count == len(payloads[first_url])
 
 
-def _live_description(*, version: str = "3.8.0") -> str:
+def _live_description(*, version: str = "3.8.2") -> str:
     links = "\n".join(
         f"[required target]({target})" for target in live_verifier.REQUIRED_TARGETS[1:]
     )
@@ -203,13 +215,13 @@ def _live_description(*, version: str = "3.8.0") -> str:
 
 def test_live_pypi_description_requires_exact_version_heading_and_install() -> None:
     images, _links = live_verifier.validate_description(
-        _live_description(), version="3.8.0"
+        _live_description(), version="3.8.2"
     )
     assert len(images) == 19
 
     with pytest.raises(ValueError, match="exact release identity"):
         live_verifier.validate_description(
-            _live_description(version="3.5.3.post2"), version="3.8.0"
+            _live_description(version="3.5.3.post2"), version="3.8.2"
         )
 
 
@@ -217,5 +229,5 @@ def test_live_pypi_description_requires_exact_version_heading_and_install() -> N
 def test_live_pypi_description_rejects_obsolete_status_markers(marker: str) -> None:
     with pytest.raises(ValueError, match="obsolete release wording"):
         live_verifier.validate_description(
-            _live_description() + marker, version="3.8.0"
+            _live_description() + marker, version="3.8.2"
         )

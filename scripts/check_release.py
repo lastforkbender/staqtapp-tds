@@ -59,7 +59,7 @@ PYPI_README_REQUIRED_LINKS = (
     "https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_API_Surface_Reference.pdf",
     "https://github.com/lastforkbender/staqtapp-tds/blob/v3.5.3/tds_api_docs/Staqtapp_TDS_Programmer_Core_API_Guide.pdf",
 )
-CURRENT_PRODUCTION_VERSION = "3.8.1"
+CURRENT_PRODUCTION_VERSION = "3.8.2"
 SOURCE_CANDIDATE_MARKER = "source candidate under review, not a published package"
 V370_JAPANESE_CANDIDATE_MARKER = "published package ではありません"
 
@@ -186,19 +186,26 @@ def main() -> int:
     production_install = (
         f"python -m pip install staqtapp-tds=={CURRENT_PRODUCTION_VERSION}"
     )
-    candidate_status = SOURCE_CANDIDATE_MARKER in readme
     candidate_heading = f"# Staqtapp-TDS v{expected_version} release candidate"
+    candidate_status = SOURCE_CANDIDATE_MARKER in readme
+    current_production_candidate = expected_version == CURRENT_PRODUCTION_VERSION and (
+        candidate_status
+        or candidate_heading in readme.splitlines()
+        or "NON-RELEASEABLE" in readme
+    )
+    if current_production_candidate:
+        return fail("the current production README cannot advertise candidate status")
     if candidate_status:
         if is_tag:
             return fail("a production tag cannot publish a source-candidate README")
-        if candidate_heading not in readme:
+        if candidate_heading not in readme.splitlines():
             return fail("PyPI README is missing the current candidate heading")
         if production_install not in readme:
             return fail("PyPI README is missing the current production install pin")
         if expected_install in readme and expected_version != CURRENT_PRODUCTION_VERSION:
             return fail("PyPI README advertises an unpublished source-version pin")
     else:
-        if expected_heading not in readme:
+        if expected_heading not in readme.splitlines():
             return fail(f"PyPI README is missing current heading {expected_heading!r}")
         if expected_install not in readme:
             return fail(f"PyPI README is missing current install pin {expected_install!r}")
@@ -209,17 +216,25 @@ def main() -> int:
     if "tag を作成できません" in japanese_readme:
         return fail("Japanese README contains obsolete pre-publication status wording")
     japanese_candidate = V370_JAPANESE_CANDIDATE_MARKER in japanese_readme
+    if expected_version == CURRENT_PRODUCTION_VERSION and (
+        japanese_candidate
+        or candidate_heading in japanese_readme.splitlines()
+        or "NON-RELEASEABLE" in japanese_readme
+    ):
+        return fail(
+            "the current Japanese production README cannot advertise candidate status"
+        )
     if japanese_candidate != candidate_status:
         return fail("English and Japanese README candidate status is inconsistent")
     if candidate_status:
-        if candidate_heading not in japanese_readme:
+        if candidate_heading not in japanese_readme.splitlines():
             return fail("Japanese README is missing the current candidate heading")
         if production_install not in japanese_readme:
             return fail("Japanese README is missing the current production install pin")
         if expected_install in japanese_readme and expected_version != CURRENT_PRODUCTION_VERSION:
             return fail("Japanese README advertises an unpublished source-version pin")
     else:
-        if f"# Staqtapp-TDS v{expected_version}" not in japanese_readme:
+        if f"# Staqtapp-TDS v{expected_version}" not in japanese_readme.splitlines():
             return fail("Japanese README is missing the current release heading")
         if expected_install not in japanese_readme:
             return fail("Japanese README is missing the current install pin")

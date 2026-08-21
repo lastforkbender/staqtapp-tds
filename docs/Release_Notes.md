@@ -1,15 +1,14 @@
 # TDS Release Notes
 
-## v3.8.2 — System Performance Corrections (NON-RELEASEABLE Source Candidate)
+## v3.8.2 — System Performance Corrections
 
 The user's system-wide audit request superseded the attached allocator-only
-assessment as the scope of this branch. This candidate therefore repairs
+assessment as the scope of this release. v3.8.2 repairs
 confirmed scaling failures across native Core, persistence/telemetry, JSON
 observation, CSV evidence operations, Generation Authority, Driver
-Foundry/VM/Studio orchestration, Trace Rank, and Eaglegate admission. That wider
-scope does not relax the native allocator proof gate. The candidate changes no
+Foundry/VM/Studio orchestration, Trace Rank, and Eaglegate admission. It changes no
 stored format, canonical CSV byte contract, public authority boundary, Browser
-capture, or important link. v3.8.1 remains the current production PyPI release.
+capture, or important link.
 
 The correction removes quadratic automatic-handle allocation, repeated linear
 manifest payload lookup, repeated whole-source CSV scans and hashes, duplicate
@@ -25,14 +24,15 @@ identities without changing target-only or shadow status. See
 `docs/135_v382_System_Performance_Corrections.md` for the local measurement summary and
 the higher-risk hypotheses deliberately deferred from this patch.
 
-This source candidate is **NON-RELEASEABLE**. Tagging and publication remain
-blocked on retained randomized paired AB/BA allocator evidence in clean
-worktrees, with the full-TDS 32-byte `RAW_BINARY` write path as the primary
-claim and the wrapper/raw-C paths as controls; diagnostics and
-telemetry, thread-count, and entry-count cells; unaffected lookup checks;
-recorded CPU and peak RSS; supported-platform CI; and the complete release
-gate. The current raw-C allocator number is a causal indication, not a release
-claim, and the exploratory paired benchmark JSON was not retained.
+The 306-process allocator research qualifier was retired after proving
+operationally infeasible and produced no performance decision. v3.8.2 therefore
+makes no retained allocator-speedup claim. Allocator correctness, ABI, and
+lifecycle coverage is carried by the normal functional and adversarial tests,
+sanitizers, supported-platform compatibility matrices, distribution builds,
+and installed-package smoke tests. This release adds no Driver or Eaglegate
+execution, canary, promotion, activation, token-acceptance, or KV-commit
+authority. Eaglegate remains shadow/target-only; the manual credentialed H100
+workflow remains unexecuted and required for hardware-evidence claims.
 
 ## v3.8.1 — Fixed-Point Reference and Live Workspace Telemetry
 

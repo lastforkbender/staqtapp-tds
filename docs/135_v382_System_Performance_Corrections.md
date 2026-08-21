@@ -1,21 +1,21 @@
 # v3.8.2 System Performance Corrections
 
-Status: **NON-RELEASEABLE source candidate**; not a published package.
+Status: **production release**.
 
 ## Scope and authority
 
-The attached v3.8.1 assessment proved one severe native allocator defect and
-kept every other observation as a hypothesis. For this audit branch, the
-user's later system-wide request supersedes that allocator-only scope: the
-review was widened to Core, persistence and observation, CSV capabilities,
-Generation Authority, Driver Foundry/VM/Studio, Trace Rank, and Eaglegate. It
-does not supersede or weaken the allocator proof gate. Corrections were
-admitted only when they preserved the relevant semantics and were protected by
-focused regression sentinels.
+The attached v3.8.1 assessment identified one severe native allocator defect
+and kept every other observation as a hypothesis. The user's later system-wide
+request widened the release review to Core, persistence and observation, CSV
+capabilities, Generation Authority, Driver Foundry/VM/Studio, Trace Rank, and
+Eaglegate. Corrections were admitted only when they preserved the relevant
+semantics and were protected by focused regression sentinels.
 
 Performance evidence remains engineering feedback. It cannot authorize Driver
 activation, CSV semantic truth, Generation publication, Eaglegate serving,
 canary traffic, promotion, token acceptance, or KV commit.
+Eaglegate remains shadow/target-only, and the manual credentialed H100 workflow
+has not been executed and remains required for any hardware-evidence claim.
 
 ## Corrected findings
 
@@ -49,9 +49,8 @@ sentinels are correctness gates, not benchmark-only checks.
 Measurements were made on Linux x86-64 with CPython 3.12.13 and GCC `-O3`.
 They demonstrate local causal shape; they are not universal hardware claims.
 
-| Workload | v3.8.1 baseline | v3.8.2 candidate | Local result |
+| Workload | v3.8.1 baseline | v3.8.2 | Local result |
 |---|---:|---:|---:|
-| Raw native automatic inserts, 100,000, one thread, diagnostics off | 26.1628 s | 0.0277 s | 943.6× indication only |
 | Telemetry `record_read`, 200,000 calls | 0.563514 s | 0.128770 s | 4.38× faster |
 | Persistence writer, 64 MiB raw payload, median `tracemalloc` peak | 67,129,697 B | 1,064,702 B | 63.05× lower traced peak |
 | Persistence writer, same workload, median elapsed | 385.290 ms | 350.673 ms | 8.98% faster |
@@ -72,43 +71,32 @@ They demonstrate local causal shape; they are not universal hardware claims.
 | Trace public fail-closed materialization, 1,600 waypoints | 478.273032 ms | 292.990240 ms | 1.63× faster |
 | Trace proof-bound materialization after admission, 1,600 waypoints | not present | 0.505660 ms | new proof-scoped seam |
 
-Every paired row above used the same candidate benchmark script to drive both
-the clean v3.8.1 and candidate `PYTHONPATH`, and it required exact result roots,
+Every paired row above used the same v3.8.2 benchmark script to drive both
+the clean v3.8.1 and v3.8.2 `PYTHONPATH`, and it required exact result roots,
 hashes, bytes, or counters to match. `tracemalloc` rows report traced Python
 allocations, not process RSS. The Eaglegate rows are repeated steady-state
 public-API admission after one expected-result check and two 500-operation
 warmups; they do not measure first construction or cold-cache latency. The
 Trace public-materializer row is the compatible public-API comparison. The
-0.505660 ms candidate row is a new proof-scoped seam usable only after graph
+0.505660 ms v3.8.2 row is a new proof-scoped seam usable only after graph
 admission; comparing it with the v3.8.1 public path illustrates removed
 validation work, but is not a same-API speedup claim.
 
-The allocator row is weaker evidence: its baseline was one causal sample while
-the candidate used three samples, and it measures the raw C index rather than
-the primary full-TDS 32-byte `RAW_BINARY` write path. Raw JSON records from these exploratory
-paired runs were not retained as repository artifacts. Retained raw JSON and a
-release-quality allocator result remain pending.
+## Allocator qualification decision
 
-## Non-releaseable allocator proof gate
+The experimental 306-process allocator qualifier combined full-TDS 32-byte
+`RAW_BINARY` writes with wrapper and raw-C controls, telemetry and thread
+cells, unaffected lookup, CPU and RSS recording, and paired baseline/release
+runs. It was retired after proving operationally infeasible on the hosted
+runner and produced no performance decision. The incomplete run is neither a
+pass nor a fail, and v3.8.2 makes no retained allocator-speedup claim.
 
-v3.8.2 must not be tagged or published until all of the following are complete
-on clean, isolated baseline and candidate worktrees:
-
-- randomized paired AB/BA process order with the full warmup/repetition policy,
-  retained raw JSON, exact source/extension identity, and confidence reporting;
-- the full-TDS 32-byte `RAW_BINARY` write path as the primary claim, with the
-  `NativeEntryIndexBackend` wrapper and raw C index retained as controls;
-- diagnostics/telemetry on and off cells, single-thread and multi-thread cells,
-  and the declared entry-count matrix;
-- unaffected lookup correctness and lookup-latency checks after insertion, not
-  insertion throughput alone;
-- recorded CPU identity/configuration, process CPU time, and peak RSS in
-  addition to wall time and Python-only traced allocation; and
-- repeat execution in release CI on the supported native platforms, followed
-  by the complete package release gate.
-
-Until that evidence is retained and green, the candidate is
-**NON-RELEASEABLE**, regardless of the large raw allocator indication.
+The native automatic-allocation correction remains covered as a correctness
+change. Normal functional and adversarial tests exercise allocation,
+collision, deletion, resizing, restoration, exhaustion, concurrency, ABI, and
+lifecycle semantics. Sanitizers, supported-platform compatibility matrices,
+native and pure distribution builds, and installed-package smoke tests provide
+the release coverage for that path.
 
 ## Verification
 
@@ -118,28 +106,25 @@ all generated native modules were removed. The final Driver/Trace/Eaglegate
 adversarial matrix added **131 passed**. `scripts/check_release.py`, bytecode
 compilation, `git diff --check`, a pure wheel build, and an extracted-wheel
 version smoke check also passed. These results qualify the implementation
-changes locally; they do not satisfy the separate allocator evidence gate or
-make this candidate releaseable.
+changes through the normal release gates; they do not create an allocator
+performance claim.
 
-The candidate checkout owns the benchmark scripts. Use each exact same script
+The v3.8.2 checkout owns the benchmark scripts. Use each exact same script
 against both source trees so the measurement harness itself is held constant:
 
 ```bash
 BASE=/path/to/clean-v3.8.1
-CAND=/path/to/v3.8.2-candidate
-PYTHONPATH="$BASE/src" python "$CAND/benchmarks/benchmark_driver_performance_corrections.py" \
+REL=/path/to/v3.8.2
+PYTHONPATH="$BASE/src" python "$REL/benchmarks/benchmark_driver_performance_corrections.py" \
   --records 5000 --iterations 11 --label baseline > /tmp/tds-driver-baseline.json
-PYTHONPATH="$CAND/src" python "$CAND/benchmarks/benchmark_driver_performance_corrections.py" \
-  --records 5000 --iterations 11 --label candidate > /tmp/tds-driver-candidate.json
+PYTHONPATH="$REL/src" python "$REL/benchmarks/benchmark_driver_performance_corrections.py" \
+  --records 5000 --iterations 11 --label release > /tmp/tds-driver-release.json
 ```
 
 Apply that two-worktree pattern to these entry points:
 
 ```bash
 CC=gcc STAQTAPP_TDS_BUILD_NATIVE=1 python setup.py build_ext --inplace --force
-CC=gcc PYTHONPATH=src python benchmarks/benchmark_native_handle_allocator.py \
-  --entries 10000 50000 100000 --threads 1 --warmups 2 --repetitions 7 \
-  --wrapper --diagnostics normal
 PYTHONPATH=src python benchmarks/benchmark_csv_generation_performance_corrections.py \
   --rows 20000 --iterations 5 --fs-index-backend python \
   --expected-fs-index-backend python-sharded

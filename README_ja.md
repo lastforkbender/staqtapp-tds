@@ -1,10 +1,4 @@
-# Staqtapp-TDS v3.8.2 release candidate
-
-> **Release status:** v3.8.2 は review 中の **NON-RELEASEABLE** source candidate であり、published package ではありません。v3.8.1 が current production PyPI release のため、install command は意図的に 3.8.1 のままです。Publication は、full-TDS の 32-byte `RAW_BINARY` write path を primary claim とし、wrapper / raw-C を control とする retained randomized paired AB/BA native allocator evidence、telemetry / thread / unaffected-lookup cell、CPU / peak-RSS 記録、supported-platform CI、complete release gate が完了するまで block されます。この candidate は Core、observation、CSV / Generation、Driver Foundry / VM / Studio、Trace Rank、Eaglegate admission の performance correction と regression evidence を追加しますが、新しい execution、canary、promotion、activation、token acceptance、KV commit authority は付与しません。Manual credentialed H100 workflow は未実行であり hardware evidence に引き続き必要です。Eaglegate は shadow / target-only のままです。
-
-> **v3.8.2 system performance correction candidate:** User の system-wide request は、この audit branch の scope として attached allocator-only assessment を supersede しました。Native handle allocator、persistence / telemetry、JSON observation、CSV evidence workflow、Generation Authority、Driver Foundry / VM / Studio orchestration、Trace Rank、Eaglegate admission の確認済み scaling failure を修正します。この wider scope は allocator proof gate を緩和しません。Stored format、canonical CSV byte、authority boundary、Browser capture、important link は変更しません。
-
-> **v3.6.0 Foundation substrate:** fail-closed native ABI / lifecycle、strict checksum / UTF-8 truth、generation-bound handle、bounded C11 diagnostics、immutable packed read、x86-64 / AArch64 semantic parity を保持します。
+# Staqtapp-TDS v3.8.2
 
 ## v3.8.2 の測定済み performance correction
 
@@ -23,8 +17,22 @@ semantic result の完全一致を必須としています。
 これらは Linux x86-64、CPython 3.12.13、GCC `-O3` における
 workload-specific measurement です。Exact root、hash、byte、counter の一致を
 必須としています。`tracemalloc` は process RSS ではなく traced Python
-allocation を示します。完全な method と result は
+allocation を示します。Retained allocator speedup は claim しません。
+306-process research qualifier は operationally infeasible であることが判明した
+ため廃止され、performance decision は生成されませんでした。Allocator の
+correctness、ABI、lifecycle は normal test、sanitizer、compatibility matrix、
+distribution build、installed-package smoke test で検証します。完全な method と result は
 `docs/135_v382_System_Performance_Corrections.md` に記録しています。
+
+> **Release status:** v3.8.2 は production release です。Stored format、
+> canonical CSV byte、public authority boundary、Browser capture、important
+> link は変更しません。この correction は新しい Driver、Eaglegate、
+> execution、canary、promotion、activation、token acceptance、KV commit
+> authority を付与しません。Manual credentialed H100 workflow は未実行で、
+> hardware evidence には引き続き必要です。Eaglegate は shadow / target-only
+> のままです。
+
+> **v3.6.0 Foundation substrate:** fail-closed native ABI / lifecycle、strict checksum / UTF-8 truth、generation-bound handle、bounded C11 diagnostics、immutable packed read、x86-64 / AArch64 semantic parity を保持します。
 
 **Temporal Directory System - AI システム向けの native-indexed `.tds` ストレージ、変数制御、トレース順位付け、CSV evidence 操作、semantic review、集中型 observability。**
 
@@ -122,7 +130,7 @@ TDS は storage hot path を狭く保つ設計です。Native index、lookup、p
 
 ```bash
 # Current production PyPI release（両方の UI を含む）
-python -m pip install staqtapp-tds==3.8.1
+python -m pip install staqtapp-tds==3.8.2
 
 # main TDS telemetry UI を起動
 staqtapp-tds
@@ -278,7 +286,7 @@ TDS は preparation、evidence、review、authority を明確に分離します�
 
 ## Validation status
 
-v3.8.2 source candidate は Core、observation、CSV / Generation、Driver、Trace
+v3.8.2 production release は Core、observation、CSV / Generation、Driver、Trace
 Rank、Eaglegate における whole-structure work の重複を修正します。Native
 automatic handle allocation、sidecar lookup、decompression、bounded persistence
 write と atomic reload index publication、exact JSON / telemetry counter と
@@ -347,14 +355,16 @@ v3.8.1 は reference-only Phase 5 fixed-point path oracle と Browser / workspac
 telemetry correction を追加します。Frontier execution または Eaglegate
 activation authority は追加しません。Local qualification は 1,159 passed、
 45 skipped、HTTP workspace smoke、distribution artifact check を完了し、
-production publication は complete tag matrix によって gate されます。
+production publication は complete tag matrix を通じて完了しました。
 
-v3.8.2 は bounded system performance correction の current
-**NON-RELEASEABLE** source candidate です。Correction は v3.8.1 の stored
+v3.8.2 は production system-performance correction です。v3.8.1 の stored
 format、canonical CSV-byte identity、evidence identity、authority boundary を
-保持するよう設計され、変更 path には regression sentinel があります。Local
-result は publication または universal hardware-performance claim ではなく、
-native allocator release proof は pending です。
+保持し、変更 path には regression sentinel があります。報告する measurement
+は workload-specific であり universal hardware claim ではありません。廃止した
+306-process allocator research qualifier は performance decision を生成して
+いないため、v3.8.2 は retained allocator-speedup を claim しません。Allocator
+の correctness、ABI、lifecycle は normal test、sanitizer、compatibility、build、
+installed-smoke gate で検証します。
 
 ## Repository map
 
