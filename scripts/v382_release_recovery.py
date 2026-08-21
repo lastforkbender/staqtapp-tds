@@ -46,6 +46,8 @@ QUALIFIED_RUN_ID = 32485115821
 CONTROLLER_RUN_ID = 32485555450
 CONTROLLER_RUN_ATTEMPT = 1
 ORIGINAL_RELEASE_RUN_ID = 32485582558
+PUBLISHING_RECOVERY_RUN_ID = 32493678825
+PUBLISHING_RECOVERY_SHA = "887e7d0ab07f2f6da7c596bb39e727b0e9103c47"
 TAG_OBJECT_SHA = "8043b37572edf6aa3c40419f2e1ad385d6e3ae70"
 REPOSITORY_ID = 1_275_110_431
 RELEASE_WORKFLOW_ID = 314_388_312
@@ -83,6 +85,13 @@ RECOVERY_PATHS = frozenset(
         ".github/workflows/release.yml",
         ".github/workflows/v382-release-controller.yml",
         "scripts/v382_release_provenance.py",
+        "scripts/v382_release_recovery.py",
+        "tests/test_v382_release_bridge.py",
+    }
+)
+POSTPUBLISH_REPAIR_PATHS = frozenset(
+    {
+        ".github/workflows/release.yml",
         "scripts/v382_release_recovery.py",
         "tests/test_v382_release_bridge.py",
     }
@@ -378,6 +387,44 @@ def _require_recovery_diff(
         )
 
 
+def _require_postpublish_repair_diff(
+    api: RecoveryGitHubAPI, recovery_sha: str
+) -> None:
+    comparison = api.get(f"/compare/{PUBLISHING_RECOVERY_SHA}...{recovery_sha}")
+    if (
+        comparison.get("status") != "ahead"
+        or comparison.get("base_commit", {}).get("sha")
+        != PUBLISHING_RECOVERY_SHA
+        or comparison.get("merge_base_commit", {}).get("sha")
+        != PUBLISHING_RECOVERY_SHA
+        or comparison.get("ahead_by") != 1
+        or comparison.get("behind_by") != 0
+        or comparison.get("total_commits") != 1
+    ):
+        raise ReleaseProvenanceError(
+            "postpublication repair is not one exact commit after the "
+            "publishing recovery"
+        )
+    files = comparison.get("files")
+    if not isinstance(files, list):
+        raise ReleaseProvenanceError(
+            "postpublication repair comparison lacks an exact file list"
+        )
+    changed = {
+        item.get("filename")
+        for item in files
+        if isinstance(item, dict) and isinstance(item.get("filename"), str)
+    }
+    if (
+        len(files) != len(POSTPUBLISH_REPAIR_PATHS)
+        or changed != POSTPUBLISH_REPAIR_PATHS
+    ):
+        raise ReleaseProvenanceError(
+            "postpublication repair changed files outside the exact fix: "
+            f"{sorted(changed)!r}"
+        )
+
+
 def _require_distribution_identities(root: Path) -> None:
     actual = validate_distribution_set(root)
     if actual != EXPECTED_DISTRIBUTION_IDENTITIES:
@@ -650,7 +697,11 @@ def verify_recovery_provenance(phase: str) -> RecoveryGitHubAPI:
         or main_ref.get("object", {}).get("sha") != recovery_sha
     ):
         raise ReleaseProvenanceError("main changed after recovery dispatch")
-    _require_recovery_diff(api, recovery_sha)
+    if postpublish:
+        _require_recovery_diff(api, PUBLISHING_RECOVERY_SHA)
+        _require_postpublish_repair_diff(api, recovery_sha)
+    else:
+        _require_recovery_diff(api, recovery_sha)
 
     qualified = api.get(f"/actions/runs/{QUALIFIED_RUN_ID}")
     require_fields(
@@ -785,6 +836,10 @@ def verify_recovery_provenance(phase: str) -> RecoveryGitHubAPI:
     _require_distribution_identities(Path(env["DISTRIBUTION_DIR"]))
     recovery_jobs = api.jobs(recovery_run_id)
     if postpublish:
+        if published_recovery_run_id != PUBLISHING_RECOVERY_RUN_ID:
+            raise ReleaseProvenanceError(
+                "postpublication run does not name the exact publishing recovery"
+            )
         _require_permanent_environment_policy(api)
         if published_recovery_run_id == recovery_run_id:
             raise ReleaseProvenanceError(
@@ -793,7 +848,7 @@ def verify_recovery_provenance(phase: str) -> RecoveryGitHubAPI:
         _require_successful_publishing_recovery(
             api,
             run_id=published_recovery_run_id,
-            recovery_sha=recovery_sha,
+            recovery_sha=PUBLISHING_RECOVERY_SHA,
         )
     else:
         _require_temporary_main_environment_policy(api)
