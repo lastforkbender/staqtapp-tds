@@ -9,12 +9,37 @@ chains, historical status ledgers and implementation journals, meta/prose tests,
 and unused source-archive bulk do not.
 
 PCSDQR changes no stored format or public API and widens no authority boundary.
-The v3.8.2 performance record remains in `benchmarks/README.md` and
-`CHANGELOG.md` instead of being repeated here.
+The v3.8.2 measured performance record remains visible below; its full
+reproducible measurements and commands remain in
+[`benchmarks/README.md`](benchmarks/README.md).
 
 > **Release status:** v3.8.3 is the production release. Eaglegate remains
 > shadow/target-only; PCSDQR grants no execution, canary, promotion, activation,
 > token-acceptance, or KV-commit authority.
+
+## v3.8.2 measured performance corrections
+
+v3.8.2 corrected confirmed scaling failures across persistence and observation,
+CSV evidence workflows, Generation Authority, Driver Foundry/VM/Studio
+orchestration, Trace Rank, and Eaglegate admission. Representative paired
+v3.8.1-to-v3.8.2 measurements required identical semantic results:
+
+| Area | Measured result |
+|---|---|
+| Core / observation | 200,000 telemetry calls were 4.38× faster; JSON canonical dump and fast load were 4.12× and 4.90× faster. |
+| Persistence | For a 64 MiB raw payload, elapsed time improved by 8.98% and traced Python peak allocation fell from 67,129,697 B to 1,064,702 B. |
+| CSV / Generation | CSV scan plus row anchors was 3.15× faster; row-offset packing used 88.36% less traced Python peak allocation; eight cached root reads over a 4,096-payload manifest fell from 310.724119 ms to 0.006660 ms. |
+| Driver platform | Direct VM, managed VM, and Studio review workloads were 33.72%, 28.02%, and 73.41% faster. |
+| Trace Rank | Graph admission and byte admission were 3.57× and 2.05× faster; proof-bound public materialization measured 1.63× against its paired reference workload. |
+| Eaglegate | Warmed public admission was 13.79×–14.45× faster across the measured 1-, 3-, and 128-plan fixtures. |
+
+These workload-specific measurements compared v3.8.1 and v3.8.2 on Linux
+x86-64 with CPython 3.12.13 and GCC `-O3`; exact roots, hashes, bytes, or
+counters had to match. `tracemalloc` reports traced Python allocation, not
+process RSS. Eaglegate measures warmed public admission, and Trace proof-bound
+materialization is not a same-API baseline speedup. No allocator throughput
+claim is made. Full methods and results remain in
+[`benchmarks/README.md`](benchmarks/README.md).
 
 > **v3.6.0 Foundation substrate**
 >

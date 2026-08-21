@@ -9,12 +9,35 @@ validation chain、historical status ledger / implementation journal、
 meta / prose test、不要な source-archive bulk は維持しません。
 
 PCSDQR は stored format と public API を変更せず、authority boundary を拡大しません。
-v3.8.2 の performance record はここで繰り返さず、`benchmarks/README.md` と
-`CHANGELOG.md` に保持します。
+v3.8.2 の measured performance record は以下に表示したまま保持し、完全な
+reproducible measurement と command は
+[`benchmarks/README.md`](benchmarks/README.md) に保持します。
 
 > **Release status:** v3.8.3 は production release です。Eaglegate は
 > shadow / target-only のままです。PCSDQR は execution、canary、
 > promotion、activation、token acceptance、KV commit authority を付与しません。
+
+## v3.8.2 の測定済み performance correction
+
+以下の representative paired measurement は v3.8.1 と v3.8.2 を比較し、
+semantic result の完全一致を必須としています。
+
+| 対象 | 測定結果 |
+|---|---|
+| Core / observation | 200,000 telemetry call は 4.38 倍高速化し、JSON canonical dump / fast load はそれぞれ 4.12 倍 / 4.90 倍高速化しました。 |
+| Persistence | 64 MiB raw payload で elapsed time は 8.98% 短縮し、traced Python peak allocation は 67,129,697 B から 1,064,702 B に低減しました。 |
+| CSV / Generation | CSV scan + row anchor は 3.15 倍高速化し、row-offset packing の traced Python peak allocation は 88.36% 低減しました。4,096-payload manifest の cached root 8 回 read は 310.724119 ms から 0.006660 ms に短縮しました。 |
+| Driver platform | Direct VM、managed VM、Studio review workload はそれぞれ 33.72%、28.02%、73.41% 高速化しました。 |
+| Trace Rank | Graph admission と byte admission はそれぞれ 3.57 倍、2.05 倍高速化し、proof-bound public materialization は paired reference workload に対して 1.63 倍を測定しました。 |
+| Eaglegate | 測定した 1 / 3 / 128 plan fixture の warmed public admission は 13.79 倍～14.45 倍高速化しました。 |
+
+これらは Linux x86-64、CPython 3.12.13、GCC `-O3` で v3.8.1 と v3.8.2 を
+比較した workload-specific measurement です。Exact root、hash、byte、counter
+の一致を必須としています。`tracemalloc` は process RSS ではなく traced
+Python allocation を示します。Eaglegate は warmed public admission の測定で、
+Trace proof-bound materialization は same-API baseline speedup ではありません。
+Allocator throughput claim は行いません。完全な method と result は
+[`benchmarks/README.md`](benchmarks/README.md) に記録しています。
 
 > **v3.6.0 Foundation substrate:** fail-closed native ABI / lifecycle、strict checksum / UTF-8 truth、generation-bound handle、bounded C11 diagnostics、immutable packed read、x86-64 / AArch64 semantic parity を保持します。
 
