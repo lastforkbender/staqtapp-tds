@@ -8,9 +8,13 @@ import json
 import os
 import re
 import struct
-import tomllib
 import subprocess
 import sys
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10 uses the declared tomli backport.
+    import tomli as tomllib
 
 # The release checker scans for bytecode artifacts. Prevent its own helper
 # import from creating a repository-local ``scripts/__pycache__`` first.
