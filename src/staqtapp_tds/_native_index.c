@@ -1382,9 +1382,16 @@ static int allocate_monotonic_handle_locked(
     NativeHandleIndex *self,
     int64_t *out_handle
 ) {
+    /*
+     * The caller owns self->lock for writing.  next_handle is a monotonic
+     * high-water mark: automatic and explicit insertions only advance it,
+     * while deletion and resize never lower it.  Consequently an automatic
+     * handle cannot already be present and a capacity-wide uniqueness scan is
+     * both redundant and quadratic across an insertion workload.  Explicit
+     * requested handles still use handle_in_use_locked() below.
+     */
     int64_t handle = self->next_handle;
     if (handle <= 0) return -5;
-    if (handle_in_use_locked(self, handle, -1)) return -4;
     *out_handle = handle;
     self->next_handle = handle == INT64_MAX ? 0 : handle + 1;
     return 0;

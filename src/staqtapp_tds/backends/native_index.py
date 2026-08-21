@@ -9,6 +9,7 @@ from staqtapp_tds.backends.python_index import EntryIndexStats
 
 
 NativeHandleRef = Tuple[int, int, int, int, int]
+_NATIVE_INITIAL_CAPACITY = 1024
 
 
 class NativeFrozenHandleView:
@@ -79,8 +80,13 @@ class NativeEntryIndexBackend:
 
     def __init__(self, shards: int = 64):
         from staqtapp_tds._native_index import NativeHandleIndex
-        capacity = max(1024, int(shards) * 64)
-        self._index = NativeHandleIndex(capacity=capacity)
+        if int(shards) <= 0:
+            raise ValueError("EntryIndex shards must be positive")
+        # The native implementation is one dynamically resized table guarded
+        # by one rwlock; ``shards`` is a facade compatibility parameter, not a
+        # native capacity multiplier.  Multiplying the Python shard count by
+        # 64 eagerly allocated 4,096 slots for every empty directory.
+        self._index = NativeHandleIndex(capacity=_NATIVE_INITIAL_CAPACITY)
         self._values: Dict[int, Any] = {}
         self._keys: Dict[int, str] = {}
         self._lock = threading.RLock()
@@ -188,47 +194,56 @@ class NativeEntryIndexBackend:
     def __len__(self) -> int:
         return int(self._index.size())
 
-    def stats(self) -> Any:
-        s = self._index.stats()
+    def _entry_stats_from(self, stats: Dict[str, Any]) -> EntryIndexStats:
         return EntryIndexStats(
-            backend=s.get("backend", self.backend_name),
-            size=int(s.get("size", 0)),
+            backend=stats.get("backend", self.backend_name),
+            size=int(stats.get("size", 0)),
             shards=-1,
-            next_handle=int(s.get("next_handle", -1)),
-            capacity=int(s.get("capacity", -1)),
-            tombstones=int(s.get("tombstones", 0)),
-            load_factor=float(s.get("load_factor", 0.0)),
-            max_probe=int(s.get("max_probe", 0)),
-            avg_probe=float(s.get("avg_probe", 0.0)),
+            next_handle=int(stats.get("next_handle", -1)),
+            capacity=int(stats.get("capacity", -1)),
+            tombstones=int(stats.get("tombstones", 0)),
+            load_factor=float(stats.get("load_factor", 0.0)),
+            max_probe=int(stats.get("max_probe", 0)),
+            avg_probe=float(stats.get("avg_probe", 0.0)),
         )
+
+    def _execution_stats_from(self, stats: Dict[str, Any]) -> Dict[str, int | bool | str]:
+        return {
+            "backend": str(stats.get("backend", self.backend_name)),
+            "namespace_id": int(stats.get("namespace_id", 0)),
+            "index_epoch": int(stats.get("index_epoch", 0)),
+            "handle_ref_contract": str(stats.get("handle_ref_contract", "")),
+            "gil_released_put": bool(stats.get("gil_released_put", False)),
+            "gil_released_get_handle": bool(stats.get("gil_released_get_handle", False)),
+            "gil_released_get_handles": bool(stats.get("gil_released_get_handles", False)),
+            "gil_released_pop_lookup": bool(stats.get("gil_released_pop_lookup", False)),
+            "gil_released_stats_scan": bool(stats.get("gil_released_stats_scan", False)),
+            "gil_released_put_many": bool(stats.get("gil_released_put_many", False)),
+            "gil_released_pop_many": bool(stats.get("gil_released_pop_many", False)),
+            "native_put_calls": int(stats.get("native_put_calls", 0)),
+            "native_batch_put_calls": int(stats.get("native_batch_put_calls", 0)),
+            "native_lookup_calls": int(stats.get("native_lookup_calls", 0)),
+            "native_batch_lookup_calls": int(stats.get("native_batch_lookup_calls", 0)),
+            "native_pop_calls": int(stats.get("native_pop_calls", 0)),
+            "native_batch_pop_calls": int(stats.get("native_batch_pop_calls", 0)),
+            "native_stats_calls": int(stats.get("native_stats_calls", 0)),
+            "native_checksum_calls": int(stats.get("native_checksum_calls", 0)),
+            "native_chunk_scan_calls": int(stats.get("native_chunk_scan_calls", 0)),
+            "gil_released_calls": int(stats.get("gil_released_calls", 0)),
+            "python_native_transitions": int(stats.get("python_native_transitions", 0)),
+            "pool_reuse_count": int(stats.get("pool_reuse_count", 0)),
+            "pool_allocator_calls": int(stats.get("pool_allocator_calls", 0)),
+            "pool_frees": int(stats.get("pool_frees", 0)),
+        }
+
+    def telemetry_stats(self) -> Tuple[EntryIndexStats, Dict[str, int | bool | str]]:
+        """Shape table and execution telemetry from one native table scan."""
+        stats = self._index.stats()
+        return self._entry_stats_from(stats), self._execution_stats_from(stats)
+
+    def stats(self) -> Any:
+        return self._entry_stats_from(self._index.stats())
 
     def native_execution_stats(self) -> Dict[str, int | bool | str]:
         """Return raw native execution counters for dashboard telemetry."""
-        s = self._index.stats()
-        return {
-            "backend": str(s.get("backend", self.backend_name)),
-            "namespace_id": int(s.get("namespace_id", 0)),
-            "index_epoch": int(s.get("index_epoch", 0)),
-            "handle_ref_contract": str(s.get("handle_ref_contract", "")),
-            "gil_released_put": bool(s.get("gil_released_put", False)),
-            "gil_released_get_handle": bool(s.get("gil_released_get_handle", False)),
-            "gil_released_get_handles": bool(s.get("gil_released_get_handles", False)),
-            "gil_released_pop_lookup": bool(s.get("gil_released_pop_lookup", False)),
-            "gil_released_stats_scan": bool(s.get("gil_released_stats_scan", False)),
-            "gil_released_put_many": bool(s.get("gil_released_put_many", False)),
-            "gil_released_pop_many": bool(s.get("gil_released_pop_many", False)),
-            "native_put_calls": int(s.get("native_put_calls", 0)),
-            "native_batch_put_calls": int(s.get("native_batch_put_calls", 0)),
-            "native_lookup_calls": int(s.get("native_lookup_calls", 0)),
-            "native_batch_lookup_calls": int(s.get("native_batch_lookup_calls", 0)),
-            "native_pop_calls": int(s.get("native_pop_calls", 0)),
-            "native_batch_pop_calls": int(s.get("native_batch_pop_calls", 0)),
-            "native_stats_calls": int(s.get("native_stats_calls", 0)),
-            "native_checksum_calls": int(s.get("native_checksum_calls", 0)),
-            "native_chunk_scan_calls": int(s.get("native_chunk_scan_calls", 0)),
-            "gil_released_calls": int(s.get("gil_released_calls", 0)),
-            "python_native_transitions": int(s.get("python_native_transitions", 0)),
-            "pool_reuse_count": int(s.get("pool_reuse_count", 0)),
-            "pool_allocator_calls": int(s.get("pool_allocator_calls", 0)),
-            "pool_frees": int(s.get("pool_frees", 0)),
-        }
+        return self._execution_stats_from(self._index.stats())

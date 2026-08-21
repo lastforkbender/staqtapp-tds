@@ -729,16 +729,24 @@ def _serialize_payload(data: Any, fmt_id: FmtID, codec: str = '') -> bytes:
     return raw
 
 
-def _deserialize_payload(raw: bytes, fmt_id: FmtID, codec: str = '') -> Any:
+def _deserialize_payload(
+    raw: bytes,
+    fmt_id: FmtID,
+    codec: str = '',
+    *,
+    already_decompressed: bool = False,
+) -> Any:
     """Decode a stored payload through the Serialization Manager.
 
     On decode failure this returns TDSResult.fail(...). That keeps corrupted,
     incompatible, or hostile bytes from masquerading as valid application data
-    while preserving TDS's non-halting execution contract.
+    while preserving TDS's non-halting execution contract. Persistence may set
+    ``already_decompressed`` after it decoded the same bytes for hash checking;
+    the original fmt_id is retained so failure metadata remains unchanged.
     """
     base = fmt_id & ~FmtID.COMPRESSED
     try:
-        if fmt_id & FmtID.COMPRESSED:
+        if fmt_id & FmtID.COMPRESSED and not already_decompressed:
             raw = CompressorRegistry.decompress(raw, codec)
         return _serialization_manager().deserialize(raw, int(base))
     except Exception as exc:
@@ -1543,8 +1551,7 @@ class TDSFileSystem:
             telemetry_manager = self.telemetry_manager,
         )
         self._pool = ConcurrencyPool.acquire()
-        self.telemetry_manager.register_sampler("swiss", self._swiss_stats_snapshot)
-        self.telemetry_manager.register_sampler("radix", self._radix_stats_snapshot)
+        self.telemetry_manager.register_index_sampler(self._index_stats_snapshot)
         self.telemetry_manager.register_sampler("storage", self._storage_stats_snapshot)
         self.telemetry_manager.register_sampler("components", self._component_status_snapshot)
 
@@ -1557,23 +1564,30 @@ class TDSFileSystem:
             with node._lock:
                 stack.extend(list(node._children.values()))
 
-    def _swiss_stats_snapshot(self) -> dict:
+    def _index_stats_snapshot(self) -> dict:
+        """Observe Swiss and radix indexes in one directory-tree traversal."""
         total_entries = 0
         backends: Dict[str, int] = {}
         max_probe = 0
         avg_probe_sum = 0.0
         stat_count = 0
+        routers = 0
+        radix_nodes = 0
+        radix_edges = 0
+        radix_max_depth = 0
+        avg_steps_sum = 0.0
         for node in self._walk_directories():
             try:
-                stats = node._entry_index.stats()
+                stats, execution_stats = node._entry_index.telemetry_stats()
                 data = stats.__dict__.copy() if hasattr(stats, '__dict__') else dict(stats)
-                if hasattr(node._entry_index, "native_execution_stats"):
-                    try:
-                        self.telemetry_manager.merge_native_execution_stats(node._entry_index.native_execution_stats())
-                    except Exception:
-                        pass
             except Exception:
                 data = {"backend": node._entry_index.backend_name, "size": len(node._entry_index)}
+                execution_stats = None
+            if execution_stats is not None:
+                try:
+                    self.telemetry_manager.merge_native_execution_stats(execution_stats)
+                except Exception:
+                    pass
             size = int(data.get("size", data.get("entries", len(node._entry_index))) or 0)
             total_entries += size
             backend = str(data.get("backend", node._entry_index.backend_name))
@@ -1582,7 +1596,16 @@ class TDSFileSystem:
             if "average_probe" in data or "avg_probe" in data:
                 avg_probe_sum += float(data.get("average_probe", data.get("avg_probe", 0.0)) or 0.0)
                 stat_count += 1
-        return {
+            routers += 1
+            try:
+                radix = node._children.stats()
+            except Exception:
+                radix = {}
+            radix_nodes += int(radix.get("nodes", 0) or 0)
+            radix_edges += int(radix.get("edges", 0) or 0)
+            radix_max_depth = max(radix_max_depth, int(radix.get("max_depth", 0) or 0))
+            avg_steps_sum += float(radix.get("average_lookup_steps", 0.0) or 0.0)
+        swiss = {
             "entries": total_entries,
             "directory_count": sum(backends.values()),
             "backends": backends,
@@ -1590,31 +1613,23 @@ class TDSFileSystem:
             "average_probe": round(avg_probe_sum / stat_count, 3) if stat_count else 0.0,
             "gil_released_stats_scan": True,
         }
-
-    def _radix_stats_snapshot(self) -> dict:
-        routers = 0
-        nodes = 0
-        edges = 0
-        max_depth = 0
-        avg_steps_sum = 0.0
-        for node in self._walk_directories():
-            routers += 1
-            try:
-                st = node._children.stats()
-            except Exception:
-                st = {}
-            nodes += int(st.get("nodes", 0) or 0)
-            edges += int(st.get("edges", 0) or 0)
-            max_depth = max(max_depth, int(st.get("max_depth", 0) or 0))
-            avg_steps_sum += float(st.get("average_lookup_steps", 0.0) or 0.0)
-        return {
+        radix = {
             "backend": "python-radix-router",
             "routers": routers,
-            "nodes": nodes,
-            "edges": edges,
-            "max_depth": max_depth,
+            "nodes": radix_nodes,
+            "edges": radix_edges,
+            "max_depth": radix_max_depth,
             "average_lookup_steps": round(avg_steps_sum / max(1, routers), 3),
         }
+        return {"swiss": swiss, "radix": radix}
+
+    def _swiss_stats_snapshot(self) -> dict:
+        """Compatibility accessor for callers outside snapshot dispatch."""
+        return self._index_stats_snapshot()["swiss"]
+
+    def _radix_stats_snapshot(self) -> dict:
+        """Compatibility accessor for callers outside snapshot dispatch."""
+        return self._index_stats_snapshot()["radix"]
 
     def _storage_stats_snapshot(self) -> dict:
         directory_count = 0

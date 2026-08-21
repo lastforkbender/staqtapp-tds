@@ -257,6 +257,7 @@ class TelemetryManager:
         self._timer_counts: Dict[str, int] = {k: 0 for k in self._timers_ns}
         self._components: Dict[str, Dict[str, object]] = {}
         self._samplers: Dict[str, object] = {}
+        self._index_sampler: object | None = None
         self._last_snapshot_at = 0.0
         self._last_snapshot: Dict[str, object] | None = None
         self._published_snapshot: Dict[str, object] | None = None
@@ -358,6 +359,13 @@ class TelemetryManager:
             self._samplers[str(name)] = sampler
             self._last_snapshot = None
 
+    def register_index_sampler(self, sampler) -> None:
+        """Register the filesystem's private one-walk Swiss/radix sampler."""
+
+        with self._lock:
+            self._index_sampler = sampler
+            self._last_snapshot = None
+
     def set_component(self, name: str, *, status: str = "healthy", **fields: object) -> None:
         if not self.enabled:
             return
@@ -444,26 +452,51 @@ class TelemetryManager:
             self._counters["native_backend_ops"] = max(int(self._counters.get("native_backend_ops", 0)), native_calls)
 
     def record_read(self, elapsed_ns: int, *, hit: bool = True, backend: str = "") -> None:
-        self.incr("reads")
-        self.incr("lookups")
-        self.incr("lookup_hits" if hit else "lookup_misses")
-        self.record_timer("read_ns", elapsed_ns)
-        self.record_timer("lookup_ns", elapsed_ns)
-        if backend:
-            is_native = "native" in backend.lower()
-            self.incr("native_backend_ops" if is_native else "python_backend_ops")
-            if is_native:
-                self.incr("gil_released_ops")
+        if not self.enabled:
+            return
+        elapsed = max(0, int(elapsed_ns))
+        is_native = bool(backend) and "native" in backend.lower()
+        with self._lock:
+            if not self.enabled:
+                return
+            # A read is one observation.  Updating its exact counters and
+            # timers under one acquisition avoids repeatedly contending on the
+            # same RLock while preserving the existing cumulative values.
+            self._counters["reads"] += 1
+            self._counters["lookups"] += 1
+            self._counters["lookup_hits" if hit else "lookup_misses"] += 1
+            self._timers_ns["read_ns"] += elapsed
+            self._timer_counts["read_ns"] += 1
+            self._timers_ns["lookup_ns"] += elapsed
+            self._timer_counts["lookup_ns"] += 1
+            if backend:
+                self._counters[
+                    "native_backend_ops" if is_native else "python_backend_ops"
+                ] += 1
+                if is_native:
+                    self._counters["gil_released_ops"] += 1
 
     def record_write(self, elapsed_ns: int, *, raw_size: int = 0, stored_size: int = 0, backend: str = "") -> None:
-        self.incr("writes")
-        self.record_timer("write_ns", elapsed_ns)
-        self.add_bytes(raw=raw_size, stored=stored_size)
-        if backend:
-            is_native = "native" in backend.lower()
-            self.incr("native_backend_ops" if is_native else "python_backend_ops")
-            if is_native:
-                self.incr("gil_released_ops")
+        if not self.enabled:
+            return
+        elapsed = max(0, int(elapsed_ns))
+        raw = max(0, int(raw_size))
+        stored = max(0, int(stored_size))
+        is_native = bool(backend) and "native" in backend.lower()
+        with self._lock:
+            if not self.enabled:
+                return
+            self._counters["writes"] += 1
+            self._timers_ns["write_ns"] += elapsed
+            self._timer_counts["write_ns"] += 1
+            self._counters["bytes_raw"] += raw
+            self._counters["bytes_stored"] += stored
+            if backend:
+                self._counters[
+                    "native_backend_ops" if is_native else "python_backend_ops"
+                ] += 1
+                if is_native:
+                    self._counters["gil_released_ops"] += 1
 
     def record_delete(self) -> None:
         self.incr("deletes")
@@ -472,9 +505,16 @@ class TelemetryManager:
         self.incr("errors")
 
     def record_chunk(self, count: int, elapsed_ns: int = 0) -> None:
-        self.incr("chunks_created", count)
-        if elapsed_ns:
-            self.record_timer("chunk_ns", elapsed_ns)
+        if not self.enabled:
+            return
+        elapsed = max(0, int(elapsed_ns))
+        with self._lock:
+            if not self.enabled:
+                return
+            self._counters["chunks_created"] += int(count)
+            if elapsed_ns:
+                self._timers_ns["chunk_ns"] += elapsed
+                self._timer_counts["chunk_ns"] += 1
 
 
     def record_telemetry_drop(self, amount: int = 1) -> None:
@@ -490,21 +530,36 @@ class TelemetryManager:
 
     def record_json(self, *, parse_ns: int = 0, serialize_ns: int = 0, backend: str = "") -> None:
         """Record JSON boundary cost without retaining payloads or parser state."""
-        if parse_ns:
-            self.record_timer("json_parse_ns", parse_ns)
-            self.incr("json_parse_calls")
-            with self._lock:
-                self._counters["json_parse_ns"] += max(0, int(parse_ns))
-        if serialize_ns:
-            self.record_timer("json_serialize_ns", serialize_ns)
-            self.incr("json_serialize_calls")
-            with self._lock:
-                self._counters["json_serialize_ns"] += max(0, int(serialize_ns))
+        if not self.enabled:
+            return
+        parse_elapsed = max(0, int(parse_ns))
+        serialize_elapsed = max(0, int(serialize_ns))
         b = str(backend).lower()
-        if b == "simdjson":
-            self.incr("json_simdjson_reads")
-        elif b == "orjson":
-            self.incr("json_orjson_writes")
+        with self._lock:
+            if not self.enabled:
+                return
+            if parse_ns:
+                self._timers_ns["json_parse_ns"] = int(
+                    self._timers_ns.get("json_parse_ns", 0)
+                ) + parse_elapsed
+                self._timer_counts["json_parse_ns"] = int(
+                    self._timer_counts.get("json_parse_ns", 0)
+                ) + 1
+                self._counters["json_parse_calls"] += 1
+                self._counters["json_parse_ns"] += parse_elapsed
+            if serialize_ns:
+                self._timers_ns["json_serialize_ns"] = int(
+                    self._timers_ns.get("json_serialize_ns", 0)
+                ) + serialize_elapsed
+                self._timer_counts["json_serialize_ns"] = int(
+                    self._timer_counts.get("json_serialize_ns", 0)
+                ) + 1
+                self._counters["json_serialize_calls"] += 1
+                self._counters["json_serialize_ns"] += serialize_elapsed
+            if b == "simdjson":
+                self._counters["json_simdjson_reads"] += 1
+            elif b == "orjson":
+                self._counters["json_orjson_writes"] += 1
 
     def record_spiral_event(self, kind: str, amount: int = 1) -> None:
         """Record optional Spiral-compatible pipeline activity.
@@ -608,12 +663,34 @@ class TelemetryManager:
             storage_extra: Dict[str, object] = {}
             components = {k: dict(v) for k, v in self._components.items()}
             samplers = dict(self._samplers)
+            index_sampler = self._index_sampler
             level = self.level
         # Invoke samplers outside the manager lock.
         if level <= TelemetryLevel.MINIMAL:
             samplers = {}
         elif level == TelemetryLevel.NORMAL:
             samplers = {k: v for k, v in samplers.items() if k in {"storage", "components"}}
+        if level > TelemetryLevel.NORMAL and index_sampler is not None:
+            try:
+                combined_indexes = index_sampler()
+                if not isinstance(combined_indexes, dict):
+                    raise TypeError("combined index sampler must return a dictionary")
+                for index_name in ("swiss", "radix"):
+                    if index_name not in combined_indexes:
+                        components[f"sampler:{index_name}"] = {
+                            "status": "degraded",
+                            "error": f"combined sampler omitted {index_name}",
+                            "updated_at": now,
+                        }
+                    else:
+                        indexes[index_name] = combined_indexes[index_name]
+            except Exception as exc:
+                for index_name in ("swiss", "radix"):
+                    components[f"sampler:{index_name}"] = {
+                        "status": "degraded",
+                        "error": str(exc),
+                        "updated_at": now,
+                    }
         for name, sampler in samplers.items():
             try:
                 value = sampler()
@@ -627,6 +704,8 @@ class TelemetryManager:
                 else:
                     indexes[name] = value
             except Exception as exc:  # samplers should never break dashboard status
+                if name in {"swiss", "radix"}:
+                    indexes.pop(name, None)
                 components[f"sampler:{name}"] = {"status": "degraded", "error": str(exc), "updated_at": now}
         native_diag = native_diag_snapshot(event_limit=16)
         native_diag_dict = native_diag.to_dict()

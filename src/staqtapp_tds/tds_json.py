@@ -69,43 +69,52 @@ class JsonCodecStats:
 
 
 _stats_lock = threading.Lock()
-_stats = JsonCodecStats()
+_STAT_FIELDS = (
+    "loads_calls",
+    "dumps_calls",
+    "parse_ns",
+    "dump_ns",
+    "simdjson_reads",
+    "stdlib_reads",
+    "orjson_writes",
+    "stdlib_writes",
+    "parse_failovers",
+    "dump_failovers",
+)
+_stats_values = {field: 0 for field in _STAT_FIELDS}
 
 
 def _bump_stats(*, parse_ns: int = 0, dump_ns: int = 0, backend: str = "", failover: bool = False) -> None:
-    global _stats
     with _stats_lock:
-        data = asdict(_stats)
         if parse_ns:
-            data["loads_calls"] += 1
-            data["parse_ns"] += max(0, int(parse_ns))
+            _stats_values["loads_calls"] += 1
+            _stats_values["parse_ns"] += max(0, int(parse_ns))
             if backend == "simdjson":
-                data["simdjson_reads"] += 1
+                _stats_values["simdjson_reads"] += 1
             else:
-                data["stdlib_reads"] += 1
+                _stats_values["stdlib_reads"] += 1
             if failover:
-                data["parse_failovers"] += 1
+                _stats_values["parse_failovers"] += 1
         if dump_ns:
-            data["dumps_calls"] += 1
-            data["dump_ns"] += max(0, int(dump_ns))
+            _stats_values["dumps_calls"] += 1
+            _stats_values["dump_ns"] += max(0, int(dump_ns))
             if backend == "orjson":
-                data["orjson_writes"] += 1
+                _stats_values["orjson_writes"] += 1
             else:
-                data["stdlib_writes"] += 1
+                _stats_values["stdlib_writes"] += 1
             if failover:
-                data["dump_failovers"] += 1
-        _stats = JsonCodecStats(**data)
+                _stats_values["dump_failovers"] += 1
 
 
 def codec_stats() -> JsonCodecStats:
     with _stats_lock:
-        return _stats
+        return JsonCodecStats(**_stats_values)
 
 
 def reset_codec_stats() -> None:
-    global _stats
     with _stats_lock:
-        _stats = JsonCodecStats()
+        for field in _STAT_FIELDS:
+            _stats_values[field] = 0
 
 
 def preferred_loads_backend() -> str:
