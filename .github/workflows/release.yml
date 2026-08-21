@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -30,6 +31,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            test "$GITHUB_REF" = "refs/tags/v3.8.3"
+            test "$GITHUB_REF_TYPE" = "tag"
+            test "$(git rev-parse HEAD^)" = "0364f8db2d0775019398f3a0d4b3bea06da96b4b"
+          fi
           python scripts/release_version.py --check-tag "$GITHUB_REF_NAME"
           test "$(git cat-file -t "refs/tags/$GITHUB_REF_NAME")" = tag
           test "$(git rev-parse "refs/tags/$GITHUB_REF_NAME^{}")" = "$GITHUB_SHA"

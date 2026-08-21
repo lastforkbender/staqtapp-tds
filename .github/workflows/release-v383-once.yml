@@ -1,0 +1,227 @@
+name: v3.8.3 one-time release operator
+
+on:
+  workflow_run:
+    workflows:
+      - Staqtapp-TDS CI
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staqtapp-tds-v3.8.3-release-operator
+  cancel-in-progress: false
+
+jobs:
+  tag-and-dispatch:
+    name: Create annotated v3.8.3 tag and start release
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: write
+    env:
+      EXPECTED_PARENT_SHA: 0364f8db2d0775019398f3a0d4b3bea06da96b4b
+      QUALIFIED_RUN_ID: ${{ github.event.workflow_run.id }}
+      QUALIFIED_SHA: ${{ github.event.workflow_run.head_sha }}
+      RELEASE_TAG: v3.8.3
+      RELEASE_VERSION: '3.8.3'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Bind the operator to the exact qualified release
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QUALIFIED_SHA"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT_SHA"
+          test "$(git diff --name-only "$EXPECTED_PARENT_SHA" HEAD | sort)" = \
+            $'.github/workflows/release-v383-once.yml\n.github/workflows/release.yml'
+          grep -qx '  workflow_dispatch:' .github/workflows/release.yml
+          test "$(python scripts/release_version.py)" = "$RELEASE_VERSION"
+          test "$(python scripts/release_version.py --print-tag)" = "$RELEASE_TAG"
+      - name: Create the annotated tag and dispatch the tag release
+        shell: bash
+        env:
+          GH_REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import time
+          from urllib.error import HTTPError
+          from urllib.parse import quote
+          from urllib.request import Request, urlopen
+
+          repo = os.environ["GH_REPOSITORY"]
+          token = os.environ["GH_TOKEN"]
+          tag = os.environ["RELEASE_TAG"]
+          version = os.environ["RELEASE_VERSION"]
+          sha = os.environ["QUALIFIED_SHA"]
+          run_id = int(os.environ["QUALIFIED_RUN_ID"])
+          base = f"https://api.github.com/repos/{repo}"
+          headers = {
+              "Accept": "application/vnd.github+json",
+              "Authorization": f"Bearer {token}",
+              "Content-Type": "application/json",
+              "User-Agent": "staqtapp-tds-v383-release-operator",
+              "X-GitHub-Api-Version": "2022-11-28",
+          }
+
+          if tag != "v3.8.3" or version != "3.8.3":
+              raise SystemExit("operator is bound only to exact v3.8.3")
+          if not re.fullmatch(r"[0-9a-f]{40}", sha) or run_id <= 0:
+              raise SystemExit("qualified run identity is invalid")
+
+          def api(method, path, payload=None, expected=(200,)):
+              data = None if payload is None else json.dumps(payload).encode()
+              request = Request(
+                  base + path,
+                  data=data,
+                  method=method,
+                  headers=headers,
+              )
+              try:
+                  with urlopen(request, timeout=30) as response:
+                      raw = response.read()
+                      status = response.status
+              except HTTPError as exc:
+                  raw = exc.read()
+                  status = exc.code
+              if status not in expected:
+                  raise SystemExit(
+                      f"{method} {path} returned {status}: {raw[:500]!r}"
+                  )
+              return status, json.loads(raw) if raw else None
+
+          _, qualified_run = api("GET", f"/actions/runs/{run_id}")
+          required_run = {
+              "id": run_id,
+              "path": ".github/workflows/ci.yml",
+              "event": "push",
+              "head_branch": "main",
+              "head_sha": sha,
+              "status": "completed",
+              "conclusion": "success",
+          }
+          for key, expected in required_run.items():
+              if qualified_run.get(key) != expected:
+                  raise SystemExit(
+                      f"qualified workflow mismatch for {key}: "
+                      f"{qualified_run.get(key)!r}"
+                  )
+          for key in ("repository", "head_repository"):
+              if qualified_run.get(key, {}).get("full_name") != repo:
+                  raise SystemExit(f"qualified workflow has wrong {key}")
+
+          _, main_ref = api("GET", "/git/ref/heads/main")
+          if (
+              main_ref.get("object", {}).get("type") != "commit"
+              or main_ref.get("object", {}).get("sha") != sha
+          ):
+              raise SystemExit("main advanced after qualification")
+
+          pypi_request = Request(
+              f"https://pypi.org/pypi/staqtapp-tds/{version}/json",
+              headers={
+                  "Accept": "application/json",
+                  "Cache-Control": "no-cache",
+                  "User-Agent": "staqtapp-tds-v383-release-operator",
+              },
+          )
+          try:
+              with urlopen(pypi_request, timeout=30) as response:
+                  response.read(1)
+                  pypi_status = response.status
+          except HTTPError as exc:
+              if exc.code != 404:
+                  raise SystemExit(
+                      f"PyPI absence check failed with HTTP {exc.code}"
+                  ) from exc
+          else:
+              raise SystemExit(
+                  f"PyPI {version} already exists (HTTP {pypi_status})"
+              )
+
+          tag_path = f"/git/ref/tags/{quote(tag, safe='')}"
+          status, tag_ref = api("GET", tag_path, expected=(200, 404))
+          if status == 404:
+              _, tag_object = api(
+                  "POST",
+                  "/git/tags",
+                  {
+                      "tag": tag,
+                      "message": "Staqtapp-TDS v3.8.3 PCSDQR",
+                      "object": sha,
+                      "type": "commit",
+                  },
+                  expected=(201,),
+              )
+              api(
+                  "POST",
+                  "/git/refs",
+                  {"ref": f"refs/tags/{tag}", "sha": tag_object["sha"]},
+                  expected=(201,),
+              )
+              _, tag_ref = api("GET", tag_path)
+
+          if tag_ref.get("object", {}).get("type") != "tag":
+              raise SystemExit("release tag is not annotated")
+          tag_object_sha = tag_ref["object"]["sha"]
+          _, tag_object = api("GET", f"/git/tags/{tag_object_sha}")
+          if (
+              not re.fullmatch(r"[0-9a-f]{40}", tag_object_sha)
+              or tag_object.get("sha") != tag_object_sha
+              or tag_object.get("tag") != tag
+              or tag_object.get("message") != "Staqtapp-TDS v3.8.3 PCSDQR"
+              or tag_object.get("object", {}).get("type") != "commit"
+              or tag_object.get("object", {}).get("sha") != sha
+          ):
+              raise SystemExit("release tag does not peel to qualified main")
+
+          def matching_release_runs():
+              _, runs = api(
+                  "GET",
+                  "/actions/workflows/release.yml/runs?per_page=100",
+              )
+              return [
+                  run
+                  for run in runs.get("workflow_runs", [])
+                  if run.get("head_sha") == sha
+                  and run.get("event") in {"push", "workflow_dispatch"}
+                  and run.get("path") == ".github/workflows/release.yml"
+              ]
+
+          matching_runs = matching_release_runs()
+          if matching_runs:
+              print("release already dispatched:", matching_runs[0]["html_url"])
+              raise SystemExit(0)
+
+          api(
+              "POST",
+              "/actions/workflows/release.yml/dispatches",
+              {"ref": tag},
+              expected=(204,),
+          )
+          for _ in range(12):
+              time.sleep(5)
+              matching_runs = matching_release_runs()
+              if matching_runs:
+                  print("release dispatched:", matching_runs[0]["html_url"])
+                  break
+          else:
+              raise SystemExit("dispatched release run did not become visible")
+          PY
