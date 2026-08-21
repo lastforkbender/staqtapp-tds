@@ -53,8 +53,8 @@ _INT16_MAX = (1 << 15) - 1
 _INT32_MAX = (1 << 31) - 1
 _ROOT_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 
-# The padding bytes in every record are emitted as zero and are checked by a
-# decode/re-encode comparison.  Record widths are part of the persisted ABI.
+# The padding bytes in every record are emitted as zero and checked explicitly
+# during decode.  Record widths are part of the persisted ABI.
 _HEADER = struct.Struct(
     "<8sHHBBBBHHHHHHHHIQQIIIIIQQQQQQ32s32s32sI36x"
 )
@@ -103,7 +103,7 @@ class PackedGraphError(ValueError):
 
 
 def _require_int(name: str, value: int, minimum: int, maximum: int) -> int:
-    if isinstance(value, bool) or not isinstance(value, int):
+    if type(value) is not int:
         raise PackedGraphError(f"{name} must be an integer")
     if value < minimum or value > maximum:
         raise PackedGraphError(
@@ -114,7 +114,7 @@ def _require_int(name: str, value: int, minimum: int, maximum: int) -> int:
 
 
 def _root_digest(name: str, value: str) -> bytes:
-    if not isinstance(value, str) or not _ROOT_RE.fullmatch(value):
+    if type(value) is not str or not _ROOT_RE.fullmatch(value):
         raise PackedGraphError(
             f"{name} must be a canonical sha256 root",
             fault=PackedGraphFault.SOURCE_MISMATCH,
@@ -175,8 +175,14 @@ class PackedGraphLimits:
 DEFAULT_PACKED_GRAPH_LIMITS = PackedGraphLimits()
 
 
+class _ImmutableSourceRootCacheSlots:
+    """Derived roots kept outside dataclass fields and canonical shape."""
+
+    __slots__ = ("_source_root_cache", "_row_offsets_root_cache")
+
+
 @dataclass(frozen=True, slots=True)
-class ImmutableSourceBinding:
+class ImmutableSourceBinding(_ImmutableSourceRootCacheSlots):
     """Authoritative bytes and row boundaries for one immutable generation.
 
     ``row_offsets`` is a canonical half-open boundary vector: it begins at
@@ -216,21 +222,48 @@ class ImmutableSourceBinding:
                 "row_offsets must end at the authoritative source length",
                 fault=PackedGraphFault.SOURCE_MISMATCH,
             )
+        self._set_derived_roots()
+
+    def _set_derived_roots(self) -> None:
+        object.__setattr__(
+            self,
+            "_source_root_cache",
+            _bytes_root(self.source_bytes),
+        )
+        object.__setattr__(
+            self,
+            "_row_offsets_root_cache",
+            _bytes_root(self.packed_row_offsets()),
+        )
+
+    def _ensure_derived_roots(self) -> None:
+        """Restore derived slots omitted by copy/pickle protocols."""
+
+        try:
+            object.__getattribute__(self, "_source_root_cache")
+            object.__getattribute__(self, "_row_offsets_root_cache")
+        except AttributeError:
+            self._set_derived_roots()
 
     @property
     def source_root(self) -> str:
-        return _bytes_root(self.source_bytes)
+        self._ensure_derived_roots()
+        return self._source_root_cache
 
     @property
     def row_count(self) -> int:
         return len(self.row_offsets) - 1
 
     def packed_row_offsets(self) -> bytes:
-        return b"".join(_CSR_OFFSET.pack(value) for value in self.row_offsets)
+        packed = bytearray(len(self.row_offsets) * CSR_OFFSET_RECORD_SIZE)
+        for index, value in enumerate(self.row_offsets):
+            _CSR_OFFSET.pack_into(packed, index * CSR_OFFSET_RECORD_SIZE, value)
+        return bytes(packed)
 
     @property
     def row_offsets_root(self) -> str:
-        return _bytes_root(self.packed_row_offsets())
+        self._ensure_derived_roots()
+        return self._row_offsets_root_cache
 
     def materialize_rows(self, row_start: int, row_end: int) -> bytes:
         _require_int("row_start", row_start, 0, self.row_count)
@@ -451,6 +484,11 @@ class Waypoint:
 
     @classmethod
     def _unpack(cls, raw: bytes) -> Waypoint:
+        if raw[-4:] != bytes(4):
+            raise PackedGraphError(
+                "waypoint padding is non-zero",
+                fault=PackedGraphFault.NONCANONICAL,
+            )
         generation, causal, predecessor, flags, b0, b1, r0, r1, feature, provenance = _WAYPOINT.unpack(raw)
         return cls(
             generation,
@@ -520,6 +558,11 @@ class Edge:
 
     @classmethod
     def _unpack(cls, raw: bytes) -> Edge:
+        if raw[-4:] != bytes(4):
+            raise PackedGraphError(
+                "edge padding is non-zero",
+                fault=PackedGraphFault.NONCANONICAL,
+            )
         destination, operation, flags, base, delta, gain, hard_mask, reserved = _EDGE.unpack(raw)
         if reserved != 0:
             raise PackedGraphError(
@@ -650,8 +693,14 @@ class PackedWaypointGraph:
         edges: tuple[Edge, ...],
         limits: PackedGraphLimits = DEFAULT_PACKED_GRAPH_LIMITS,
     ) -> PackedWaypointGraph:
+        if cls is not PackedWaypointGraph:
+            raise PackedGraphError(
+                "packed graph factories must be called on PackedWaypointGraph"
+            )
+        if type(limits) is not PackedGraphLimits:
+            raise PackedGraphError("limits must be an exact PackedGraphLimits")
         sources = _validate_source_order(source_bindings)
-        graph = cls(
+        graph = PackedWaypointGraph(
             server_namespace_root=server_namespace_root,
             feature_schema_root=feature_schema_root,
             hard_mask_universe=hard_mask_universe,
@@ -662,11 +711,17 @@ class PackedWaypointGraph:
             edge_offsets=edge_offsets,
             edges=edges,
         )
-        graph._validate_structure(limits)
+        # The exact base constructor validates the default hard envelope. An
+        # identity check (never overloadable equality) selects the additional
+        # narrower-limit pass.
+        if limits is not DEFAULT_PACKED_GRAPH_LIMITS:
+            PackedWaypointGraph._validate_structure(graph, limits)
         graph._validate_sources(sources)
         return graph
 
     def _validate_structure(self, limits: PackedGraphLimits) -> None:
+        if type(limits) is not PackedGraphLimits:
+            raise PackedGraphError("limits must be an exact PackedGraphLimits")
         _root_digest("server_namespace_root", self.server_namespace_root)
         _root_digest("feature_schema_root", self.feature_schema_root)
         _require_int("hard_mask_universe", self.hard_mask_universe, 1, _UINT64_MAX)
@@ -697,16 +752,16 @@ class PackedWaypointGraph:
         )
 
         generation_keys = tuple(item.generation_root for item in self.generations)
-        if generation_keys != tuple(sorted(generation_keys)):
+        if any(right < left for left, right in pairwise(generation_keys)):
             raise PackedGraphError(
                 "generation table is not in canonical root order",
                 fault=PackedGraphFault.NONCANONICAL,
             )
-        if len(set(generation_keys)) != len(generation_keys):
+        if any(right == left for left, right in pairwise(generation_keys)):
             raise PackedGraphError("generation table contains duplicate roots")
 
         provenance_keys = tuple(item._canonical_key() for item in self.provenance)
-        if provenance_keys != tuple(sorted(provenance_keys)):
+        if any(right < left for left, right in pairwise(provenance_keys)):
             raise PackedGraphError(
                 "provenance table is not in canonical order",
                 fault=PackedGraphFault.NONCANONICAL,
@@ -727,16 +782,16 @@ class PackedWaypointGraph:
                 )
 
         feature_keys = tuple(item._pack() for item in self.feature_blocks)
-        if feature_keys != tuple(sorted(feature_keys)):
+        if any(right < left for left, right in pairwise(feature_keys)):
             raise PackedGraphError(
                 "feature table is not in canonical order",
                 fault=PackedGraphFault.NONCANONICAL,
             )
-        if len(set(feature_keys)) != len(feature_keys):
+        if any(right == left for left, right in pairwise(feature_keys)):
             raise PackedGraphError("feature table contains duplicate blocks")
 
         waypoint_keys = tuple(item._canonical_key() for item in self.waypoints)
-        if waypoint_keys != tuple(sorted(waypoint_keys)):
+        if any(right < left for left, right in pairwise(waypoint_keys)):
             raise PackedGraphError(
                 "waypoint table is not in canonical causal order",
                 fault=PackedGraphFault.NONCANONICAL,
@@ -817,7 +872,7 @@ class PackedWaypointGraph:
             end = self.edge_offsets[source_index + 1]
             row = self.edges[start:end]
             keys = tuple(edge._canonical_key() for edge in row)
-            if keys != tuple(sorted(keys)):
+            if any(right < left for left, right in pairwise(keys)):
                 raise PackedGraphError(
                     "CSR edge row is not in canonical order",
                     fault=PackedGraphFault.NONCANONICAL,
@@ -896,17 +951,29 @@ class PackedWaypointGraph:
         )
         offsets, total_size = _layout(*counts, limits)
 
-        # Every bound and final size is proven before any section is joined.
-        body = b"".join(
-            (
-                b"".join(item._pack() for item in self.generations),
-                b"".join(item._pack() for item in self.provenance),
-                b"".join(item._pack() for item in self.feature_blocks),
-                b"".join(item._pack() for item in self.waypoints),
-                b"".join(_CSR_OFFSET.pack(item) for item in self.edge_offsets),
-                b"".join(item._pack() for item in self.edges),
-            )
-        )
+        # Every bound and final size is proven before the one bounded output
+        # buffer is allocated. Fixed-width records are copied directly into
+        # their admitted sections, without full-size section/body temporaries.
+        result = bytearray(total_size)
+
+        def pack_records(records: tuple[object, ...], start: int, width: int) -> None:
+            cursor = start
+            for record in records:
+                raw = record._pack()  # type: ignore[attr-defined]
+                if len(raw) != width:  # pragma: no cover - internal ABI invariant
+                    raise PackedGraphError("serialized record width invariant failed")
+                result[cursor : cursor + width] = raw
+                cursor += width
+
+        pack_records(self.generations, offsets[0], GENERATION_RECORD_SIZE)
+        pack_records(self.provenance, offsets[1], PROVENANCE_RECORD_SIZE)
+        pack_records(self.feature_blocks, offsets[2], FEATURE_RECORD_SIZE)
+        pack_records(self.waypoints, offsets[3], WAYPOINT_RECORD_SIZE)
+        cursor = offsets[4]
+        for item in self.edge_offsets:
+            _CSR_OFFSET.pack_into(result, cursor, item)
+            cursor += CSR_OFFSET_RECORD_SIZE
+        pack_records(self.edges, offsets[5], EDGE_RECORD_SIZE)
         server_digest = _root_digest(
             "server_namespace_root", self.server_namespace_root
         )
@@ -919,9 +986,11 @@ class PackedWaypointGraph:
             server_namespace_digest=server_digest,
             feature_schema_digest=schema_digest,
         )
-        integrity_material = zero_header + body
-        digest = hashlib.sha256(integrity_material).digest()
-        checksum = zlib.crc32(integrity_material) & _UINT32_MAX
+        result[:HEADER_SIZE] = zero_header
+        view = memoryview(result)
+        digest = hashlib.sha256(view).digest()
+        checksum = zlib.crc32(view) & _UINT32_MAX
+        view.release()
         header = _pack_header(
             total_size=total_size,
             hard_mask_universe=self.hard_mask_universe,
@@ -932,10 +1001,8 @@ class PackedWaypointGraph:
             content_digest=digest,
             content_crc32=checksum,
         )
-        result = header + body
-        if len(result) != total_size:  # pragma: no cover - internal invariant
-            raise PackedGraphError("serialized graph size invariant failed")
-        return result
+        result[:HEADER_SIZE] = header
+        return bytes(result)
 
     @classmethod
     def from_bytes(
@@ -947,6 +1014,12 @@ class PackedWaypointGraph:
     ) -> PackedWaypointGraph:
         """Decode and admit only a canonical, exact-source-bound graph."""
 
+        if cls is not PackedWaypointGraph:
+            raise PackedGraphError(
+                "packed graph factories must be called on PackedWaypointGraph"
+            )
+        if type(limits) is not PackedGraphLimits:
+            raise PackedGraphError("limits must be an exact PackedGraphLimits")
         if type(payload) is not bytes:
             raise PackedGraphError("packed graph payload must be exact immutable bytes")
         if len(payload) < HEADER_SIZE:
@@ -1068,9 +1141,14 @@ class PackedWaypointGraph:
             server_namespace_digest=server_digest,
             feature_schema_digest=schema_digest,
         )
-        integrity_material = zero_header + payload[HEADER_SIZE:]
-        actual_digest = hashlib.sha256(integrity_material).digest()
-        actual_crc32 = zlib.crc32(integrity_material) & _UINT32_MAX
+        body = memoryview(payload)[HEADER_SIZE:]
+        hasher = hashlib.sha256()
+        hasher.update(zero_header)
+        hasher.update(body)
+        actual_digest = hasher.digest()
+        actual_crc32 = zlib.crc32(zero_header)
+        actual_crc32 = zlib.crc32(body, actual_crc32) & _UINT32_MAX
+        body.release()
         if stored_digest != actual_digest or stored_crc32 != actual_crc32:
             raise PackedGraphError(
                 "packed graph hash or checksum mismatch",
@@ -1124,7 +1202,7 @@ class PackedWaypointGraph:
             Edge._unpack(raw)
             for raw in records(edge_offset, edge_count, EDGE_RECORD_SIZE)
         )
-        graph = cls(
+        graph = PackedWaypointGraph(
             server_namespace_root=_digest_root(server_digest),
             feature_schema_root=_digest_root(schema_digest),
             hard_mask_universe=hard_mask_universe,
@@ -1135,13 +1213,9 @@ class PackedWaypointGraph:
             edge_offsets=edge_offsets,
             edges=edges,
         )
-        graph._validate_structure(limits)
+        if limits is not DEFAULT_PACKED_GRAPH_LIMITS:
+            PackedWaypointGraph._validate_structure(graph, limits)
         graph._validate_sources(source_bindings)
-        if graph.to_bytes(source_bindings, limits=limits) != payload:
-            raise PackedGraphError(
-                "packed graph does not decode to its canonical representation",
-                fault=PackedGraphFault.NONCANONICAL,
-            )
         return graph
 
     def materialize_waypoint(
@@ -1153,15 +1227,22 @@ class PackedWaypointGraph:
 
         _require_int("waypoint_index", waypoint_index, 0, len(self.waypoints) - 1)
         sources = self._validate_sources(source_bindings)
+        return self._materialize_admitted_waypoint(waypoint_index, sources)
+
+    def _materialize_admitted_waypoint(
+        self,
+        waypoint_index: int,
+        source_bindings: tuple[ImmutableSourceBinding, ...],
+    ) -> bytes:
+        """Materialize from bindings already admitted with this graph."""
+
+        _require_int("waypoint_index", waypoint_index, 0, len(self.waypoints) - 1)
         waypoint = self.waypoints[waypoint_index]
-        source = sources[waypoint.generation_index]
-        result = source.materialize_rows(waypoint.row_start, waypoint.row_end)
-        if result != source.source_bytes[waypoint.byte_start : waypoint.byte_end]:
-            raise PackedGraphError(
-                "waypoint source/row materialization mismatch",
-                fault=PackedGraphFault.SOURCE_MISMATCH,
-            )
-        return result
+        source = source_bindings[waypoint.generation_index]
+        # Whole-graph admission already proved that these exact row boundaries
+        # equal the byte span. The proof-bound path performs one immutable slice;
+        # the public materializer above still revalidates all supplied sources.
+        return source.source_bytes[waypoint.byte_start : waypoint.byte_end]
 
     @property
     def format_descriptor(self) -> dict[str, int | str]:
@@ -1195,12 +1276,12 @@ def _validate_source_order(
     if any(not isinstance(item, ImmutableSourceBinding) for item in source_bindings):
         raise PackedGraphError("source_bindings contains an invalid record")
     roots = tuple(item.generation_root for item in source_bindings)
-    if roots != tuple(sorted(roots)):
+    if any(right < left for left, right in pairwise(roots)):
         raise PackedGraphError(
             "source bindings are not in canonical generation-root order",
             fault=PackedGraphFault.NONCANONICAL,
         )
-    if len(set(roots)) != len(roots):
+    if any(right == left for left, right in pairwise(roots)):
         raise PackedGraphError("source bindings contain duplicate generation roots")
     return source_bindings
 

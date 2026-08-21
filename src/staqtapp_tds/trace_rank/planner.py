@@ -40,9 +40,13 @@ from staqtapp_tds.trace_rank.graph import (
     PACKED_GRAPH_FORMAT_ID,
     PACKED_GRAPH_FORMAT_VERSION,
     Edge,
+    FeatureBlock,
+    GenerationBinding,
     ImmutableSourceBinding,
     PackedGraphLimits,
     PackedWaypointGraph,
+    ProvenanceRecord,
+    Waypoint,
 )
 
 PATH_PLANNER_CONTRACT_ID = "tds-fixed-point-dijkstra-v1"
@@ -165,7 +169,7 @@ def build_reference_baseline_manifest(
 ) -> TraceRankBaselineManifest:
     """Build the replay manifest; callers supply the source/binary identity."""
 
-    if not isinstance(verified_graph, VerifiedPackedGraph):
+    if type(verified_graph) is not VerifiedPackedGraph:
         raise TraceRankPlannerError("verified_graph must be VerifiedPackedGraph")
     return TraceRankBaselineManifest(
         implementation_root=implementation_root,
@@ -210,25 +214,28 @@ class VerifiedPackedGraph:
     def __init__(self) -> None:
         raise TypeError("use VerifiedPackedGraph.from_bytes or .from_graph")
 
-    @classmethod
-    def from_bytes(
-        cls,
-        payload: bytes,
+    @staticmethod
+    def _validate_admission_arguments(
         source_bindings: tuple[ImmutableSourceBinding, ...],
-        *,
         source_evidence_roots: tuple[str, ...],
         edge_catalog_root: str,
-        limits: PackedGraphLimits = DEFAULT_PACKED_GRAPH_LIMITS,
-    ) -> "VerifiedPackedGraph":
-        """Decode canonical bytes and derive every graph identity internally."""
-
-        if type(payload) is not bytes:
-            raise TraceRankPlannerError("packed graph payload must be exact bytes")
-        if not isinstance(limits, PackedGraphLimits):
-            raise TraceRankPlannerError("limits must be PackedGraphLimits")
-        if not isinstance(source_bindings, tuple):
+        limits: PackedGraphLimits,
+    ) -> tuple[ImmutableSourceBinding, ...]:
+        if type(limits) is not PackedGraphLimits or any(
+            type(getattr(limits, name)) is not int
+            for name in (
+                "max_generations",
+                "max_provenance_records",
+                "max_feature_blocks",
+                "max_waypoints",
+                "max_edges",
+                "max_graph_bytes",
+            )
+        ):
+            raise TraceRankPlannerError("limits must be an exact PackedGraphLimits")
+        if type(source_bindings) is not tuple:
             raise TraceRankPlannerError("source_bindings must be an immutable tuple")
-        if not isinstance(source_evidence_roots, tuple):
+        if type(source_evidence_roots) is not tuple:
             raise TraceRankPlannerError(
                 "source_evidence_roots must be an immutable tuple"
             )
@@ -243,16 +250,140 @@ class VerifiedPackedGraph:
                 fault=TraceRankFault.INTEGRITY_FAILURE,
             )
         for index, root in enumerate(source_evidence_roots):
+            if type(root) is not str:
+                raise TraceRankPlannerError(
+                    f"source_evidence_roots[{index}] must be an exact string"
+                )
             _require_root(f"source_evidence_roots[{index}]", root)
+        if type(edge_catalog_root) is not str:
+            raise TraceRankPlannerError("edge_catalog_root must be an exact string")
         _require_root("edge_catalog_root", edge_catalog_root)
-        graph = PackedWaypointGraph.from_bytes(
-            payload, source_bindings, limits=limits
+        exact_sources: list[ImmutableSourceBinding] = []
+        for index, source in enumerate(source_bindings):
+            if (
+                type(source) is not ImmutableSourceBinding
+                or type(source.generation_root) is not str
+                or type(source.source_bytes) is not bytes
+                or type(source.row_offsets) is not tuple
+                or any(type(offset) is not int for offset in source.row_offsets)
+            ):
+                raise TraceRankPlannerError(
+                    f"source_bindings[{index}] must be an exact "
+                    "ImmutableSourceBinding"
+                )
+            exact_sources.append(source)
+        return tuple(exact_sources)
+
+    @staticmethod
+    def _is_exact_graph_value(graph: PackedWaypointGraph) -> bool:
+        """Return whether base-class serialization is bound to this value.
+
+        Subclass records may override ``to_bytes`` or ``_pack`` and emit bytes
+        for state other than the object being sealed. Such values are accepted
+        only through the decode-normalization path in :meth:`from_graph`.
+        """
+
+        def exact_int_fields(value: object, names: tuple[str, ...]) -> bool:
+            return all(type(getattr(value, name)) is int for name in names)
+
+        exact_generations = all(
+            type(item) is GenerationBinding
+            and type(item.generation_root) is str
+            and type(item.source_root) is str
+            and type(item.row_offsets_root) is str
+            and exact_int_fields(item, ("source_size", "row_count"))
+            for item in graph.generations
         )
-        if graph.to_bytes(source_bindings, limits=limits) != payload:
-            raise TraceRankPlannerError(
-                "packed graph failed exact decode/re-encode admission",
-                fault=TraceRankFault.INTEGRITY_FAILURE,
+        exact_provenance = all(
+            type(item) is ProvenanceRecord
+            and type(item.provenance_root) is str
+            and exact_int_fields(
+                item,
+                (
+                    "generation_index",
+                    "privacy_class",
+                    "license_class",
+                    "policy_mask",
+                ),
             )
+            for item in graph.provenance
+        )
+        exact_features = all(
+            type(item) is FeatureBlock
+            and type(item.values) is tuple
+            and all(type(value) is int for value in item.values)
+            and exact_int_fields(
+                item,
+                ("missing_mask", "privacy_class", "quantization_id", "flags"),
+            )
+            for item in graph.feature_blocks
+        )
+        exact_waypoints = all(
+            type(item) is Waypoint
+            and exact_int_fields(
+                item,
+                (
+                    "generation_index",
+                    "causal_sequence",
+                    "predecessor_index",
+                    "byte_start",
+                    "byte_end",
+                    "row_start",
+                    "row_end",
+                    "feature_index",
+                    "provenance_index",
+                    "flags",
+                ),
+            )
+            for item in graph.waypoints
+        )
+        exact_edges = all(
+            type(item) is Edge
+            and exact_int_fields(
+                item,
+                (
+                    "destination_index",
+                    "operation",
+                    "base_cost",
+                    "learned_delta",
+                    "evidence_gain",
+                    "hard_eligibility_mask",
+                    "flags",
+                ),
+            )
+            for item in graph.edges
+        )
+        return bool(
+            type(graph) is PackedWaypointGraph
+            and type(graph.server_namespace_root) is str
+            and type(graph.feature_schema_root) is str
+            and type(graph.hard_mask_universe) is int
+            and type(graph.generations) is tuple
+            and exact_generations
+            and type(graph.provenance) is tuple
+            and exact_provenance
+            and type(graph.feature_blocks) is tuple
+            and exact_features
+            and type(graph.waypoints) is tuple
+            and exact_waypoints
+            and type(graph.edge_offsets) is tuple
+            and all(type(item) is int for item in graph.edge_offsets)
+            and type(graph.edges) is tuple
+            and exact_edges
+        )
+
+    @staticmethod
+    def _derive_admission_values(
+        graph: PackedWaypointGraph,
+        payload: bytes,
+        source_bindings: tuple[ImmutableSourceBinding, ...],
+        *,
+        source_evidence_roots: tuple[str, ...],
+        edge_catalog_root: str,
+        limits: PackedGraphLimits,
+    ) -> dict[str, Any]:
+        """Derive identities; this helper cannot mint a proof object."""
+
         if any(edge.learned_delta != 0 for edge in graph.edges):
             raise TraceRankPlannerError(
                 "the Phase-5 reference rejects learned edge deltas",
@@ -283,7 +414,6 @@ class VerifiedPackedGraph:
                 "source_evidence_roots": list(source_evidence_roots),
             },
         )
-        result = object.__new__(cls)
         values = {
             "graph": graph,
             "packed_bytes": payload,
@@ -295,6 +425,44 @@ class VerifiedPackedGraph:
             "feature_schema_root": graph.feature_schema_root,
             "graph_admission_root": admission_root,
         }
+        return values
+
+    @classmethod
+    def from_bytes(
+        cls,
+        payload: bytes,
+        source_bindings: tuple[ImmutableSourceBinding, ...],
+        *,
+        source_evidence_roots: tuple[str, ...],
+        edge_catalog_root: str,
+        limits: PackedGraphLimits = DEFAULT_PACKED_GRAPH_LIMITS,
+    ) -> "VerifiedPackedGraph":
+        """Decode canonical bytes and derive every graph identity internally."""
+
+        if cls is not VerifiedPackedGraph:
+            raise TraceRankPlannerError(
+                "verified graph factories must be called on VerifiedPackedGraph"
+            )
+        if type(payload) is not bytes:
+            raise TraceRankPlannerError("packed graph payload must be exact bytes")
+        exact_sources = VerifiedPackedGraph._validate_admission_arguments(
+            source_bindings,
+            source_evidence_roots,
+            edge_catalog_root,
+            limits,
+        )
+        graph = PackedWaypointGraph.from_bytes(
+            payload, exact_sources, limits=limits
+        )
+        values = VerifiedPackedGraph._derive_admission_values(
+            graph,
+            payload,
+            exact_sources,
+            source_evidence_roots=source_evidence_roots,
+            edge_catalog_root=edge_catalog_root,
+            limits=limits,
+        )
+        result = object.__new__(VerifiedPackedGraph)
         for name, value in values.items():
             object.__setattr__(result, name, value)
         return result
@@ -309,17 +477,46 @@ class VerifiedPackedGraph:
         edge_catalog_root: str,
         limits: PackedGraphLimits = DEFAULT_PACKED_GRAPH_LIMITS,
     ) -> "VerifiedPackedGraph":
-        """Serialize a builder graph and re-admit it through the byte decoder."""
+        """Serialize and seal a graph after canonical source-bound validation."""
 
+        if cls is not VerifiedPackedGraph:
+            raise TraceRankPlannerError(
+                "verified graph factories must be called on VerifiedPackedGraph"
+            )
         if not isinstance(graph, PackedWaypointGraph):
             raise TraceRankPlannerError("graph must be a PackedWaypointGraph")
-        payload = graph.to_bytes(source_bindings, limits=limits)
-        return cls.from_bytes(
-            payload,
+        exact_sources = VerifiedPackedGraph._validate_admission_arguments(
             source_bindings,
+            source_evidence_roots,
+            edge_catalog_root,
+            limits,
+        )
+        payload = graph.to_bytes(exact_sources, limits=limits)
+        if not VerifiedPackedGraph._is_exact_graph_value(graph):
+            graph = PackedWaypointGraph.from_bytes(
+                payload,
+                exact_sources,
+                limits=limits,
+            )
+        values = VerifiedPackedGraph._derive_admission_values(
+            graph,
+            payload,
+            exact_sources,
             source_evidence_roots=source_evidence_roots,
             edge_catalog_root=edge_catalog_root,
             limits=limits,
+        )
+        result = object.__new__(VerifiedPackedGraph)
+        for name, value in values.items():
+            object.__setattr__(result, name, value)
+        return result
+
+    def materialize_waypoint(self, waypoint_index: int) -> bytes:
+        """Materialize from the immutable source bindings admitted by this proof."""
+
+        return self.graph._materialize_admitted_waypoint(
+            waypoint_index,
+            self.source_bindings,
         )
 
     def canonical_dict(self) -> dict[str, Any]:
@@ -390,7 +587,7 @@ def _canonical_int_tuple(
         raise TraceRankPlannerError(f"{name} must be an immutable tuple")
     for index, value in enumerate(values):
         _require_int(f"{name}[{index}]", value, minimum, maximum)
-    if values != tuple(sorted(set(values))):
+    if any(right <= left for left, right in zip(values, values[1:])):
         raise TraceRankPlannerError(f"{name} must be unique and in canonical order")
     return values
 
@@ -430,7 +627,11 @@ class QualifiedPathPolicy:
     ) -> "QualifiedPathPolicy":
         """Bind controller output to one graph and full ServingEpoch."""
 
-        if not isinstance(verified_graph, VerifiedPackedGraph):
+        if cls is not QualifiedPathPolicy:
+            raise TraceRankPlannerError(
+                "policy factories must be called on QualifiedPathPolicy"
+            )
+        if type(verified_graph) is not VerifiedPackedGraph:
             raise TraceRankPlannerError("verified_graph must be VerifiedPackedGraph")
         if not isinstance(expected_epoch, ServingEpochIdentity):
             raise TraceRankPlannerError("expected_epoch must be ServingEpochIdentity")
@@ -499,7 +700,7 @@ class QualifiedPathPolicy:
             "serving_epoch_root": expected_epoch.epoch_root,
         }
         policy_root = _canonical_root("qualified-path-policy", values)
-        result = object.__new__(cls)
+        result = object.__new__(QualifiedPathPolicy)
         values["allowed_operations"] = operations
         values["allowed_privacy_classes"] = privacy
         values["allowed_license_classes"] = licenses
@@ -549,11 +750,15 @@ class AdmittedPathContext:
         *,
         limits: TraceRankLimits = TRACE_RANK_V2_VERTICAL_SLICE_LIMITS,
     ) -> "AdmittedPathContext":
-        if not isinstance(verified_graph, VerifiedPackedGraph):
+        if cls is not AdmittedPathContext:
+            raise TraceRankPlannerError(
+                "context factories must be called on AdmittedPathContext"
+            )
+        if type(verified_graph) is not VerifiedPackedGraph:
             raise TraceRankPlannerError("verified_graph must be VerifiedPackedGraph")
         if not isinstance(expected_epoch, ServingEpochIdentity):
             raise TraceRankPlannerError("expected_epoch must be ServingEpochIdentity")
-        if not isinstance(policy, QualifiedPathPolicy):
+        if type(policy) is not QualifiedPathPolicy:
             raise TraceRankPlannerError("policy must be QualifiedPathPolicy")
         if not isinstance(baseline, TraceRankBaselineManifest):
             raise TraceRankPlannerError("baseline must be TraceRankBaselineManifest")
@@ -633,7 +838,7 @@ class AdmittedPathContext:
                 "serving_epoch_root": expected_epoch.epoch_root,
             },
         )
-        result = object.__new__(cls)
+        result = object.__new__(AdmittedPathContext)
         for name, value in {
             "verified_graph": verified_graph,
             "expected_epoch": expected_epoch,
@@ -677,7 +882,13 @@ class TraceRankPathRequest:
             )
         for index, candidate in enumerate(self.candidate_waypoints):
             _require_int(f"candidate_waypoints[{index}]", candidate, 0, _UINT64_MAX)
-        if self.candidate_waypoints != tuple(sorted(set(self.candidate_waypoints))):
+        if any(
+            right <= left
+            for left, right in zip(
+                self.candidate_waypoints,
+                self.candidate_waypoints[1:],
+            )
+        ):
             raise TraceRankPlannerError(
                 "candidate_waypoints must be unique and in canonical order"
             )
@@ -1245,7 +1456,7 @@ def _validate_request(
     context: AdmittedPathContext,
     request: TraceRankPathRequest,
 ) -> None:
-    if not isinstance(context, AdmittedPathContext):
+    if type(context) is not AdmittedPathContext:
         raise TraceRankPlannerError("context must be AdmittedPathContext")
     if not isinstance(request, TraceRankPathRequest):
         raise TraceRankPlannerError("request must be TraceRankPathRequest")

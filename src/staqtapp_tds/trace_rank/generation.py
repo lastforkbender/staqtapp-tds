@@ -182,7 +182,7 @@ def bind_csv_generation_sources(
         if lease.binding.namespace != expected_namespace:
             raise PackedGraphError("CSV generation leases cross a namespace boundary")
     roots = tuple(lease.generation_root for lease in leases)
-    if roots != tuple(sorted(roots)) or len(set(roots)) != len(roots):
+    if any(right <= left for left, right in zip(roots, roots[1:])):
         raise PackedGraphError(
             "CSV generation leases must be unique and in generation-root order"
         )
