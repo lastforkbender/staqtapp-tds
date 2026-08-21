@@ -113,8 +113,11 @@ TDS は storage hot path を狭く保つ設計です。Native index、lookup、p
 ## インストール
 
 ```bash
-# Current production PyPI release（両方の UI を含む）
+# Current production core と HTML Browser
 python -m pip install staqtapp-tds==3.8.3
+
+# optional PyQt5 Driver Studio cockpit を追加
+python -m pip install "staqtapp-tds[gui]==3.8.3"
 
 # main TDS telemetry UI を起動
 staqtapp-tds
@@ -123,7 +126,12 @@ staqtapp-tds
 staqtapp-tds-generation-audit
 ```
 
-Python 3.10 以上、NumPy、PyQt5 が standard installation に必要です。Driver Studio は自動的に install され、`staqtapp-tds` は main HTML/CSS/JS telemetry Browser を起動します。C extension は optional です。Caller が native-only を明示的に強制しない限り、対応する operation には deterministic Python fallback があります。
+Standard installation に必要なのは Python 3.10 以上と NumPy です。
+`staqtapp-tds` は main HTML/CSS/JS telemetry Browser を起動します。
+PyQt5 は optional Driver Studio cockpit を構築するときだけ必要で、
+`gui` extra から install します。C extension は optional です。Caller が
+native-only を明示的に強制しない限り、対応する operation には
+deterministic Python fallback があります。
 
 ## Core storage quick start
 

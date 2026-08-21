@@ -121,8 +121,11 @@ TDS is designed around a narrow storage hot path. Native indexing, lookup, persi
 ## Install
 
 ```bash
-# Current production PyPI release; includes both UIs
+# Current production core and HTML Browser
 python -m pip install staqtapp-tds==3.8.3
+
+# Add the optional PyQt5 Driver Studio cockpit
+python -m pip install "staqtapp-tds[gui]==3.8.3"
 
 # Launch the main TDS telemetry UI
 staqtapp-tds
@@ -131,7 +134,12 @@ staqtapp-tds
 staqtapp-tds-generation-audit
 ```
 
-Python 3.10 or newer, NumPy, and PyQt5 are required by the standard installation. Driver Studio is installed automatically, while `staqtapp-tds` launches the main HTML/CSS/JS telemetry Browser. The C extensions remain optional; supported operations retain deterministic Python fallback paths unless a caller explicitly forces native-only execution.
+Python 3.10 or newer and NumPy are required by the standard installation.
+`staqtapp-tds` launches the main HTML/CSS/JS telemetry Browser. PyQt5 is
+required only when constructing the optional Driver Studio cockpit and is
+installed through the `gui` extra. The C extensions remain optional; supported
+operations retain deterministic Python fallback paths unless a caller
+explicitly forces native-only execution.
 
 ## Core storage quick start
 

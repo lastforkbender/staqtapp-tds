@@ -25,7 +25,6 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
   "numpy>=1.23",
-  "PyQt5>=5.15",
   "tomli>=2; python_version < '3.11'",
 ]
 
@@ -36,8 +35,7 @@ Issues = "https://github.com/lastforkbender/staqtapp-tds/issues"
 
 [project.optional-dependencies]
 fast = ["numba>=0.58"]
-# Backward-compatible alias: Driver Studio is included by every standard install.
-gui = []
+gui = ["PyQt5>=5.15"]
 test = [
   "pytest>=7",
 ]

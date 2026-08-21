@@ -15,6 +15,9 @@ checks close to the behavior they protect.
 - Removed obsolete development and validation bulk from the source archive
   while retaining runtime sources, public assets, examples, and maintained
   documentation.
+- Moved PyQt5 to the existing optional `gui` dependency where the import-safe
+  Driver Studio code expects it, keeping core and native installation available
+  on platforms without a PyQt5 wheel.
 - Changed no stored format or public API and widened no storage, Driver,
   Eaglegate, execution, activation, token-acceptance, or KV-commit authority.
 - Kept the v3.8.2 functional performance history below and its reproducible

@@ -13,8 +13,8 @@ def test_standard_install_includes_main_telemetry_ui_launcher():
     metadata = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     project = metadata["project"]
 
-    assert "PyQt5>=5.15" in project["dependencies"]
-    assert project["optional-dependencies"]["gui"] == []
+    assert "PyQt5>=5.15" not in project["dependencies"]
+    assert project["optional-dependencies"]["gui"] == ["PyQt5>=5.15"]
     assert project["scripts"]["staqtapp-tds"] == "staqtapp_tds.admin.app:main"
     assert project["scripts"]["staqtapp-tds-admin"] == "staqtapp_tds.admin.console:main"
     assert project["scripts"]["staqtapp-tds-foundation-closure"] == (

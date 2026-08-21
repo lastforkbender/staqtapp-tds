@@ -9,9 +9,13 @@ task. For exact signatures, use the programmer references under `tds_api_docs/`,
 ```bash
 python -m pip install staqtapp-tds==3.8.3
 staqtapp-tds
+
+# Optional PyQt5 Driver Studio cockpit
+python -m pip install "staqtapp-tds[gui]==3.8.3"
 ```
 
-The standard installation includes the Browser and Driver Studio. Optional C
+The standard installation includes the HTML Browser and headless Driver Studio
+models. Constructing the PyQt5 cockpit requires the `gui` extra. Optional C
 extensions are source-build accelerators and require
 `STAQTAPP_TDS_BUILD_NATIVE=1`; application code must remain correct with the
 Python fallback.
