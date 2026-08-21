@@ -30,10 +30,21 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+_BENCHMARK_DIR = Path(__file__).resolve().parent
+if str(_BENCHMARK_DIR) not in sys.path:
+    sys.path.insert(0, str(_BENCHMARK_DIR))
+
+from native_allocator_cpu_control import (  # noqa: E402
+    canonical_cpu_stat_delta,
+    discover_cpu_control,
+    quota_sufficient_for_threads,
+)
+
 RUNNER_ID = "native-handle-allocator-release-gate-v2"
 RUNNER_PATH = Path(__file__).resolve()
 WORKER_PATH = RUNNER_PATH.with_name("native_allocator_release_sample.py")
 SENTINEL_PATH = RUNNER_PATH.with_name("native_allocator_release_sentinels.py")
+CPU_CONTROL_PATH = RUNNER_PATH.with_name("native_allocator_cpu_control.py")
 EXPECTED_BACKEND = "native-c-swiss-entryindex"
 BASELINE_VERSION = "3.8.1"
 CANDIDATE_VERSION = "3.8.2"
@@ -141,7 +152,7 @@ def _verify_harness_binding(
     if tracked_status:
         raise RuntimeError(f"tracked worktree must be clean before qualification: {tracked_status}")
     bindings = {}
-    for path in (RUNNER_PATH, WORKER_PATH, SENTINEL_PATH):
+    for path in (RUNNER_PATH, WORKER_PATH, SENTINEL_PATH, CPU_CONTROL_PATH):
         relative = path.relative_to(repo).as_posix()
         live = path.read_bytes()
         committed = _git_blob(repo, candidate["commit"], relative)
@@ -346,29 +357,8 @@ def _available_cpus() -> list[int]:
         raise RuntimeError("release qualification requires sched_getaffinity") from exc
 
 
-def _cpu_max() -> dict[str, Any]:
-    source = Path("/sys/fs/cgroup/cpu.max")
-    try:
-        raw = source.read_text(encoding="utf-8").strip()
-    except (OSError, UnicodeError) as exc:
-        raise RuntimeError("release qualification requires cgroup v2 cpu.max") from exc
-    fields = raw.split()
-    if len(fields) != 2:
-        raise RuntimeError(f"invalid cgroup cpu.max: {raw!r}")
-    try:
-        period_usec = int(fields[1])
-        quota_usec = None if fields[0] == "max" else int(fields[0])
-    except ValueError as exc:
-        raise RuntimeError(f"invalid cgroup cpu.max: {raw!r}") from exc
-    if period_usec <= 0 or (quota_usec is not None and quota_usec <= 0):
-        raise RuntimeError(f"nonpositive cgroup cpu.max: {raw!r}")
-    return {
-        "source": str(source),
-        "raw": raw,
-        "quota_usec": quota_usec,
-        "period_usec": period_usec,
-        "quota_cores": None if quota_usec is None else quota_usec / period_usec,
-    }
+def _cpu_control() -> dict[str, Any]:
+    return discover_cpu_control()
 
 
 def _effective_cpu_topology() -> dict[str, Any]:
@@ -393,22 +383,24 @@ def _effective_cpu_topology() -> dict[str, Any]:
     # Pick the highest admitted sibling for every physical core, then prefer the
     # tail for the declared quiet-core set. No two selected IDs share a core.
     representatives = sorted(max(siblings) for siblings in groups.values())
-    cpu_max = _cpu_max()
+    cpu_control = _cpu_control()
+    effective_quota = cpu_control["effective_quota"]
     quota_floor = (
         len(representatives)
-        if cpu_max["quota_cores"] is None
-        else math.floor(float(cpu_max["quota_cores"]))
+        if effective_quota["finite"] is False
+        else int(effective_quota["ratio_numerator"])
+        // int(effective_quota["ratio_denominator"])
     )
     effective_count = min(len(representatives), quota_floor)
     if effective_count < 2:
         raise RuntimeError(
             "release qualification requires at least two allowed physical cores "
-            "and cpu.max quota for at least two threads"
+            "and CPU-control quota for at least two threads"
         )
     multi_threads = min(8, effective_count)
     selected_multi = representatives[-multi_threads:]
-    if cpu_max["quota_cores"] is not None and float(cpu_max["quota_cores"]) < multi_threads:
-        raise RuntimeError("cgroup cpu.max quota is below the declared thread count")
+    if not quota_sufficient_for_threads(cpu_control, multi_threads):
+        raise RuntimeError("CPU-control quota is below the declared thread count")
     topology_payload = {
         "allowed_cpu_ids": allowed,
         "logical_cpu_topology": logical,
@@ -428,7 +420,7 @@ def _effective_cpu_topology() -> dict[str, Any]:
         "multi_threads": multi_threads,
         "single_cpu_ids": [selected_multi[-1]],
         "multi_cpu_ids": selected_multi,
-        "cpu_max": cpu_max,
+        "cpu_control": cpu_control,
     }
 
 
@@ -571,8 +563,8 @@ def _worker_command(
         ",".join(str(cpu) for cpu in topology["allowed_cpu_ids"]),
         "--expected-topology-sha256",
         topology["topology_sha256"],
-        "--expected-cpu-max",
-        topology["cpu_max"]["raw"],
+        "--expected-cpu-control-json",
+        json.dumps(topology["cpu_control"], sort_keys=True, separators=(",", ":")),
     ]
     affinity = _affinity_for(int(cell["threads"]), topology)
     command.extend(["--cpu-affinity", affinity])
@@ -902,10 +894,9 @@ def _validate_retained_records(
                         or runtime.get("admitted_topology", {}).get("topology_sha256")
                         != topology["topology_sha256"]
                         or runtime.get("cpu_affinity") != expected_affinity
-                        or runtime.get("cgroup_cpu_max")
-                        != {"source": topology["cpu_max"]["source"], "raw": topology["cpu_max"]["raw"]}
+                        or runtime.get("cpu_control") != topology["cpu_control"]
                     ):
-                        raise RuntimeError("worker CPU topology/affinity/quota differs from protocol")
+                        raise RuntimeError("worker CPU topology/affinity/control differs from protocol")
                     for measurement_set in (
                         record["measurements"],
                         record["dedicated_latency"]["measurements"],
@@ -982,7 +973,7 @@ def _decide_status(failed_checks: list[dict[str, Any]]) -> str:
 
 def _interference(record: dict[str, Any]) -> dict[str, Any]:
     throttle_events = 0
-    throttled_usec = 0
+    throttled_usec = 0.0
     steal_ticks = 0
     steal_capacity_seconds = 0.0
     pressure_some_usec = 0
@@ -992,7 +983,17 @@ def _interference(record: dict[str, Any]) -> dict[str, Any]:
     evidence_complete = True
     evidence_errors: list[str] = []
     expected_affinity = record["runtime_identity"].get("cpu_affinity")
-    expected_cpu_max = record["runtime_identity"].get("cgroup_cpu_max") or {}
+    expected_cpu_control = record["runtime_identity"].get("cpu_control") or {}
+    cpu_control_mode = expected_cpu_control.get("mode")
+    throttle_applicable = cpu_control_mode in {"cgroup-v1", "cgroup-v2"}
+    expected_throttle_levels = [
+        {
+            "directory": level["directory"],
+            "source": level["stat"]["source"],
+        }
+        for level in expected_cpu_control.get("hierarchy_levels", [])
+        if level.get("stat", {}).get("throttle_applicable") is True
+    ]
     threads = int(record["cell"]["threads"])
     phases = (
         record["measurements"]["insertion"],
@@ -1002,15 +1003,51 @@ def _interference(record: dict[str, Any]) -> dict[str, Any]:
     )
     for phase in phases:
         evidence = phase["cpu_interference"]
-        cgroup = evidence.get("cgroup_cpu_stat_delta")
+        reported_cgroup = evidence.get("cgroup_cpu_stat_delta")
+        raw_cgroup_before = evidence.get("cgroup_cpu_stat_raw_before")
+        raw_cgroup_after = evidence.get("cgroup_cpu_stat_raw_after")
+        try:
+            recomputed_cgroup, recompute_errors = canonical_cpu_stat_delta(
+                expected_cpu_control,
+                raw_cgroup_before,
+                raw_cgroup_after,
+            )
+        except Exception as exc:
+            recomputed_cgroup = None
+            recompute_errors = [
+                f"retained raw CPU throttle snapshots are malformed: "
+                f"{type(exc).__name__}: {exc}"
+            ]
+        if recompute_errors:
+            evidence_complete = False
+            evidence_errors.extend(str(value) for value in recompute_errors)
+        if recomputed_cgroup != reported_cgroup:
+            evidence_complete = False
+            evidence_errors.append(
+                "reported CPU throttle delta differs from retained raw snapshots"
+            )
+        cgroup = (
+            recomputed_cgroup
+            if not recompute_errors and recomputed_cgroup == reported_cgroup
+            else None
+        )
         per_cpu = evidence.get("per_cpu_tick_delta")
         pressure = evidence.get("pressure_total_usec_delta")
         ticks_per_second = evidence.get("clock_ticks_per_second")
         phase_wall_seconds = float(phase["wall_ns"]) / 1_000_000_000.0
         phase_errors = evidence.get("evidence_errors")
-        if phase_errors:
+        if not isinstance(phase_errors, list):
+            evidence_complete = False
+            evidence_errors.append("phase evidence_errors is missing or malformed")
+        elif phase_errors:
+            evidence_complete = False
             evidence_errors.extend(str(value) for value in phase_errors)
-        if not isinstance(cgroup, dict) or not per_cpu:
+        expected_cgroup_keys = (
+            ["nr_throttled", "throttled_usec"] if throttle_applicable else []
+        )
+        if (not throttle_applicable and cgroup is not None) or (
+            throttle_applicable and not isinstance(cgroup, dict)
+        ) or not per_cpu:
             evidence_complete = False
         if (
             evidence.get("affinity_before") != expected_affinity
@@ -1022,25 +1059,59 @@ def _interference(record: dict[str, Any]) -> dict[str, Any]:
         if (
             evidence.get("affinity_source") != "os.sched_getaffinity(0)"
             or evidence.get("per_cpu_ticks_source") != "/proc/stat"
-            or evidence.get("cgroup_cpu_stat_source") != "/sys/fs/cgroup/cpu.stat"
-            or evidence.get("cgroup_cpu_max_source") != "/sys/fs/cgroup/cpu.max"
-            or evidence.get("required_cgroup_throttle_keys")
-            != ["nr_throttled", "throttled_usec"]
-            or evidence.get("cgroup_cpu_max") != expected_cpu_max.get("raw")
+            or evidence.get("cpu_control_before") != expected_cpu_control
+            or evidence.get("cpu_control_after") != expected_cpu_control
+            or evidence.get("cpu_control") != expected_cpu_control
+            or evidence.get("required_cgroup_throttle_keys") != expected_cgroup_keys
         ):
             evidence_complete = False
-            evidence_errors.append("host counter source/key/cpu.max identity changed")
+            evidence_errors.append("host counter source/key/CPU-control identity changed")
         if not ticks_per_second or float(ticks_per_second) <= 0:
             evidence_complete = False
-        if cgroup:
-            if any(value < 0 for value in cgroup.values()):
+        if isinstance(cgroup, dict):
+            level_deltas = cgroup.get("levels")
+            observed_level_identities = (
+                [
+                    {
+                        "directory": level.get("directory"),
+                        "source": level.get("source"),
+                    }
+                    for level in level_deltas
+                ]
+                if isinstance(level_deltas, list)
+                and all(isinstance(level, dict) for level in level_deltas)
+                else None
+            )
+            if observed_level_identities != expected_throttle_levels:
                 evidence_complete = False
-                evidence_errors.append("negative cgroup delta")
-            if "nr_throttled" not in cgroup or "throttled_usec" not in cgroup:
+                evidence_errors.append("CPU throttle level source/order changed")
+            calculated_events = 0
+            calculated_usec = 0.0
+            valid_level_deltas = level_deltas if isinstance(level_deltas, list) else []
+            for level in valid_level_deltas:
+                if not isinstance(level, dict):
+                    evidence_complete = False
+                    evidence_errors.append("invalid per-level throttle delta")
+                    continue
+                if (
+                    "nr_throttled" not in level
+                    or "throttled_usec" not in level
+                    or int(level["nr_throttled"]) < 0
+                    or float(level["throttled_usec"]) < 0
+                ):
+                    evidence_complete = False
+                    evidence_errors.append("missing or negative per-level throttle delta")
+                    continue
+                calculated_events += int(level["nr_throttled"])
+                calculated_usec += float(level["throttled_usec"])
+            if (
+                cgroup.get("nr_throttled") != calculated_events
+                or float(cgroup.get("throttled_usec", -1)) != calculated_usec
+            ):
                 evidence_complete = False
-                evidence_errors.append("required throttle delta missing")
-            throttle_events += int(cgroup.get("nr_throttled", 0))
-            throttled_usec += int(cgroup.get("throttled_usec", 0))
+                evidence_errors.append("aggregate throttle delta differs from hierarchy levels")
+            throttle_events += calculated_events
+            throttled_usec += calculated_usec
         if pressure:
             pressure_phase_count += 1
             if "some" not in pressure or "full" not in pressure:
@@ -1092,20 +1163,10 @@ def _interference(record: dict[str, Any]) -> dict[str, Any]:
         and pressure_full_fraction is not None
         and pressure_full_fraction <= MAX_CPU_PSI_FULL_FRACTION
     )
-    quota_raw = expected_cpu_max.get("raw")
-    quota_sufficient = False
-    if isinstance(quota_raw, str):
-        quota_fields = quota_raw.split()
-        if len(quota_fields) == 2:
-            try:
-                quota_sufficient = quota_fields[0] == "max" or (
-                    int(quota_fields[0]) / int(quota_fields[1]) >= threads
-                )
-            except (ValueError, ZeroDivisionError):
-                quota_sufficient = False
+    quota_sufficient = quota_sufficient_for_threads(expected_cpu_control, threads)
     if not quota_sufficient:
         evidence_complete = False
-        evidence_errors.append("cpu.max quota is unavailable or below declared threads")
+        evidence_errors.append("CPU-control quota is unavailable or below declared threads")
     clean = (
         evidence_complete
         and throttle_events == 0
@@ -1118,7 +1179,8 @@ def _interference(record: dict[str, Any]) -> dict[str, Any]:
         "evidence_complete": evidence_complete,
         "evidence_errors": sorted(set(evidence_errors)),
         "exact_selected_cpu_ids": expected_affinity,
-        "cpu_max_quota_sufficient_for_threads": quota_sufficient,
+        "cpu_control": expected_cpu_control,
+        "cpu_control_quota_sufficient_for_threads": quota_sufficient,
         "cgroup_throttle_events": throttle_events,
         "cgroup_throttled_usec": throttled_usec,
         "selected_cpu_steal_ticks": steal_ticks,
@@ -1359,7 +1421,7 @@ def _summarize_cell(
         "host_interference",
         all(item["clean"] for item in interference),
         interference,
-        "exact/stable cgroup, selected-CPU, cpu.max and PSI evidence; nonnegative deltas; zero throttle; quota >=threads; steal <=0.5%; PSI some <=5% and full <=1%",
+        "exact/stable v2, v1, true-root-unlimited, or proven-none CPU-control identity across every visible quota/burst/stat hierarchy level; selected-CPU and PSI evidence; canonical nonnegative per-level throttle deltas; zero throttle at every level; each finite quota >=threads or proven unconstrained; steal <=0.5%; PSI some <=5% and full <=1%",
     )
     check(
         "thermal_host_interference",
@@ -1542,7 +1604,7 @@ def _machine_identity(topology: dict[str, Any] | None = None) -> dict[str, Any]:
         "logical_cpu_count": os.cpu_count(),
         "available_cpu_affinity": topology["allowed_cpu_ids"],
         "cpu_topology_sha256": topology["topology_sha256"],
-        "cpu_max": topology["cpu_max"],
+        "cpu_control": topology["cpu_control"],
         "storage_device_class": "recorded-per-fixed-persistence-and-generation-sentinel",
     }
 
@@ -1970,24 +2032,61 @@ def main() -> int:
         parser.error("the v2 publication protocol requires exactly seven measured pairs")
     if args.warmup_pairs != 2:
         parser.error("the release protocol requires exactly two excluded warmup pairs")
-    for required in (WORKER_PATH, SENTINEL_PATH):
+    for required in (WORKER_PATH, SENTINEL_PATH, CPU_CONTROL_PATH):
         if not required.is_file():
             parser.error(f"qualification component is missing: {required}")
 
     repo = args.repository.resolve()
     output = args.output_dir.resolve()
-    if output.exists() and any(output.iterdir()):
-        parser.error("output directory must be absent or empty")
-
+    existing = set(output.iterdir()) if output.exists() else set()
+    allowed_workflow_bootstrap = output / "workflow-bootstrap.json"
+    if existing - {allowed_workflow_bootstrap}:
+        parser.error(
+            "output directory must be absent, empty, or contain only workflow-bootstrap.json"
+        )
+    if allowed_workflow_bootstrap in existing and not allowed_workflow_bootstrap.is_file():
+        parser.error("workflow-bootstrap.json must be a regular file")
+    output.mkdir(parents=True, exist_ok=True)
     run_id = f"allocator-v382-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}-{uuid.uuid4().hex[:8]}"
+    qualifier_bootstrap_path = output / "qualifier-bootstrap.json"
+    qualifier_bootstrap = {
+        "schema": 2,
+        "runner_id": RUNNER_ID,
+        "run_id": run_id,
+        "status": "BOOTSTRAPPED_BEFORE_CPU_CONTROL_DISCOVERY",
+        "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "repository": str(repo),
+        "baseline_ref": args.baseline_ref,
+        "candidate_ref": args.candidate_ref,
+        "cpu_control_proof_sources": [
+            "/proc/self/mountinfo",
+            "/proc/self/cgroup",
+        ],
+    }
+    _write_json(qualifier_bootstrap_path, qualifier_bootstrap)
     baseline = _resolve_source(repo, args.baseline_ref, "baseline")
     candidate = _resolve_source(repo, args.candidate_ref, "candidate")
     if baseline["commit"] == candidate["commit"]:
         parser.error("baseline and candidate resolve to the same commit")
     harness_binding = _verify_harness_binding(repo, baseline, candidate)
-    output.mkdir(parents=True, exist_ok=True)
-
-    topology = _effective_cpu_topology()
+    try:
+        topology = _effective_cpu_topology()
+    except Exception as exc:
+        qualifier_bootstrap.update(
+            {
+                "status": "CPU_CONTROL_DISCOVERY_FAILED",
+                "failure": f"{type(exc).__name__}: {exc}",
+            }
+        )
+        _write_json(qualifier_bootstrap_path, qualifier_bootstrap)
+        raise
+    qualifier_bootstrap.update(
+        {
+            "status": "CPU_CONTROL_DISCOVERED",
+            "cpu_control": topology["cpu_control"],
+        }
+    )
+    _write_json(qualifier_bootstrap_path, qualifier_bootstrap)
     multi_threads = int(topology["multi_threads"])
     cells = _cells(multi_threads)
 
@@ -2007,7 +2106,12 @@ def main() -> int:
     )
     worker_path = candidate_root / "benchmarks" / WORKER_PATH.name
     sentinel_path = candidate_root / "benchmarks" / SENTINEL_PATH.name
-    if _sha256(worker_path) != _sha256(WORKER_PATH) or _sha256(sentinel_path) != _sha256(SENTINEL_PATH):
+    cpu_control_path = candidate_root / "benchmarks" / CPU_CONTROL_PATH.name
+    if (
+        _sha256(worker_path) != _sha256(WORKER_PATH)
+        or _sha256(sentinel_path) != _sha256(SENTINEL_PATH)
+        or _sha256(cpu_control_path) != _sha256(CPU_CONTROL_PATH)
+    ):
         raise RuntimeError("exported candidate harness identity changed")
 
     protocol = {
@@ -2019,6 +2123,8 @@ def main() -> int:
         "worker_sha256": _sha256(worker_path),
         "sentinel_path": str(sentinel_path),
         "sentinel_sha256": _sha256(sentinel_path),
+        "cpu_control_path": str(cpu_control_path),
+        "cpu_control_sha256": _sha256(cpu_control_path),
         "harness_binding": harness_binding,
         "run_id": run_id,
         "seed": args.seed,

@@ -15,6 +15,480 @@ SPEC = importlib.util.spec_from_file_location("native_allocator_qualifier", QUAL
 assert SPEC is not None and SPEC.loader is not None
 QUALIFIER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(QUALIFIER)
+import native_allocator_cpu_control as CPU_CONTROL
+
+
+def _v2_cpu_control(
+    *,
+    raw: str = "max 100000",
+    quota_usec: int | None = None,
+    quota_cores: float | None = None,
+) -> dict[str, object]:
+    period = 100000
+    finite = quota_usec is not None
+    level = {
+        "directory": "/sys/fs/cgroup/job",
+        "hierarchy_path": "/job",
+        "is_mountpoint": False,
+        "quota": {
+            "sources": ["/sys/fs/cgroup/job/cpu.max"],
+            "raw": {"cpu.max": raw},
+            "quota_usec": quota_usec,
+            "period_usec": period,
+            "quota_cores": quota_cores,
+        },
+        "burst": {
+            "source": "/sys/fs/cgroup/job/cpu.max.burst",
+            "status": "absent-enoent",
+            "raw": None,
+        },
+        "stat": {
+            "source": "/sys/fs/cgroup/job/cpu.stat",
+            "raw_throttle_keys": ["nr_throttled", "throttled_usec"],
+            "canonical_throttle_keys": ["nr_throttled", "throttled_usec"],
+            "canonical_throttled_time_unit": "microseconds",
+            "normalization": "identity-microseconds",
+            "throttle_applicable": True,
+        },
+    }
+    return {
+        "mode": "cgroup-v2",
+        "unconstrained": False,
+        "proof_sources": {
+            "mountinfo": "/proc/self/mountinfo",
+            "self_cgroup": "/proc/self/cgroup",
+        },
+        "mount": {
+            "raw": "1 0 0:1 / /sys/fs/cgroup rw - cgroup2 cgroup2 rw",
+            "root": "/",
+            "mount_point": "/sys/fs/cgroup",
+            "filesystem_type": "cgroup2",
+            "mount_source": "cgroup2",
+            "mount_options": ["rw"],
+            "super_options": ["rw"],
+        },
+        "membership": {
+            "raw": "0::/job",
+            "hierarchy_id": "0",
+            "controllers": [],
+            "path": "/job",
+        },
+        "control_directory": "/sys/fs/cgroup/job",
+        "root_visibility_proof": {
+            "mount_root": "/",
+            "controllers": {
+                "source": "/sys/fs/cgroup/cgroup.controllers",
+                "raw": "cpu memory",
+                "values": ["cpu", "memory"],
+            },
+        },
+        "hierarchy_levels": [level],
+        "effective_quota": {
+            "finite": finite,
+            "quota_usec": quota_usec,
+            "period_usec": period if finite else None,
+            "quota_cores": quota_cores,
+            "limiting_level_indices": [0] if finite else [],
+            "limiting_level_directories": [level["directory"]] if finite else [],
+            **(
+                {
+                    "ratio_numerator": int(quota_usec) // period,
+                    "ratio_denominator": 1,
+                }
+                if finite
+                else {}
+            ),
+        },
+    }
+
+
+def _write_v2_root_files(mount: Path) -> None:
+    mount.mkdir(parents=True, exist_ok=True)
+    (mount / "cgroup.controllers").write_text("cpu memory\n", encoding="utf-8")
+    (mount / "cgroup.subtree_control").write_text("+cpu\n", encoding="utf-8")
+    (mount / "cgroup.procs").write_text("123\n", encoding="utf-8")
+
+
+def _write_v2_level(directory: Path, quota: str, *, burst: str | None = None) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "cpu.max").write_text(quota + "\n", encoding="utf-8")
+    (directory / "cpu.stat").write_text(
+        "usage_usec 10\nuser_usec 6\nsystem_usec 4\n"
+        "nr_throttled 0\nthrottled_usec 0\n",
+        encoding="utf-8",
+    )
+    if burst is not None:
+        (directory / "cpu.max.burst").write_text(burst + "\n", encoding="utf-8")
+
+
+def test_v2_hierarchy_binds_every_level_effective_quota_burst_and_throttle(
+    tmp_path: Path,
+) -> None:
+    mount = tmp_path / "unified"
+    leaf = mount / "parent" / "leaf"
+    _write_v2_root_files(mount)
+    (mount / "cpu.stat").write_text(
+        "usage_usec 10\nuser_usec 6\nsystem_usec 4\n",
+        encoding="utf-8",
+    )
+    _write_v2_level(mount / "parent", "200000 100000", burst="50000")
+    _write_v2_level(leaf, "max 100000", burst="0")
+    mountinfo = tmp_path / "mountinfo"
+    mountinfo.write_text(
+        f"36 25 0:32 / {mount} rw,nosuid - cgroup2 cgroup2 rw\n",
+        encoding="utf-8",
+    )
+    self_cgroup = tmp_path / "cgroup"
+    self_cgroup.write_text("0::/parent/leaf\n", encoding="utf-8")
+
+    identity = CPU_CONTROL.discover_cpu_control(mountinfo, self_cgroup)
+    assert [level["directory"] for level in identity["hierarchy_levels"]] == [
+        str(leaf), str(mount / "parent"), str(mount)
+    ]
+    assert identity["effective_quota"]["quota_cores"] == 2.0
+    assert identity["effective_quota"]["limiting_level_directories"] == [
+        str(mount / "parent")
+    ]
+    assert identity["hierarchy_levels"][1]["burst"]["raw"] == "50000"
+    assert identity["hierarchy_levels"][2]["burst"]["status"] == "absent-enoent"
+    assert identity["hierarchy_levels"][2]["quota"] is None
+    assert identity["hierarchy_levels"][2]["stat"]["throttle_applicable"] is False
+    assert CPU_CONTROL.quota_sufficient_for_threads(identity, 2) is True
+    assert CPU_CONTROL.quota_sufficient_for_threads(identity, 3) is False
+
+    before = CPU_CONTROL.read_cpu_stat(identity)
+    parent_stat = mount / "parent" / "cpu.stat"
+    parent_stat.write_text(
+        "usage_usec 20\nuser_usec 12\nsystem_usec 8\n"
+        "nr_throttled 1\nthrottled_usec 1500\n",
+        encoding="utf-8",
+    )
+    after = CPU_CONTROL.read_cpu_stat(identity)
+    delta, errors = CPU_CONTROL.canonical_cpu_stat_delta(identity, before, after)
+    assert errors == []
+    assert delta["levels"][1]["nr_throttled"] == 1
+    assert delta["nr_throttled"] == 1 and delta["throttled_usec"] == 1500.0
+
+    original = identity
+    (mount / "parent" / "cpu.max.burst").write_text("75000\n", encoding="utf-8")
+    burst_changed = CPU_CONTROL.discover_cpu_control(mountinfo, self_cgroup)
+    assert burst_changed != original
+    (mount / "parent" / "cpu.max.burst").write_text("50000\n", encoding="utf-8")
+    (mount / "parent" / "cpu.max").write_text("150000 100000\n", encoding="utf-8")
+    changed = CPU_CONTROL.discover_cpu_control(mountinfo, self_cgroup)
+    assert changed != original
+    (mount / "parent" / "cpu.max").unlink()
+    with pytest.raises(RuntimeError, match="non-root v2 cgroup level lacks cpu.max"):
+        CPU_CONTROL.discover_cpu_control(mountinfo, self_cgroup)
+
+
+def test_v2_effective_quota_uses_exact_minimum_across_different_periods(
+    tmp_path: Path,
+) -> None:
+    mount = tmp_path / "unified-ratios"
+    leaf = mount / "parent" / "leaf"
+    _write_v2_root_files(mount)
+    (mount / "cpu.stat").write_text(
+        "usage_usec 10\nuser_usec 6\nsystem_usec 4\n",
+        encoding="utf-8",
+    )
+    _write_v2_level(mount / "parent", "300000 200000")
+    _write_v2_level(leaf, "250000 100000")
+    mountinfo = tmp_path / "mountinfo"
+    mountinfo.write_text(
+        f"36 25 0:32 / {mount} rw - cgroup2 cgroup2 rw\n",
+        encoding="utf-8",
+    )
+    self_cgroup = tmp_path / "cgroup"
+    self_cgroup.write_text("0::/parent/leaf\n", encoding="utf-8")
+
+    identity = CPU_CONTROL.discover_cpu_control(mountinfo, self_cgroup)
+    assert identity["effective_quota"]["ratio_numerator"] == 3
+    assert identity["effective_quota"]["ratio_denominator"] == 2
+    assert identity["effective_quota"]["limiting_level_directories"] == [
+        str(mount / "parent")
+    ]
+    assert CPU_CONTROL.quota_sufficient_for_threads(identity, 1) is True
+    assert CPU_CONTROL.quota_sufficient_for_threads(identity, 2) is False
+
+
+def _write_v1_level(directory: Path, quota: str, *, burst: str | None = None) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "cpu.cfs_quota_us").write_text(quota + "\n", encoding="utf-8")
+    (directory / "cpu.cfs_period_us").write_text("100000\n", encoding="utf-8")
+    (directory / "cpu.stat").write_text(
+        "nr_periods 10\nnr_throttled 0\nthrottled_time 0\n",
+        encoding="utf-8",
+    )
+    if burst is not None:
+        (directory / "cpu.cfs_burst_us").write_text(burst + "\n", encoding="utf-8")
+
+
+def test_v1_hierarchy_binds_parent_quota_and_normalizes_each_level(tmp_path: Path) -> None:
+    mount = tmp_path / "cpu-v1"
+    leaf = mount / "parent" / "leaf"
+    mount.mkdir()
+    (mount / "release_agent").write_text("\n", encoding="utf-8")
+    _write_v1_level(mount, "-1")
+    _write_v1_level(mount / "parent", "200000", burst="50000")
+    _write_v1_level(leaf, "-1")
+    mountinfo = tmp_path / "mountinfo"
+    mountinfo.write_text(
+        f"41 25 0:36 / {mount} rw - cgroup cgroup rw,cpu,cpuacct\n",
+        encoding="utf-8",
+    )
+    self_cgroup = tmp_path / "cgroup"
+    self_cgroup.write_text("2:cpu,cpuacct:/parent/leaf\n", encoding="utf-8")
+    identity = CPU_CONTROL.discover_cpu_control(mountinfo, self_cgroup)
+    assert identity["effective_quota"]["quota_cores"] == 2.0
+    before = CPU_CONTROL.read_cpu_stat(identity)
+    before[1]["counters"]["throttled_time"] = 1250
+    after = json.loads(json.dumps(before))
+    after[1]["counters"]["nr_throttled"] = 1
+    after[1]["counters"]["throttled_time"] = 2750
+    delta, errors = CPU_CONTROL.canonical_cpu_stat_delta(identity, before, after)
+    assert errors == []
+    assert delta["levels"][1]["throttled_usec"] == 1.5
+    (mount / "release_agent").unlink()
+    with pytest.raises(RuntimeError, match="release_agent unavailable"):
+        CPU_CONTROL.discover_cpu_control(mountinfo, self_cgroup)
+
+
+def test_hidden_cgroup_ancestry_fails_closed(tmp_path: Path) -> None:
+    mount = tmp_path / "hidden"
+    mount.mkdir()
+    mountinfo = tmp_path / "mountinfo"
+    mountinfo.write_text(
+        f"36 25 0:32 /host/container {mount} rw - cgroup2 cgroup2 rw\n",
+        encoding="utf-8",
+    )
+    self_cgroup = tmp_path / "cgroup"
+    self_cgroup.write_text("0::/\n", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="hidden cgroup ancestry"):
+        CPU_CONTROL.discover_cpu_control(mountinfo, self_cgroup)
+
+
+def test_cpu_control_none_requires_positive_two_proc_source_proof(
+    tmp_path: Path,
+) -> None:
+    mountinfo = tmp_path / "mountinfo"
+    mountinfo.write_text(
+        "12 1 0:12 / /proc rw - proc proc rw\n",
+        encoding="utf-8",
+    )
+    self_cgroup = tmp_path / "cgroup"
+    self_cgroup.write_text("1:name=systemd:/\n", encoding="utf-8")
+    identity = CPU_CONTROL.discover_cpu_control(mountinfo, self_cgroup)
+    assert identity["mode"] == "none"
+    assert identity["unconstrained"] is True
+    assert identity["no_cpu_cgroup_proof"]["proof_kind"] == (
+        "no-visible-linux-cpu-controller"
+    )
+    assert len(identity["no_cpu_cgroup_proof"]["mountinfo_sha256"]) == 64
+    assert len(identity["no_cpu_cgroup_proof"]["self_cgroup_sha256"]) == 64
+    assert CPU_CONTROL.quota_sufficient_for_threads(identity, 8) is True
+
+    evidence = _clean_interference()
+    evidence["cpu_control_before"] = identity
+    evidence["cpu_control_after"] = identity
+    evidence["cpu_control"] = identity
+    evidence["cgroup_cpu_stat_delta"] = None
+    evidence["cgroup_cpu_stat_raw_before"] = []
+    evidence["cgroup_cpu_stat_raw_after"] = []
+    evidence["required_cgroup_throttle_keys"] = []
+    phase = {"wall_ns": 1_000_000_000, "cpu_interference": evidence}
+    interference = QUALIFIER._interference(
+        {
+            "cell": {"threads": 1},
+            "runtime_identity": {"cpu_affinity": [8], "cpu_control": identity},
+            "measurements": {"insertion": phase, "lookup_control": phase},
+            "dedicated_latency": {
+                "measurements": {"insertion": phase, "lookup_control": phase}
+            },
+        }
+    )
+    assert interference["cpu_control_quota_sufficient_for_threads"] is True
+    assert interference["evidence_complete"] is True
+    assert interference["clean"] is True
+
+    # A visible CPU controller with missing quota/stat files is never silently
+    # reclassified as an unconstrained host.
+    cpu_mount = tmp_path / "broken-cpu"
+    cpu_mount.mkdir()
+    mountinfo.write_text(
+        f"41 25 0:36 / {cpu_mount} rw - cgroup cgroup rw,cpu\n",
+        encoding="utf-8",
+    )
+    self_cgroup.write_text("2:cpu:/ci/job\n", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="unavailable|lacks|resolved"):
+        CPU_CONTROL.discover_cpu_control(mountinfo, self_cgroup)
+
+    mountinfo.write_text(
+        "12 1 0:12 / /proc rw - proc proc rw\n",
+        encoding="utf-8",
+    )
+    self_cgroup.write_text("0::/\n", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="contradictory"):
+        CPU_CONTROL.discover_cpu_control(mountinfo, self_cgroup)
+    with pytest.raises(RuntimeError, match="mount namespace evidence unavailable"):
+        CPU_CONTROL.discover_cpu_control(tmp_path / "missing-mountinfo", self_cgroup)
+
+
+def test_v2_no_cpu_controller_proof_binds_absent_controls_at_every_level(
+    tmp_path: Path,
+) -> None:
+    mount = tmp_path / "unified-no-cpu"
+    leaf = mount / "leaf"
+    _write_v2_root_files(mount)
+    (mount / "cgroup.controllers").write_text("memory pids\n", encoding="utf-8")
+    leaf.mkdir()
+    mountinfo = tmp_path / "mountinfo"
+    mountinfo.write_text(
+        f"36 25 0:32 / {mount} rw - cgroup2 cgroup2 rw\n",
+        encoding="utf-8",
+    )
+    self_cgroup = tmp_path / "cgroup"
+    self_cgroup.write_text("0::/leaf\n", encoding="utf-8")
+
+    identity = CPU_CONTROL.discover_cpu_control(mountinfo, self_cgroup)
+    assert identity["mode"] == "none"
+    hierarchy = identity["no_cpu_cgroup_proof"][
+        "v2_no_cpu_controller_hierarchies"
+    ][0]
+    assert hierarchy["root_visibility_proof"]["controllers"]["values"] == [
+        "memory",
+        "pids",
+    ]
+    assert hierarchy["absent_cpu_controls"] == [
+        str(leaf / "cpu.max"),
+        str(leaf / "cpu.max.burst"),
+        str(mount / "cpu.max"),
+        str(mount / "cpu.max.burst"),
+    ]
+
+    (mount / "cgroup.controllers").write_text("\n", encoding="utf-8")
+    empty_controllers = CPU_CONTROL.discover_cpu_control(mountinfo, self_cgroup)
+    assert empty_controllers["mode"] == "none"
+    assert empty_controllers["no_cpu_cgroup_proof"][
+        "v2_no_cpu_controller_hierarchies"
+    ][0]["root_visibility_proof"]["controllers"]["values"] == []
+
+    for path, raw in (
+        (leaf / "cpu.max", "max 100000\n"),
+        (mount / "cpu.max.burst", "0\n"),
+    ):
+        path.write_text(raw, encoding="utf-8")
+        with pytest.raises(RuntimeError, match="unexpectedly exists"):
+            CPU_CONTROL.discover_cpu_control(mountinfo, self_cgroup)
+        path.unlink()
+
+
+def test_cpu_control_rejects_ambiguous_valid_control_paths(tmp_path: Path) -> None:
+    mounts = [tmp_path / "unified-a", tmp_path / "unified-b"]
+    for mount in mounts:
+        mount.mkdir()
+        _write_v2_root_files(mount)
+        (mount / "cpu.stat").write_text(
+            "usage_usec 10\nuser_usec 6\nsystem_usec 4\n",
+            encoding="utf-8",
+        )
+    mountinfo = tmp_path / "mountinfo"
+    mountinfo.write_text(
+        "".join(
+            f"{index} 25 0:{index} / {mount} rw - cgroup2 cgroup2 rw\n"
+            for index, mount in enumerate(mounts, start=40)
+        ),
+        encoding="utf-8",
+    )
+    self_cgroup = tmp_path / "cgroup"
+    self_cgroup.write_text("0::/\n", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="ambiguous"):
+        CPU_CONTROL.discover_cpu_control(mountinfo, self_cgroup)
+
+
+def test_v2_true_hierarchy_root_unlimited_and_root_proof_mutation(
+    tmp_path: Path,
+) -> None:
+    mount = tmp_path / "true-root"
+    mount.mkdir()
+    _write_v2_root_files(mount)
+    (mount / "cpu.stat").write_text(
+        "usage_usec 10\nuser_usec 6\nsystem_usec 4\n",
+        encoding="utf-8",
+    )
+    mountinfo = tmp_path / "mountinfo"
+    mountinfo.write_text(
+        f"36 25 0:32 / {mount} rw - cgroup2 cgroup2 rw\n",
+        encoding="utf-8",
+    )
+    self_cgroup = tmp_path / "cgroup"
+    self_cgroup.write_text("0::/\n", encoding="utf-8")
+    identity = CPU_CONTROL.discover_cpu_control(mountinfo, self_cgroup)
+    assert identity["mode"] == "cgroup-v2-root"
+    assert identity["unconstrained"] is True
+    assert CPU_CONTROL.read_cpu_stat(identity) == []
+    assert CPU_CONTROL.canonical_cpu_stat_delta(identity, [], []) == (None, [])
+    assert CPU_CONTROL.quota_sufficient_for_threads(identity, 8) is True
+
+    evidence = _clean_interference()
+    evidence["cpu_control_before"] = identity
+    evidence["cpu_control_after"] = identity
+    evidence["cpu_control"] = identity
+    evidence["cgroup_cpu_stat_delta"] = None
+    evidence["cgroup_cpu_stat_raw_before"] = []
+    evidence["cgroup_cpu_stat_raw_after"] = []
+    evidence["required_cgroup_throttle_keys"] = []
+    phase = {"wall_ns": 1_000_000_000, "cpu_interference": evidence}
+    record = {
+        "cell": {"threads": 1},
+        "runtime_identity": {"cpu_affinity": [8], "cpu_control": identity},
+        "measurements": {"insertion": phase, "lookup_control": phase},
+        "dedicated_latency": {
+            "measurements": {"insertion": phase, "lookup_control": phase}
+        },
+    }
+    assert QUALIFIER._interference(record)["clean"] is True
+    evidence["cpu_control"] = json.loads(json.dumps(identity))
+    evidence["cpu_control"]["root_visibility_proof"]["controllers"]["raw"] = "memory"
+    assert QUALIFIER._interference(record)["evidence_complete"] is False
+
+    for sentinel, raw in (
+        ("cgroup.events", "populated 1\n"),
+        ("cgroup.type", "domain\n"),
+        ("cpu.max", "max 100000\n"),
+        ("cpu.max.burst", "0\n"),
+    ):
+        path = mount / sentinel
+        path.write_text(raw, encoding="utf-8")
+        with pytest.raises(RuntimeError, match="unexpectedly exists"):
+            CPU_CONTROL.discover_cpu_control(mountinfo, self_cgroup)
+        path.unlink()
+    (mount / "cpu.stat").write_text(
+        "usage_usec 10\nuser_usec 6\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(RuntimeError, match="universal usage counters"):
+        CPU_CONTROL.discover_cpu_control(mountinfo, self_cgroup)
+
+
+def test_empty_and_contradictory_procfs_evidence_fails_closed(tmp_path: Path) -> None:
+    mountinfo = tmp_path / "mountinfo"
+    self_cgroup = tmp_path / "cgroup"
+    valid_mount = "12 1 0:12 / /proc rw - proc proc rw\n"
+    valid_member = "1:name=systemd:/\n"
+    for mount_raw, member_raw, expected in (
+        ("", valid_member, "mount namespace evidence is empty"),
+        ("   \n", valid_member, "mount namespace evidence is empty"),
+        (valid_mount, "", "cgroup membership evidence is empty"),
+        (valid_mount, "  \n", "cgroup membership evidence is empty"),
+        ("", "", "mount namespace evidence is empty"),
+        (valid_mount, "0:cpu:/\n", "contradictory unified"),
+        (valid_mount, "2::/\n", "contradictory v1"),
+    ):
+        mountinfo.write_text(mount_raw, encoding="utf-8")
+        self_cgroup.write_text(member_raw, encoding="utf-8")
+        with pytest.raises(RuntimeError, match=expected):
+            CPU_CONTROL.discover_cpu_control(mountinfo, self_cgroup)
 
 
 def test_harness_binding_requires_exact_head_baseline_blobs_and_c_diff(
@@ -27,7 +501,13 @@ def test_harness_binding_requires_exact_head_baseline_blobs_and_c_diff(
     runner = benchmark_dir / "qualify_native_handle_allocator.py"
     worker = benchmark_dir / "native_allocator_release_sample.py"
     sentinel = benchmark_dir / "native_allocator_release_sentinels.py"
-    for path, content in ((runner, b"runner-v2"), (worker, b"worker-v2"), (sentinel, b"sentinel-v2")):
+    cpu_control = benchmark_dir / "native_allocator_cpu_control.py"
+    for path, content in (
+        (runner, b"runner-v2"),
+        (worker, b"worker-v2"),
+        (sentinel, b"sentinel-v2"),
+        (cpu_control, b"cpu-control-v2"),
+    ):
         path.write_bytes(content)
 
     baseline_c = b"baseline-native-source"
@@ -39,6 +519,7 @@ def test_harness_binding_requires_exact_head_baseline_blobs_and_c_diff(
     monkeypatch.setattr(QUALIFIER, "RUNNER_PATH", runner)
     monkeypatch.setattr(QUALIFIER, "WORKER_PATH", worker)
     monkeypatch.setattr(QUALIFIER, "SENTINEL_PATH", sentinel)
+    monkeypatch.setattr(QUALIFIER, "CPU_CONTROL_PATH", cpu_control)
     monkeypatch.setattr(QUALIFIER, "BASELINE_COMMIT", "baseline-commit")
     monkeypatch.setattr(
         QUALIFIER, "BASELINE_NATIVE_SOURCE_SHA256", hashlib.sha256(baseline_c).hexdigest()
@@ -88,6 +569,7 @@ def test_harness_binding_requires_exact_head_baseline_blobs_and_c_diff(
         "benchmarks/qualify_native_handle_allocator.py",
         "benchmarks/native_allocator_release_sample.py",
         "benchmarks/native_allocator_release_sentinels.py",
+        "benchmarks/native_allocator_cpu_control.py",
     }
 
     with pytest.raises(RuntimeError, match="candidate ref must resolve exactly"):
@@ -127,17 +609,44 @@ def test_cells_include_full_tds_primary_complete_wrapper_and_mandatory_raw_contr
 
 
 def _clean_interference() -> dict[str, object]:
+    cpu_control = _v2_cpu_control()
+    level = cpu_control["hierarchy_levels"][0]
     return {
         "affinity_before": [8],
         "affinity_after": [8],
         "affinity_source": "os.sched_getaffinity(0)",
-        "cgroup_cpu_stat_delta": {"nr_throttled": 0, "throttled_usec": 0},
-        "cgroup_cpu_stat_source": "/sys/fs/cgroup/cpu.stat",
+        "cgroup_cpu_stat_delta": {
+            "levels": [
+                {
+                    "directory": level["directory"],
+                    "source": level["stat"]["source"],
+                    "nr_throttled": 0,
+                    "throttled_usec": 0,
+                }
+            ],
+            "nr_throttled": 0,
+            "throttled_usec": 0.0,
+        },
+        "cgroup_cpu_stat_raw_before": [
+            {
+                "directory": level["directory"],
+                "source": level["stat"]["source"],
+                "counters": {"nr_throttled": 0, "throttled_usec": 0},
+            }
+        ],
+        "cgroup_cpu_stat_raw_after": [
+            {
+                "directory": level["directory"],
+                "source": level["stat"]["source"],
+                "counters": {"nr_throttled": 0, "throttled_usec": 0},
+            }
+        ],
+        "cpu_control_before": json.loads(json.dumps(cpu_control)),
+        "cpu_control_after": json.loads(json.dumps(cpu_control)),
+        "cpu_control": cpu_control,
         "required_cgroup_throttle_keys": ["nr_throttled", "throttled_usec"],
         "per_cpu_tick_delta": {"8": {"steal": 0}},
         "per_cpu_ticks_source": "/proc/stat",
-        "cgroup_cpu_max": "max 100000",
-        "cgroup_cpu_max_source": "/sys/fs/cgroup/cpu.max",
         "pressure_total_usec_delta": {"some": 0, "full": 0},
         "clock_ticks_per_second": 100,
         "evidence_errors": [],
@@ -210,7 +719,7 @@ def _record(
         },
         "runtime_identity": {
             "cpu_affinity": [8],
-            "cgroup_cpu_max": {"source": "/sys/fs/cgroup/cpu.max", "raw": "max 100000"},
+            "cpu_control": _v2_cpu_control(),
         },
         "semantic_outcome": {
             "handle_set_sha256": "handles",
@@ -404,7 +913,7 @@ def test_steal_is_normalized_by_cpu_capacity_and_missing_evidence_fails_closed()
         "cell": {"threads": 2},
         "runtime_identity": {
             "cpu_affinity": [8, 9],
-            "cgroup_cpu_max": {"source": "/sys/fs/cgroup/cpu.max", "raw": "max 100000"},
+            "cpu_control": _v2_cpu_control(),
         },
         "measurements": {"insertion": phase, "lookup_control": phase},
         "dedicated_latency": {
@@ -420,6 +929,227 @@ def test_steal_is_normalized_by_cpu_capacity_and_missing_evidence_fails_closed()
     missing = QUALIFIER._interference(record)
     assert missing["evidence_complete"] is False
     assert missing["clean"] is False
+
+    evidence["per_cpu_tick_delta"] = {
+        "8": {"steal": 0},
+        "9": {"steal": 0},
+    }
+    evidence["cpu_control"]["hierarchy_levels"][0]["quota"]["raw"][
+        "cpu.max"
+    ] = "190000 100000"
+    changed_quota = QUALIFIER._interference(record)
+    assert changed_quota["evidence_complete"] is False
+    assert any(
+        "CPU-control identity changed" in error
+        for error in changed_quota["evidence_errors"]
+    )
+
+    evidence["cpu_control"] = json.loads(json.dumps(record["runtime_identity"]["cpu_control"]))
+    evidence["cgroup_cpu_stat_delta"]["levels"][0]["source"] = "/wrong/cpu.stat"
+    changed_stat_source = QUALIFIER._interference(record)
+    assert changed_stat_source["evidence_complete"] is False
+    assert (
+        "reported CPU throttle delta differs from retained raw snapshots"
+        in changed_stat_source["evidence_errors"]
+    )
+
+
+def test_parent_level_throttle_is_gated_when_leaf_remains_zero() -> None:
+    cpu_control = _v2_cpu_control()
+    leaf = cpu_control["hierarchy_levels"][0]
+    leaf["directory"] = "/sys/fs/cgroup/team/job"
+    leaf["hierarchy_path"] = "/team/job"
+    leaf["quota"]["sources"] = ["/sys/fs/cgroup/team/job/cpu.max"]
+    leaf["burst"]["source"] = "/sys/fs/cgroup/team/job/cpu.max.burst"
+    leaf["stat"]["source"] = "/sys/fs/cgroup/team/job/cpu.stat"
+    parent = json.loads(json.dumps(leaf))
+    parent["directory"] = "/sys/fs/cgroup/team"
+    parent["hierarchy_path"] = "/team"
+    parent["quota"]["sources"] = ["/sys/fs/cgroup/team/cpu.max"]
+    parent["burst"]["source"] = "/sys/fs/cgroup/team/cpu.max.burst"
+    parent["stat"]["source"] = "/sys/fs/cgroup/team/cpu.stat"
+    root = {
+        "directory": "/sys/fs/cgroup",
+        "hierarchy_path": "/",
+        "is_mountpoint": True,
+        "quota": None,
+        "burst": {
+            "source": "/sys/fs/cgroup/cpu.max.burst",
+            "status": "absent-enoent",
+            "raw": None,
+        },
+        "stat": {
+            "source": "/sys/fs/cgroup/cpu.stat",
+            "raw_throttle_keys": [],
+            "canonical_throttle_keys": [],
+            "canonical_throttled_time_unit": "microseconds",
+            "normalization": "not-applicable-v2-hierarchy-root",
+            "throttle_applicable": False,
+        },
+    }
+    cpu_control["hierarchy_levels"] = [leaf, parent, root]
+    cpu_control["membership"]["raw"] = "0::/team/job"
+    cpu_control["membership"]["path"] = "/team/job"
+    cpu_control["control_directory"] = leaf["directory"]
+    cpu_control["effective_quota"]["limiting_level_directories"] = [
+        leaf["directory"]
+    ]
+    evidence = _clean_interference()
+    evidence["cpu_control_before"] = json.loads(json.dumps(cpu_control))
+    evidence["cpu_control_after"] = json.loads(json.dumps(cpu_control))
+    evidence["cpu_control"] = cpu_control
+    evidence["cgroup_cpu_stat_delta"] = {
+        "levels": [
+            {
+                "directory": "/sys/fs/cgroup/team/job",
+                "source": "/sys/fs/cgroup/team/job/cpu.stat",
+                "nr_throttled": 0,
+                "throttled_usec": 0,
+            },
+            {
+                "directory": "/sys/fs/cgroup/team",
+                "source": "/sys/fs/cgroup/team/cpu.stat",
+                "nr_throttled": 1,
+                "throttled_usec": 250,
+            },
+        ],
+        "nr_throttled": 1,
+        "throttled_usec": 250.0,
+    }
+    evidence["cgroup_cpu_stat_raw_before"] = [
+        {
+            "directory": "/sys/fs/cgroup/team/job",
+            "source": "/sys/fs/cgroup/team/job/cpu.stat",
+            "counters": {"nr_throttled": 0, "throttled_usec": 0},
+        },
+        {
+            "directory": "/sys/fs/cgroup/team",
+            "source": "/sys/fs/cgroup/team/cpu.stat",
+            "counters": {"nr_throttled": 0, "throttled_usec": 0},
+        },
+    ]
+    evidence["cgroup_cpu_stat_raw_after"] = [
+        {
+            "directory": "/sys/fs/cgroup/team/job",
+            "source": "/sys/fs/cgroup/team/job/cpu.stat",
+            "counters": {"nr_throttled": 0, "throttled_usec": 0},
+        },
+        {
+            "directory": "/sys/fs/cgroup/team",
+            "source": "/sys/fs/cgroup/team/cpu.stat",
+            "counters": {"nr_throttled": 1, "throttled_usec": 250},
+        },
+    ]
+    phase = {"wall_ns": 1_000_000_000, "cpu_interference": evidence}
+    record = {
+        "cell": {"threads": 1},
+        "runtime_identity": {"cpu_affinity": [8], "cpu_control": cpu_control},
+        "measurements": {"insertion": phase, "lookup_control": phase},
+        "dedicated_latency": {
+            "measurements": {"insertion": phase, "lookup_control": phase}
+        },
+    }
+    result = QUALIFIER._interference(record)
+    assert result["evidence_complete"] is True
+    assert result["cgroup_throttle_events"] == 4
+    assert result["cgroup_throttled_usec"] == 1000.0
+    assert result["clean"] is False
+
+    claimed_delta = evidence["cgroup_cpu_stat_delta"]
+    claimed_delta["levels"][1]["nr_throttled"] = 0
+    claimed_delta["levels"][1]["throttled_usec"] = 0
+    claimed_delta["nr_throttled"] = 0
+    claimed_delta["throttled_usec"] = 0.0
+    concealed_parent_growth = QUALIFIER._interference(record)
+    assert concealed_parent_growth["evidence_complete"] is False
+    assert concealed_parent_growth["clean"] is False
+    assert (
+        "reported CPU throttle delta differs from retained raw snapshots"
+        in concealed_parent_growth["evidence_errors"]
+    )
+
+    evidence["cgroup_cpu_stat_delta"] = {
+        "levels": [
+            {
+                "directory": "/sys/fs/cgroup/team/job",
+                "source": "/sys/fs/cgroup/team/job/cpu.stat",
+                "nr_throttled": 0,
+                "throttled_usec": 0,
+            },
+            {
+                "directory": "/sys/fs/cgroup/team",
+                "source": "/sys/fs/cgroup/team/cpu.stat",
+                "nr_throttled": 1,
+                "throttled_usec": 250,
+            },
+        ],
+        "nr_throttled": 1,
+        "throttled_usec": 250.0,
+    }
+    evidence.pop("cgroup_cpu_stat_raw_before")
+    missing_raw = QUALIFIER._interference(record)
+    assert missing_raw["evidence_complete"] is False
+    assert missing_raw["clean"] is False
+
+
+def test_worker_reported_cpu_control_drift_is_always_fatal() -> None:
+    cpu_control = _v2_cpu_control()
+    evidence = _clean_interference()
+    evidence["cpu_control"] = cpu_control
+    evidence["evidence_errors"] = ["CPU-control identity changed during phase"]
+    phase = {"wall_ns": 1_000_000_000, "cpu_interference": evidence}
+    record = {
+        "cell": {"threads": 1},
+        "runtime_identity": {"cpu_affinity": [8], "cpu_control": cpu_control},
+        "measurements": {"insertion": phase, "lookup_control": phase},
+        "dedicated_latency": {
+            "measurements": {"insertion": phase, "lookup_control": phase}
+        },
+    }
+    drift = QUALIFIER._interference(record)
+    assert drift["evidence_complete"] is False
+    assert drift["clean"] is False
+    assert "CPU-control identity changed during phase" in drift["evidence_errors"]
+
+    evidence["evidence_errors"] = None
+    malformed = QUALIFIER._interference(record)
+    assert malformed["evidence_complete"] is False
+    assert malformed["clean"] is False
+    assert "phase evidence_errors is missing or malformed" in malformed[
+        "evidence_errors"
+    ]
+
+    endpoint_evidence = _clean_interference()
+    endpoint_evidence["cpu_control"] = cpu_control
+    endpoint_evidence["cpu_control_before"]["hierarchy_levels"][0]["quota"][
+        "raw"
+    ]["cpu.max"] = "100000 100000"
+    endpoint_phase = {
+        "wall_ns": 1_000_000_000,
+        "cpu_interference": endpoint_evidence,
+    }
+    endpoint_record = {
+        "cell": {"threads": 1},
+        "runtime_identity": {"cpu_affinity": [8], "cpu_control": cpu_control},
+        "measurements": {
+            "insertion": endpoint_phase,
+            "lookup_control": endpoint_phase,
+        },
+        "dedicated_latency": {
+            "measurements": {
+                "insertion": endpoint_phase,
+                "lookup_control": endpoint_phase,
+            }
+        },
+    }
+    mutated_before = QUALIFIER._interference(endpoint_record)
+    assert mutated_before["evidence_complete"] is False
+    assert mutated_before["clean"] is False
+
+    endpoint_evidence["cpu_control_before"] = None
+    missing_before = QUALIFIER._interference(endpoint_record)
+    assert missing_before["evidence_complete"] is False
+    assert missing_before["clean"] is False
 
 
 def test_independent_telemetry_roots_require_real_records_and_exact_equality() -> None:
@@ -655,13 +1385,7 @@ def _strict_record_fixture(tmp_path: Path) -> tuple[list[dict[str, object]], dic
         "multi_threads": 2,
         "single_cpu_ids": [9],
         "multi_cpu_ids": [8, 9],
-        "cpu_max": {
-            "source": "/sys/fs/cgroup/cpu.max",
-            "raw": "max 100000",
-            "quota_usec": None,
-            "period_usec": 100000,
-            "quota_cores": None,
-        },
+        "cpu_control": _v2_cpu_control(),
     }
     cell = {
         "id": "full-tds-shipped-normal-50000-t1",
@@ -813,6 +1537,7 @@ def test_strict_retained_validator_rejects_link_seed_order_and_extra_records(
         ("link", "build provenance"),
         ("seed", "cell parameters"),
         ("order", "source order"),
+        ("cpu_control", "CPU topology/affinity/control"),
         ("extra", "cardinality"),
     ):
         records, protocol, builds = _strict_record_fixture(tmp_path / mutation)
@@ -823,6 +1548,10 @@ def test_strict_retained_validator_rejects_link_seed_order_and_extra_records(
         elif mutation == "order":
             records[0]["sample"]["order"] = "BA"
             records[1]["sample"]["order"] = "BA"
+        elif mutation == "cpu_control":
+            records[0]["runtime_identity"]["cpu_control"]["hierarchy_levels"][0][
+                "quota"
+            ]["raw"]["cpu.max"] = "changed 100000"
         else:
             records.append(json.loads(json.dumps(records[-1])))
         with pytest.raises(RuntimeError, match=expected):
@@ -832,7 +1561,12 @@ def test_strict_retained_validator_rejects_link_seed_order_and_extra_records(
 def test_effective_topology_uses_allowed_physical_cores_and_quota_without_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(QUALIFIER.os, "sched_getaffinity", lambda _pid: {0, 1, 2, 3})
+    monkeypatch.setattr(
+        QUALIFIER.os,
+        "sched_getaffinity",
+        lambda _pid: {0, 1, 2, 3},
+        raising=False,
+    )
     original_read_text = QUALIFIER.Path.read_text
 
     def topology_read(path: Path, *args: object, **kwargs: object) -> str:
@@ -846,14 +1580,12 @@ def test_effective_topology_uses_allowed_physical_cores_and_quota_without_fallba
     monkeypatch.setattr(QUALIFIER.Path, "read_text", topology_read)
     monkeypatch.setattr(
         QUALIFIER,
-        "_cpu_max",
-        lambda: {
-            "source": "/sys/fs/cgroup/cpu.max",
-            "raw": "200000 100000",
-            "quota_usec": 200000,
-            "period_usec": 100000,
-            "quota_cores": 2.0,
-        },
+        "_cpu_control",
+        lambda: _v2_cpu_control(
+            raw="200000 100000",
+            quota_usec=200000,
+            quota_cores=2.0,
+        ),
     )
     topology = QUALIFIER._effective_cpu_topology()
     assert topology["representative_cpu_ids"] == [1, 3]
@@ -863,17 +1595,30 @@ def test_effective_topology_uses_allowed_physical_cores_and_quota_without_fallba
 
     monkeypatch.setattr(
         QUALIFIER,
-        "_cpu_max",
-        lambda: {
-            "source": "/sys/fs/cgroup/cpu.max",
-            "raw": "100000 100000",
-            "quota_usec": 100000,
-            "period_usec": 100000,
-            "quota_cores": 1.0,
-        },
+        "_cpu_control",
+        lambda: _v2_cpu_control(
+            raw="100000 100000",
+            quota_usec=100000,
+            quota_cores=1.0,
+        ),
     )
     with pytest.raises(RuntimeError, match="at least two"):
         QUALIFIER._effective_cpu_topology()
+
+
+def test_missing_sched_getaffinity_api_is_mac_safe_and_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delattr(QUALIFIER.os, "sched_getaffinity", raising=False)
+    with pytest.raises(RuntimeError, match="requires sched_getaffinity"):
+        QUALIFIER._available_cpus()
+    monkeypatch.setattr(
+        QUALIFIER.os,
+        "sched_getaffinity",
+        lambda _pid: {4, 6},
+        raising=False,
+    )
+    assert QUALIFIER._available_cpus() == [4, 6]
 
 
 def test_thermal_one_sided_unavailable_and_ceiling_fail_closed() -> None:
@@ -938,4 +1683,13 @@ def test_release_job_leaves_upload_margin_around_runner() -> None:
     job = job.split("\n  native-architecture-semantic-evidence:", 1)[0]
     assert "timeout-minutes: 330" in job
     assert "timeout --signal=TERM --kill-after=30s 300m" in job
+    assert "workflow-bootstrap.json" in job
+    assert job.index("workflow-bootstrap.json") < job.index("timeout --signal=TERM")
     assert "if: always()" in job
+
+    qualifier_source = QUALIFIER_PATH.read_text(encoding="utf-8")
+    bootstrap_write = qualifier_source.index(
+        "_write_json(qualifier_bootstrap_path, qualifier_bootstrap)"
+    )
+    cpu_discovery = qualifier_source.index("topology = _effective_cpu_topology()")
+    assert bootstrap_write < cpu_discovery

@@ -333,6 +333,32 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
+      - name: Bootstrap allocator evidence artifact
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p native-allocator-release-evidence
+          python3 - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          payload = {
+              "schema": 1,
+              "status": "WORKFLOW_BOOTSTRAPPED_BEFORE_QUALIFIER",
+              "created_utc": datetime.now(timezone.utc).isoformat(),
+              "github_run_id": os.environ["GITHUB_RUN_ID"],
+              "github_run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              "github_job": os.environ["GITHUB_JOB"],
+              "github_sha": os.environ["GITHUB_SHA"],
+          }
+          Path("native-allocator-release-evidence/workflow-bootstrap.json").write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.13'

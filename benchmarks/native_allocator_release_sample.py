@@ -26,13 +26,21 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
+_BENCHMARK_DIR = Path(__file__).resolve().parent
+if str(_BENCHMARK_DIR) not in sys.path:
+    sys.path.insert(0, str(_BENCHMARK_DIR))
+
+from native_allocator_cpu_control import (  # noqa: E402
+    CANONICAL_THROTTLE_KEYS,
+    canonical_cpu_stat_delta,
+    discover_cpu_control,
+    read_cpu_stat,
+)
+
 BENCHMARK_ID = "native-handle-allocator-release-sample-v2"
 SCRIPT_PATH = Path(__file__).resolve()
 VALUE = b"x" * 32
-CGROUP_CPU_STAT_PATH = Path("/sys/fs/cgroup/cpu.stat")
-CGROUP_CPU_MAX_PATH = Path("/sys/fs/cgroup/cpu.max")
 PROC_STAT_PATH = Path("/proc/stat")
-REQUIRED_CGROUP_THROTTLE_KEYS = ("nr_throttled", "throttled_usec")
 
 
 def _sha256(path: Path) -> str:
@@ -201,7 +209,18 @@ def _pressure_totals(raw: str | None) -> dict[str, int] | None:
     return result or None
 
 
-def _cpu_interference_snapshot() -> dict[str, Any]:
+def _cpu_interference_snapshot(cpu_control: dict[str, Any]) -> dict[str, Any]:
+    try:
+        observed_cpu_control = discover_cpu_control()
+        cpu_control_error = None
+    except Exception as exc:
+        observed_cpu_control = None
+        cpu_control_error = f"{type(exc).__name__}: {exc}"
+    active_cpu_control = (
+        observed_cpu_control
+        if isinstance(observed_cpu_control, dict)
+        else cpu_control
+    )
     affinity = _affinity()
     selected = set(affinity or [])
     per_cpu: dict[str, dict[str, int]] | None = None
@@ -238,30 +257,37 @@ def _cpu_interference_snapshot() -> dict[str, Any]:
         per_cpu = None
     pressure = None
     pressure_source = None
-    for pressure_path in (
-        Path("/sys/fs/cgroup/cpu.pressure"),
-        Path("/proc/pressure/cpu"),
-    ):
+    pressure_paths: list[Path] = []
+    control_directory = active_cpu_control.get("control_directory")
+    if isinstance(control_directory, str) and control_directory:
+        pressure_paths.append(Path(control_directory) / "cpu.pressure")
+    pressure_paths.append(Path("/proc/pressure/cpu"))
+    for pressure_path in dict.fromkeys(pressure_paths):
         try:
             pressure = pressure_path.read_text(encoding="utf-8").strip()
             pressure_source = str(pressure_path)
             break
         except Exception:
             continue
-    cpu_max = None
     try:
-        cpu_max = CGROUP_CPU_MAX_PATH.read_text(encoding="utf-8").strip()
-    except Exception:
-        pass
+        cgroup_cpu_stat = (
+            read_cpu_stat(active_cpu_control)
+            if observed_cpu_control is not None
+            else None
+        )
+        cgroup_stat_error = None
+    except Exception as exc:
+        cgroup_cpu_stat = None
+        cgroup_stat_error = f"{type(exc).__name__}: {exc}"
     return {
         "affinity": affinity,
         "affinity_source": "os.sched_getaffinity(0)",
         "per_cpu_ticks": per_cpu,
         "per_cpu_ticks_source": str(PROC_STAT_PATH),
-        "cgroup_cpu_stat": _integer_file_map(CGROUP_CPU_STAT_PATH),
-        "cgroup_cpu_stat_source": str(CGROUP_CPU_STAT_PATH),
-        "cgroup_cpu_max": cpu_max,
-        "cgroup_cpu_max_source": str(CGROUP_CPU_MAX_PATH),
+        "cpu_control": observed_cpu_control,
+        "cpu_control_error": cpu_control_error,
+        "cgroup_cpu_stat": cgroup_cpu_stat,
+        "cgroup_cpu_stat_error": cgroup_stat_error,
         "pressure": pressure,
         "pressure_source": pressure_source,
     }
@@ -273,7 +299,14 @@ def _cpu_interference_delta(
 ) -> dict[str, Any]:
     before_cgroup = before.get("cgroup_cpu_stat")
     after_cgroup = after.get("cgroup_cpu_stat")
-    cgroup_delta = _io_delta(before_cgroup, after_cgroup)
+    cpu_control_before = before.get("cpu_control")
+    cpu_control_after = after.get("cpu_control")
+    cpu_control = cpu_control_after if isinstance(cpu_control_after, dict) else {}
+    cgroup_delta, cgroup_errors = canonical_cpu_stat_delta(
+        cpu_control,
+        before_cgroup,
+        after_cgroup,
+    )
     before_cpu = before.get("per_cpu_ticks") or {}
     after_cpu = after.get("per_cpu_ticks") or {}
     per_cpu_delta = {
@@ -296,22 +329,25 @@ def _cpu_interference_delta(
     expected_cpu_keys = {str(cpu) for cpu in (selected_before or [])}
     if set(before_cpu) != expected_cpu_keys or set(after_cpu) != expected_cpu_keys:
         errors.append("per-CPU evidence does not exactly match selected CPU set")
-    if before.get("cgroup_cpu_stat_source") != after.get("cgroup_cpu_stat_source"):
-        errors.append("cgroup cpu.stat evidence source changed during phase")
-    if before.get("cgroup_cpu_max_source") != after.get("cgroup_cpu_max_source"):
-        errors.append("cgroup cpu.max evidence source changed during phase")
-    if before.get("cgroup_cpu_max") != after.get("cgroup_cpu_max"):
-        errors.append("cgroup cpu.max changed during phase")
-    for snapshot_name, cgroup in (("before", before_cgroup), ("after", after_cgroup)):
-        if not isinstance(cgroup, dict):
-            errors.append(f"cgroup cpu.stat unavailable {snapshot_name} phase")
-        elif any(key not in cgroup for key in REQUIRED_CGROUP_THROTTLE_KEYS):
-            errors.append(f"required cgroup throttle keys missing {snapshot_name} phase")
+    if cpu_control_before != cpu_control_after:
+        errors.append("CPU-control identity changed during phase")
+    for snapshot_name, snapshot in (("before", before), ("after", after)):
+        if snapshot.get("cpu_control_error"):
+            errors.append(
+                f"CPU-control discovery failed {snapshot_name} phase: "
+                f"{snapshot['cpu_control_error']}"
+            )
+    errors.extend(cgroup_errors)
+    for snapshot_name, snapshot in (("before", before), ("after", after)):
+        if snapshot.get("cgroup_cpu_stat_error"):
+            errors.append(
+                f"CPU cgroup stat read failed {snapshot_name} phase: "
+                f"{snapshot['cgroup_cpu_stat_error']}"
+            )
     if before.get("pressure_source") != after.get("pressure_source"):
         errors.append("CPU pressure evidence source changed during phase")
-    for family, delta in (("cgroup", cgroup_delta), ("pressure", pressure_delta)):
-        if delta is not None and any(value < 0 for value in delta.values()):
-            errors.append(f"negative {family} counter delta")
+    if pressure_delta is not None and any(value < 0 for value in pressure_delta.values()):
+        errors.append("negative pressure counter delta")
     for cpu, delta in per_cpu_delta.items():
         if delta is None or any(value < 0 for value in delta.values()):
             errors.append(f"missing or negative per-CPU counter delta for CPU {cpu}")
@@ -320,12 +356,18 @@ def _cpu_interference_delta(
         "affinity_after": selected_after,
         "affinity_source": after.get("affinity_source"),
         "cgroup_cpu_stat_delta": cgroup_delta,
-        "cgroup_cpu_stat_source": after.get("cgroup_cpu_stat_source"),
-        "required_cgroup_throttle_keys": list(REQUIRED_CGROUP_THROTTLE_KEYS),
+        "cpu_control_before": cpu_control_before,
+        "cpu_control_after": cpu_control_after,
+        "cpu_control": cpu_control_after,
+        "cgroup_cpu_stat_raw_before": before_cgroup,
+        "cgroup_cpu_stat_raw_after": after_cgroup,
+        "required_cgroup_throttle_keys": (
+            []
+            if cpu_control.get("mode") in {"none", "cgroup-v2-root"}
+            else list(CANONICAL_THROTTLE_KEYS)
+        ),
         "per_cpu_tick_delta": per_cpu_delta,
         "per_cpu_ticks_source": after.get("per_cpu_ticks_source"),
-        "cgroup_cpu_max": after.get("cgroup_cpu_max"),
-        "cgroup_cpu_max_source": after.get("cgroup_cpu_max_source"),
         "pressure_before": before.get("pressure"),
         "pressure_after": after.get("pressure"),
         "pressure_source": after.get("pressure_source"),
@@ -397,15 +439,20 @@ def _run_partitioned(
     return sorted(observed_cpu_ids)
 
 
-def _measure_phase(operation: Callable[[int], None], total: int, threads: int) -> dict[str, Any]:
+def _measure_phase(
+    operation: Callable[[int], None],
+    total: int,
+    threads: int,
+    cpu_control: dict[str, Any],
+) -> dict[str, Any]:
     io_before = _io_counters()
-    interference_before = _cpu_interference_snapshot()
+    interference_before = _cpu_interference_snapshot(cpu_control)
     process_started = time.process_time_ns()
     wall_started = time.perf_counter_ns()
     actual_cpu_ids = _run_partitioned(operation, total, threads)
     wall_ns = time.perf_counter_ns() - wall_started
     process_cpu_ns = time.process_time_ns() - process_started
-    interference_after = _cpu_interference_snapshot()
+    interference_after = _cpu_interference_snapshot(cpu_control)
     io_after = _io_counters()
     return {
         "operations": total,
@@ -548,6 +595,7 @@ def _execute_workload(
     native_module: Any,
     *,
     latency_run: bool,
+    cpu_control: dict[str, Any],
 ) -> dict[str, Any]:
     from staqtapp_tds.telemetry import TelemetryLevel, TelemetryManager
 
@@ -654,7 +702,7 @@ def _execute_workload(
 
     rss_before_current = _current_rss_bytes()
     rss_before_peak = _rss_bytes_from_rusage()
-    insertion = _measure_phase(put_operation, args.entries, args.threads)
+    insertion = _measure_phase(put_operation, args.entries, args.threads, cpu_control)
     insertion_current_rss = _current_rss_bytes()
     insertion_peak_rss = _rss_bytes_from_rusage()
     insertion_rss = {
@@ -686,6 +734,7 @@ def _execute_workload(
         lookup_operation,
         lookup_operations,
         args.threads,
+        cpu_control,
     )
     whole_current_rss = _current_rss_bytes()
     whole_peak_rss = _rss_bytes_from_rusage()
@@ -833,11 +882,14 @@ def _measure_sample(args: argparse.Namespace) -> dict[str, Any]:
     if topology["topology_sha256"] != args.expected_topology_sha256:
         raise RuntimeError("admitted physical CPU topology differs from protocol")
     try:
-        observed_cpu_max = CGROUP_CPU_MAX_PATH.read_text(encoding="utf-8").strip()
-    except (OSError, UnicodeError) as exc:
-        raise RuntimeError("cgroup cpu.max unavailable in worker") from exc
-    if observed_cpu_max != args.expected_cpu_max:
-        raise RuntimeError("cgroup cpu.max differs from protocol")
+        expected_cpu_control = json.loads(args.expected_cpu_control_json)
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise RuntimeError("invalid expected CPU-control identity") from exc
+    if not isinstance(expected_cpu_control, dict):
+        raise RuntimeError("expected CPU-control identity must be an object")
+    observed_cpu_control = discover_cpu_control()
+    if observed_cpu_control != expected_cpu_control:
+        raise RuntimeError("CPU-control mode/source/quota differs from protocol")
     affinity = _set_affinity(args.cpu_affinity)
     host_before = _host_snapshot()
     import staqtapp_tds
@@ -850,13 +902,23 @@ def _measure_sample(args: argparse.Namespace) -> dict[str, Any]:
     diagnostics_enabled = args.diagnostics == "normal"
     _native_index.diag_reset()
     _native_index.diag_set_enabled(diagnostics_enabled)
-    throughput = _execute_workload(args, _native_index, latency_run=False)
+    throughput = _execute_workload(
+        args,
+        _native_index,
+        latency_run=False,
+        cpu_control=observed_cpu_control,
+    )
     throughput_diagnostics = _diagnostic_semantics(_native_index, diagnostics_enabled)
     gc.collect()
 
     _native_index.diag_reset()
     _native_index.diag_set_enabled(diagnostics_enabled)
-    latency = _execute_workload(args, _native_index, latency_run=True)
+    latency = _execute_workload(
+        args,
+        _native_index,
+        latency_run=True,
+        cpu_control=observed_cpu_control,
+    )
     latency_diagnostics = _diagnostic_semantics(_native_index, diagnostics_enabled)
 
     if throughput["semantic_outcome"] != latency["semantic_outcome"]:
@@ -986,10 +1048,7 @@ def _measure_sample(args: argparse.Namespace) -> dict[str, Any]:
             "admitted_cpu_affinity_before_pin": admitted_affinity,
             "cpu_affinity": affinity,
             "admitted_topology": topology,
-            "cgroup_cpu_max": {
-                "source": str(CGROUP_CPU_MAX_PATH),
-                "raw": observed_cpu_max,
-            },
+            "cpu_control": observed_cpu_control,
             "storage_device_class": "not-applicable-no-persistence",
         },
         "measurements": throughput["measurements"],
@@ -1044,7 +1103,7 @@ def main() -> int:
     parser.add_argument("--cpu-affinity")
     parser.add_argument("--expected-admitted-affinity", required=True)
     parser.add_argument("--expected-topology-sha256", required=True)
-    parser.add_argument("--expected-cpu-max", required=True)
+    parser.add_argument("--expected-cpu-control-json", required=True)
     parser.add_argument("--build-provenance")
     parser.add_argument(
         "--expected-backend",
