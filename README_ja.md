@@ -1,10 +1,30 @@
 # Staqtapp-TDS v3.8.2 release candidate
 
-> **Release status:** v3.8.2 は review 中の **NON-RELEASEABLE** source candidate であり、published package ではありません。v3.8.1 が current production PyPI release のため、install command は意図的に 3.8.1 のままです。Publication は、32-byte value wrapper を primary path とする retained randomized paired AB/BA native allocator evidence、telemetry / thread / unaffected-lookup cell、CPU / peak-RSS 記録、supported-platform CI、complete release gate が完了するまで block されます。この candidate は Core、observation、CSV / Generation、Driver Foundry / VM / Studio、Trace Rank、Eaglegate admission の performance correction と regression evidence を追加しますが、新しい execution、canary、promotion、activation、token acceptance、KV commit authority は付与しません。Manual credentialed H100 workflow は未実行であり hardware evidence に引き続き必要です。Eaglegate は shadow / target-only のままです。
+> **Release status:** v3.8.2 は review 中の **NON-RELEASEABLE** source candidate であり、published package ではありません。v3.8.1 が current production PyPI release のため、install command は意図的に 3.8.1 のままです。Publication は、full-TDS の 32-byte `RAW_BINARY` write path を primary claim とし、wrapper / raw-C を control とする retained randomized paired AB/BA native allocator evidence、telemetry / thread / unaffected-lookup cell、CPU / peak-RSS 記録、supported-platform CI、complete release gate が完了するまで block されます。この candidate は Core、observation、CSV / Generation、Driver Foundry / VM / Studio、Trace Rank、Eaglegate admission の performance correction と regression evidence を追加しますが、新しい execution、canary、promotion、activation、token acceptance、KV commit authority は付与しません。Manual credentialed H100 workflow は未実行であり hardware evidence に引き続き必要です。Eaglegate は shadow / target-only のままです。
 
 > **v3.8.2 system performance correction candidate:** User の system-wide request は、この audit branch の scope として attached allocator-only assessment を supersede しました。Native handle allocator、persistence / telemetry、JSON observation、CSV evidence workflow、Generation Authority、Driver Foundry / VM / Studio orchestration、Trace Rank、Eaglegate admission の確認済み scaling failure を修正します。この wider scope は allocator proof gate を緩和しません。Stored format、canonical CSV byte、authority boundary、Browser capture、important link は変更しません。
 
 > **v3.6.0 Foundation substrate:** fail-closed native ABI / lifecycle、strict checksum / UTF-8 truth、generation-bound handle、bounded C11 diagnostics、immutable packed read、x86-64 / AArch64 semantic parity を保持します。
+
+## v3.8.2 の測定済み performance correction
+
+以下の representative paired measurement は v3.8.1 と v3.8.2 を比較し、
+semantic result の完全一致を必須としています。
+
+| 対象 | 測定結果 |
+|---|---|
+| Core / observation | 200,000 telemetry call は 4.38 倍高速化し、JSON canonical dump / fast load はそれぞれ 4.12 倍 / 4.90 倍高速化しました。 |
+| Persistence | 64 MiB raw payload で elapsed time は 8.98% 短縮し、traced Python peak allocation は 67,129,697 B から 1,064,702 B に低減しました。 |
+| CSV / Generation | CSV scan + row anchor は 3.15 倍高速化し、row-offset packing の traced Python peak allocation は 88.36% 低減しました。4,096-payload manifest の cached root 8 回 read は 310.724119 ms から 0.006660 ms に短縮しました。 |
+| Driver platform | Direct VM、managed VM、Studio review workload はそれぞれ 33.72%、28.02%、73.41% 高速化しました。 |
+| Trace Rank | Graph admission、byte admission、public fail-closed materialization はそれぞれ 3.57 倍、2.05 倍、1.63 倍高速化しました。 |
+| Eaglegate | 測定した 1 / 3 / 128 plan fixture の warmed public admission は 13.79 倍～14.45 倍高速化しました。 |
+
+これらは Linux x86-64、CPython 3.12.13、GCC `-O3` における
+workload-specific measurement です。Exact root、hash、byte、counter の一致を
+必須としています。`tracemalloc` は process RSS ではなく traced Python
+allocation を示します。完全な method と result は
+`docs/135_v382_System_Performance_Corrections.md` に記録しています。
 
 **Temporal Directory System - AI システム向けの native-indexed `.tds` ストレージ、変数制御、トレース順位付け、CSV evidence 操作、semantic review、集中型 observability。**
 

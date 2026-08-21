@@ -109,7 +109,7 @@ def test_release_workflow_makes_publication_depend_on_every_gate() -> None:
     assert workflow.index("build-distributions:") < workflow.index("publish-pypi:")
     assert "needs: release-gates-complete" in workflow
     assert "name: Release gates complete" in workflow
-    assert "if: github.ref_type == 'tag'" in workflow
+    assert "github.ref_type == 'tag'" in workflow
     assert "staqtapp-tds-distributions" in workflow
     assert "id-token: write" in workflow
     assert not (ROOT / ".github" / "workflows" / "publish.yml").exists()
@@ -124,8 +124,8 @@ def test_production_pypi_smoke_covers_every_supported_os() -> None:
     workflow = (ROOT / ".github" / "workflows" / "pypi-smoke.yml").read_text(
         encoding="utf-8"
     )
-    assert "release:" in workflow
     assert "workflow_dispatch:" in workflow
+    assert "release:" not in workflow
     assert "https://pypi.org/simple" in workflow
     assert "--no-cache-dir" in workflow
     assert "staqtapp-tds=={version}" in workflow

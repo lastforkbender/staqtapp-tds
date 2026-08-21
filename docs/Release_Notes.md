@@ -27,7 +27,8 @@ the higher-risk hypotheses deliberately deferred from this patch.
 
 This source candidate is **NON-RELEASEABLE**. Tagging and publication remain
 blocked on retained randomized paired AB/BA allocator evidence in clean
-worktrees, with the 32-byte-value wrapper as the primary path; diagnostics and
+worktrees, with the full-TDS 32-byte `RAW_BINARY` write path as the primary
+claim and the wrapper/raw-C paths as controls; diagnostics and
 telemetry, thread-count, and entry-count cells; unaffected lookup checks;
 recorded CPU and peak RSS; supported-platform CI; and the complete release
 gate. The current raw-C allocator number is a causal indication, not a release

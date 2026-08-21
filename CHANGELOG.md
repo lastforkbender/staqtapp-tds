@@ -38,7 +38,8 @@ proof gate. v3.8.1 remains the published PyPI release.
   native-active mode and 1,230 passed / 49 skipped in pure-Python mode; release
   sanity, source hygiene, bytecode compilation, and pure-wheel smoke checks pass.
 - Kept the candidate **NON-RELEASEABLE** pending retained randomized paired
-  AB/BA allocator evidence: the 32-byte wrapper primary path, diagnostics/
+  AB/BA allocator evidence: the full-TDS 32-byte `RAW_BINARY` write primary
+  path with wrapper/raw-C controls, diagnostics/
   telemetry and thread cells, unaffected lookup, CPU/peak-RSS recording,
   supported-platform CI, and the complete release gate. The current raw-C
   result and unretained exploratory JSON do not satisfy that gate.

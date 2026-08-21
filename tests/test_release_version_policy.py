@@ -81,8 +81,8 @@ def test_release_workflows_have_no_hard_coded_post_release_identity() -> None:
     assert ".post" not in smoke
     assert "python scripts/release_version.py --verify-installed" in release
     assert "name: staqtapp-tds-distributions" in release
-    assert "if: github.ref_type == 'tag'" in release
-    assert "--check-env RELEASE_VERSION" in smoke
+    assert "github.ref_type == 'tag'" in release
+    assert '--check-tag "$RELEASE_VERSION"' in smoke
     assert "default:" not in smoke.split("inputs:", 1)[1].split("permissions:", 1)[0]
 
 

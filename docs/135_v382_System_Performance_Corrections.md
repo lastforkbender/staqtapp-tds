@@ -85,7 +85,7 @@ validation work, but is not a same-API speedup claim.
 
 The allocator row is weaker evidence: its baseline was one causal sample while
 the candidate used three samples, and it measures the raw C index rather than
-the primary 32-byte-value wrapper path. Raw JSON records from these exploratory
+the primary full-TDS 32-byte `RAW_BINARY` write path. Raw JSON records from these exploratory
 paired runs were not retained as repository artifacts. Retained raw JSON and a
 release-quality allocator result remain pending.
 
@@ -96,8 +96,8 @@ on clean, isolated baseline and candidate worktrees:
 
 - randomized paired AB/BA process order with the full warmup/repetition policy,
   retained raw JSON, exact source/extension identity, and confidence reporting;
-- the 32-byte-value `NativeEntryIndexBackend` wrapper as the primary claim,
-  with the raw C index retained only for causal localization;
+- the full-TDS 32-byte `RAW_BINARY` write path as the primary claim, with the
+  `NativeEntryIndexBackend` wrapper and raw C index retained as controls;
 - diagnostics/telemetry on and off cells, single-thread and multi-thread cells,
   and the declared entry-count matrix;
 - unaffected lookup correctness and lookup-latency checks after insertion, not

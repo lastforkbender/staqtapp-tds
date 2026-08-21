@@ -21,7 +21,27 @@
 
 # Staqtapp-TDS v3.8.2 release candidate
 
-> **Release status:** v3.8.2 is a **NON-RELEASEABLE** source candidate under review, not a published package. v3.8.1 remains the current production PyPI release, so the install command below intentionally stays pinned to 3.8.1. Publication is blocked on retained randomized paired AB/BA native allocator evidence using the 32-byte-value wrapper as the primary path, telemetry/thread and unaffected-lookup cells, CPU/peak-RSS recording, supported-platform CI, and the complete release gate. The candidate adds performance corrections and regression evidence without granting new Driver, Eaglegate, execution, canary, promotion, activation, token-acceptance, or KV-commit authority. The manual credentialed H100 workflow has not been executed and remains required for hardware evidence; Eaglegate remains shadow/target-only.
+> **Release status:** v3.8.2 is a **NON-RELEASEABLE** source candidate under review, not a published package. v3.8.1 remains the current production PyPI release, so the install command below intentionally stays pinned to 3.8.1. Publication is blocked on retained randomized paired AB/BA native allocator evidence using the full-TDS 32-byte `RAW_BINARY` write path as the primary claim, with wrapper and raw-C controls, telemetry/thread and unaffected-lookup cells, CPU/peak-RSS recording, supported-platform CI, and the complete release gate. The candidate adds performance corrections and regression evidence without granting new Driver, Eaglegate, execution, canary, promotion, activation, token-acceptance, or KV-commit authority. The manual credentialed H100 workflow has not been executed and remains required for hardware evidence; Eaglegate remains shadow/target-only.
+
+## v3.8.2 measured performance corrections
+
+Representative paired v3.8.1 to v3.8.2 measurements required identical
+semantic results:
+
+| Area | Measured result |
+|---|---|
+| Core / observation | 200,000 telemetry calls were 4.38× faster; JSON canonical dump and fast load were 4.12× and 4.90× faster. |
+| Persistence | For a 64 MiB raw payload, elapsed time improved by 8.98% and traced Python peak allocation fell from 67,129,697 B to 1,064,702 B. |
+| CSV / Generation | CSV scan plus row anchors was 3.15× faster; row-offset packing used 88.36% less traced Python peak allocation; eight cached root reads over a 4,096-payload manifest fell from 310.724119 ms to 0.006660 ms. |
+| Driver platform | Direct VM, managed VM, and Studio review workloads were 33.72%, 28.02%, and 73.41% faster. |
+| Trace Rank | Graph admission, byte admission, and public fail-closed materialization were 3.57×, 2.05×, and 1.63× faster. |
+| Eaglegate | Warmed public admission was 13.79×–14.45× faster across the measured 1-, 3-, and 128-plan fixtures. |
+
+These workload-specific measurements were made on Linux x86-64 with CPython
+3.12.13 and GCC `-O3`; exact roots, hashes, bytes, or counters had to match.
+`tracemalloc` values describe traced Python allocation, not process RSS. Full
+methods and results are recorded in
+`docs/135_v382_System_Performance_Corrections.md`.
 
 **Temporal Directory System - native-indexed `.tds` storage, controlled variables, trace ranking, CSV evidence operations, semantic review, and centralized observability for AI systems.**
 
