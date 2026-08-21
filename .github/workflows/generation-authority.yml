@@ -87,7 +87,7 @@ jobs:
               if offenders:
                   raise SystemExit(f"forbidden imports in {path}: {offenders}")
           PY
-      - name: Prove v3.8.1 release status remains qualification-only
+      - name: Prove v3.8.2 candidate status remains qualification-only
         shell: bash
         run: |
           python - <<'PY'
@@ -97,8 +97,8 @@ jobs:
           japanese = Path("README_ja.md").read_text(encoding="utf-8")
           normalized_english = " ".join(english.split())
           normalized_japanese = " ".join(japanese.split())
-          assert "source candidate under review, not a published package" not in english
-          assert "published package ではありません" not in japanese
+          assert "source candidate under review, not a published package" in english
+          assert "published package ではありません" in japanese
           assert "staqtapp-tds==3.8.1" in english
           assert "staqtapp-tds==3.8.1" in japanese
           assert "CANARY and ACTIVE publication are rejected" in normalized_english
