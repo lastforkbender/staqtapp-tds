@@ -1,1 +1,0 @@
-v3.6.0 candidate: PEP 489 multi-phase initialization with fail-closed subinterpreter, process-lifetime reinitialization, and free-threaded-build admission; no learned serving or version bump.

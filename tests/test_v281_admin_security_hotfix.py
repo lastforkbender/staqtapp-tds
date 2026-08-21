@@ -1,10 +1,8 @@
 import http.client
-import re
 import socket
 import threading
 from http.server import ThreadingHTTPServer
 
-from staqtapp_tds import __version__
 from staqtapp_tds.admin.panel import AdminPanelServer, render_dashboard_html
 
 
@@ -35,10 +33,6 @@ def _post(port: int, path: str, payload: str, headers: dict[str, str] | None = N
     status = resp.status
     conn.close()
     return status, body
-
-
-def test_v281_version():
-    assert __version__ == "3.8.2"
 
 
 def test_v281_dashboard_embeds_csrf_token_meta():

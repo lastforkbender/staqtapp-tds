@@ -4,7 +4,7 @@ from dataclasses import replace
 
 import pytest
 
-from staqtapp_tds import TDSFileSystem, __version__
+from staqtapp_tds import TDSFileSystem
 from staqtapp_tds.csv_layer import (
     CSV_NATIVE_ROW_ANCHOR_KERNEL_VERSION,
     artifact_keys,
@@ -60,7 +60,6 @@ def _row_anchor_ready_csv(
 
 
 def test_version_347_csv_native_row_anchor_kernel():
-    assert __version__ == "3.8.2"
     assert CSV_NATIVE_ROW_ANCHOR_KERNEL_VERSION == "1.0"
 
 

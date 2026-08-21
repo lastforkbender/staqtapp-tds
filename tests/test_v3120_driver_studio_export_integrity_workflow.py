@@ -1,4 +1,3 @@
-from staqtapp_tds import __version__
 from staqtapp_tds.drivers import StudioPanelKind
 from staqtapp_tds.studio_pyqt5 import (
     StudioExportIntegrityCheckpoint,
@@ -21,10 +20,6 @@ def _runtime():
     runtime = bridge.live_panel_runtime(max_events=16)
     runtime.mark_all_dirty(reason="export integrity workflow paint")
     return bridge, runtime
-
-
-def test_v3120_version():
-    assert __version__ == "3.8.2"
 
 
 def test_export_integrity_workflow_capability_matrix_is_verify_only():

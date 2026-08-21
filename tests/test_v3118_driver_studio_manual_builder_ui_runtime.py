@@ -1,4 +1,3 @@
-from staqtapp_tds import __version__
 from staqtapp_tds.drivers import StudioPanelKind
 from staqtapp_tds.studio_pyqt5 import (
     DEFAULT_STUDIO_QT_THEME,
@@ -11,10 +10,6 @@ from staqtapp_tds.studio_pyqt5 import (
     studio_manual_builder_ui_runtime_capability_matrix,
     studio_qt_visual_quality_review,
 )
-
-
-def test_v3118_version():
-    assert __version__ == "3.8.2"
 
 
 def test_manual_builder_ui_runtime_is_import_safe_and_not_authority():

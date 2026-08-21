@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from staqtapp_tds import TDSDirectory, TDSFileSystem, __version__
+from staqtapp_tds import TDSDirectory, TDSFileSystem
 from staqtapp_tds.csv_layer import (
     csv_scan_artifact_keys,
     import_csv_bytes,
@@ -29,10 +29,6 @@ class CountingDirectory(TDSDirectory):
     def write_json(self, *args, **kwargs):
         self.json_writes += 1
         return super().write_json(*args, **kwargs)
-
-
-def test_version_333_csv_scan_artifact_materialization():
-    assert __version__ == "3.8.2"
 
 
 def test_csv_scan_artifacts_materialize_as_optional_derived_artifacts():

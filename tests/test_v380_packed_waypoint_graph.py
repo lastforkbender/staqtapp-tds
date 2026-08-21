@@ -514,7 +514,6 @@ def test_qualified_count_and_memory_bounds_fail_before_serialization() -> None:
 def test_binary_surface_has_no_search_or_execution_authority() -> None:
     graph, _sources = fixture_graph()
 
-    assert not hasattr(graph, "search")
-    assert not hasattr(graph, "dijkstra")
-    assert not hasattr(graph, "execute")
-    assert not hasattr(graph, "commit")
+    for command in ("search", "dijkstra", "execute", "commit"):
+        assert not hasattr(graph, command)
+        assert not hasattr(packed_graph_module, command)

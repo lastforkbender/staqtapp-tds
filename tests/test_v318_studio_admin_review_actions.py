@@ -1,7 +1,6 @@
 import copy
 import json
 
-from staqtapp_tds import __version__
 from staqtapp_tds.drivers import (
     BatchReviewPolicy,
     DriverBatchReviewBoard,
@@ -98,10 +97,6 @@ def _bundle(report):
         created_by="admin-1",
         created_at="2026-07-06T03:00:00Z",
     )
-
-
-def test_v318_version():
-    assert __version__ == "3.8.2"
 
 
 def test_studio_admin_review_capability_matrix_allows_submission_not_authority():

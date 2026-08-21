@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from copy import deepcopy
-
-from staqtapp_tds import __version__
 from staqtapp_tds.tds_filesystem import TDSFileSystem
 from staqtapp_tds.csv_layer import (
     CSV_SEMANTIC_IR_HANDOFF_CONTRACT_KEYS,
@@ -58,7 +55,6 @@ def _ready_csv(
 
 
 def test_version_3411_csv_suite_closure_semantic_ir_handoff():
-    assert __version__ == "3.8.2"
     assert CSV_SEMANTIC_IR_HANDOFF_VERSION == "1.0"
     assert CSV_SEMANTIC_IR_HANDOFF_PAYLOAD_BYTE_LIMIT >= 131_072
     assert len(CSV_SEMANTIC_IR_REQUIRED_EVIDENCE_NAMES) == 19

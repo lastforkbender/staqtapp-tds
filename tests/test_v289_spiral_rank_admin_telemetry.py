@@ -1,11 +1,6 @@
-from staqtapp_tds import __version__
 from staqtapp_tds.admin.control import AdminControl
 from staqtapp_tds.admin.spiral_rank import SpiralRankTelemetry
 from staqtapp_tds.spiral.rank import NativeSpiralRankEngine
-
-
-def test_v289_version():
-    assert __version__ == "3.8.2"
 
 
 def test_spiral_rank_telemetry_observes_run():

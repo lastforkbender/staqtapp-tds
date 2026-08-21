@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from staqtapp_tds import TDSFileSystem, __version__
+from staqtapp_tds import TDSFileSystem
 from staqtapp_tds.csv_layer import (
     artifact_keys,
     commit_csv_native_storage_artifacts,
@@ -26,10 +26,6 @@ def _native_ready_csv(fs: TDSFileSystem, payload: bytes = b"id,name\n1,Ada\n2,Gr
     assert replay.ok is True
     assert native_commit.ok is True
     return manifest, native_commit
-
-
-def test_version_341_csv_native_storage_revalidation_drift_guard():
-    assert __version__ == "3.8.2"
 
 
 def test_csv_native_storage_revalidation_clean_snapshot_has_no_storage_writes():

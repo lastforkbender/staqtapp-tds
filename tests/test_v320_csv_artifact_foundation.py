@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from staqtapp_tds import TDSFileSystem, TDSPersistence, __version__
+from staqtapp_tds import TDSFileSystem, TDSPersistence
 from staqtapp_tds.csv_layer import (
     artifact_keys,
     build_row_offset_map,
@@ -16,10 +16,6 @@ from staqtapp_tds.csv_layer import (
     logical_record_offsets,
     prove_original_roundtrip,
 )
-
-
-def test_version_320_csv_foundation():
-    assert __version__ == "3.8.2"
 
 
 def test_csv_import_preserves_original_and_writes_derived_artifacts():

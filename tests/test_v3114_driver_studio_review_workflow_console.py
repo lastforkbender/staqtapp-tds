@@ -1,6 +1,5 @@
 import copy
 
-from staqtapp_tds import __version__
 from staqtapp_tds.drivers import (
     DriverBatchReviewBoard,
     DriverFixtureCase,
@@ -96,10 +95,6 @@ def _bundle():
         created_by="admin-1",
         created_at="2026-07-06T08:00:00Z",
     )
-
-
-def test_v3114_version():
-    assert __version__ == "3.8.2"
 
 
 def test_review_workflow_capability_matrix_is_decision_support_not_authority():

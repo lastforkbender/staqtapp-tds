@@ -13,8 +13,8 @@ def test_standard_install_includes_main_telemetry_ui_launcher():
     metadata = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     project = metadata["project"]
 
-    assert "PyQt5>=5.15" in project["dependencies"]
-    assert project["optional-dependencies"]["gui"] == []
+    assert "PyQt5>=5.15" not in project["dependencies"]
+    assert project["optional-dependencies"]["gui"] == ["PyQt5>=5.15"]
     assert project["scripts"]["staqtapp-tds"] == "staqtapp_tds.admin.app:main"
     assert project["scripts"]["staqtapp-tds-admin"] == "staqtapp_tds.admin.console:main"
     assert project["scripts"]["staqtapp-tds-foundation-closure"] == (
@@ -49,6 +49,14 @@ def test_native_extensions_remain_explicitly_opt_in():
     assert project["optional-dependencies"]["native"] == []
     assert 'os.environ.get("STAQTAPP_TDS_BUILD_NATIVE", "")' in setup_source
     assert "setup(ext_modules=ext_modules if native_enabled else [])" in setup_source
+
+
+def test_python_310_toml_reader_is_a_runtime_dependency():
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    dependency = "tomli>=2; python_version < '3.11'"
+
+    assert dependency in project["dependencies"]
+    assert dependency not in project["optional-dependencies"]["test"]
 
 
 def test_main_launcher_opens_the_telemetry_browser(monkeypatch):

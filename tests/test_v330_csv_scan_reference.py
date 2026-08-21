@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from staqtapp_tds import TDSFileSystem, __version__
+from staqtapp_tds import TDSFileSystem
 from staqtapp_tds.csv_layer import (
     import_csv_bytes,
     logical_record_offsets_bytes,
@@ -10,10 +10,6 @@ from staqtapp_tds.csv_layer import (
     validate_csv_scan_profile,
 )
 from staqtapp_tds.csv_layer.dialect import detect_csv_dialect
-
-
-def test_version_330_csv_scan_reference_foundation():
-    assert __version__ == "3.8.2"
 
 
 def test_csv_scan_profile_matches_row_offset_reference_across_chunk_boundaries():

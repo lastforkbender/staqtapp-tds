@@ -13,7 +13,6 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOL_PATH = ROOT / "tools" / "aarch64_hardening_v360.py"
-WORKFLOW_PATH = ROOT / ".github" / "workflows" / "aarch64-hardening.yml"
 
 
 def load_tool() -> Any:
@@ -42,22 +41,6 @@ def in_tree_extensions_are_built() -> bool:
     return bool(list(package_dir.glob("_native_index*.so"))) and bool(
         list(package_dir.glob("_csv_scan_kernel*.so"))
     )
-
-
-def test_aarch64_workflow_has_no_timing_or_scaling_gate() -> None:
-    source = WORKFLOW_PATH.read_text(encoding="utf-8")
-    assert "aarch64-performance-evidence" not in source
-    assert "tools/aarch64_benchmark_v360.py" not in source
-    assert "PERFORMANCE_RESULT" not in source
-
-    aggregate = source.split("  aarch64-hardening-complete:", 1)[1]
-    for required in (
-        "aarch64-native-soak",
-        "aarch64-sanitizers",
-        "aarch64-thread-sanitizer",
-        "aarch64-deterministic-fuzz",
-    ):
-        assert f"      - {required}" in aggregate
 
 
 def test_v360_aarch64_hardening_contract_is_domain_separated() -> None:

@@ -1,6 +1,5 @@
 import json
 
-from staqtapp_tds import __version__
 from staqtapp_tds.admin.panel import AdminPanelServer, render_dashboard_html
 
 
@@ -10,10 +9,6 @@ def _asset(path: str):
     assert asset is not None, path
     data, ctype = asset
     return data.decode("utf-8"), ctype
-
-
-def test_v280_version():
-    assert __version__ == "3.8.2"
 
 
 def test_v280_language_pack_manifest_is_packaged():

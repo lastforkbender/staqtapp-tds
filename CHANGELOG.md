@@ -1,10 +1,34 @@
+# v3.8.3 PCSDQR — Paper Ceiling Software Development Quagmire Removal
+
+Released a repository and release-process correction that keeps engineering
+checks close to the behavior they protect.
+
+- Retained direct runtime-behavior, declared-dependency, supported-platform,
+  package-build, and installed-artifact checks while removing repeated wrappers
+  and aggregate validation chains.
+- Removed historical implementation journals, status/proof ledgers, stale
+  roadmaps, generated evidence narratives, and redundant reference copies;
+  current architecture, developer, API, security, and release documentation
+  remain.
+- Removed meta/prose tests and transient pass-count assertions that policed
+  documentation or workflow narration instead of executable behavior.
+- Removed obsolete development and validation bulk from the source archive
+  while retaining runtime sources, public assets, examples, and maintained
+  documentation.
+- Moved PyQt5 to the existing optional `gui` dependency where the import-safe
+  Driver Studio code expects it, keeping core and native installation available
+  on platforms without a PyQt5 wheel.
+- Changed no stored format or public API and widened no storage, Driver,
+  Eaglegate, execution, activation, token-acceptance, or KV-commit authority.
+- Kept the v3.8.2 functional performance history below and its reproducible
+  measurements in `benchmarks/README.md`.
+
 # v3.8.2 — System performance corrections
 
-The user's wider system audit request superseded the attached allocator-only
-assessment as this release's scope. Released a semantics-preserving correction
-across confirmed Core, persistence, observation, CSV, Generation Authority,
-Driver, Trace Rank, and Eaglegate hot paths. Stored formats, canonical CSV-byte
-identities, evidence identities, and authority boundaries remain unchanged.
+Released a semantics-preserving correction across confirmed Core, persistence,
+observation, CSV, Generation Authority, Driver, Trace Rank, and Eaglegate hot
+paths. Stored formats, canonical CSV-byte identities, evidence identities, and
+authority boundaries remain unchanged.
 
 - Removed the redundant capacity scan from locked monotonic native automatic
   handle allocation while retaining explicit-handle collision checks.
@@ -34,15 +58,6 @@ identities, evidence identities, and authority boundaries remain unchanged.
 - Added subsystem regression sentinels and reproducible native allocator,
   persistence-writer, CSV/Generation, Driver, observation, Eaglegate, and Trace
   Rank benchmarks.
-- Completed the post-review aggregate suite with 1,283 passed / 1 skipped in
-  native-active mode and 1,230 passed / 49 skipped in pure-Python mode; release
-  sanity, source hygiene, bytecode compilation, and pure-wheel smoke checks pass.
-- Retired the 306-process allocator research qualifier after it proved
-  operationally infeasible. It produced no performance decision, so v3.8.2
-  makes no retained allocator-speedup claim. Allocator correctness, ABI, and
-  lifecycle coverage instead remains within the normal tests, sanitizers,
-  supported-platform compatibility matrices, distribution builds, and
-  installed-package smoke tests.
 - Preserved Eaglegate as shadow/target-only with no new execution, canary,
   promotion, activation, token-acceptance, or KV-commit authority. The manual
   credentialed H100 workflow remains unexecuted and required for hardware
@@ -154,9 +169,6 @@ learned serving, Atomic Generations, or Eaglegate execution.
 - Preserved Browser, Studio, diagnostics, performance evidence, and the new
   closure report as non-authoritative observers.
 
-A production tag and PyPI publication remain separate release-controller
-operations after the exact merged source head passes the tag matrix.
-
 # v3.5.3.post1 — PyPI presentation correction
 
 Corrective post-release with the qualified v3.5.3 storage implementation.
@@ -171,8 +183,6 @@ Corrective post-release with the qualified v3.5.3 storage implementation.
   Markdown link targets in the PyPI-facing README.
 - Preserved v3.5.3 runtime behavior while assigning the PEP 440 post-release
   identity and admitting it to the existing Semantic IR compatibility sets.
-- Restricted trusted publication to annotated tag `v3.5.3.post1` after the
-  complete aggregate release gate.
 
 # v3.5.3 — Guaranteed Storage controlled activation and release qualification
 
@@ -182,9 +192,8 @@ controlled activation, visible operating mode, and lossless rollback into a new
 verified legacy mount.
 
 Published to production PyPI on 2026-07-16 from annotated tag `v3.5.3` at
-commit `84c253f2a7d68a20ddcab96e94cc107439ccdd32`. PyPI trusted publishing accepted
-the universal wheel and source distribution with attestations after the
-pull-request, merged-main, and tag release matrices passed.
+commit `84c253f2a7d68a20ddcab96e94cc107439ccdd32`. PyPI trusted publishing delivered
+the universal wheel and source distribution with attestations.
 
 Phase 11 release qualification found and corrected destructive segment-GC
 defects: corrupt generations could be omitted from reference accounting, one
@@ -209,8 +218,7 @@ Release preparation also:
   historical rather than exhaustive for v3.5.3;
 - corrected the top spacing of all 634 light-blue API signature strips and
   verified that none intersects the method or class heading above it;
-- replaced the independent token-based PyPI workflow with one gated trusted-
-  publishing job after Python, platform, native, test, and package validation;
+- replaced the independent token-based PyPI workflow with trusted publishing;
 - forced every raw-descriptor TDS, generation, segment, migration-copy, and
   materialization write into Windows binary mode so CRT newline translation
   cannot alter headers, offsets, lengths, checksums, or GC evidence;
@@ -265,17 +273,6 @@ Preserved:
 - no per-row or per-cell writes
 - original v3.5.2 implementation introduced no README/API-surface changes; the documentation refresh above supersedes that documentation state
 
-Validation:
-
-```text
-v3.5.2 atomic batch/adversarial tests: 21 passed
-v3.5.0 foundation tests: 20 passed
-v3.5.1 lifecycle tests: 20 passed
-full source/fallback suite: 683 passed, 11 skipped
-full native-build suite: 694 passed
-release and packaged-release checks: passed
-```
-
 ## v3.5.1 — Semantic IR Lifecycle Transition Contract
 
 Added the first explicit, deterministic Semantic IR lifecycle ledger above the v3.5.0 candidate foundation. The release admits only `proposed -> validated`, `proposed -> contested`, and `validated -> contested`. Every transition requires caller-supplied authorization metadata, source-candidate validation, current evidence replay, predecessor fingerprints, immutable history, and deterministic replay.
@@ -310,17 +307,6 @@ Preserved:
 - no native storage writes, lock control, hot-path entry, or native C engine changes
 - no per-row or per-cell writes
 - original v3.5.2 implementation introduced no README/API-surface changes; the documentation refresh above supersedes that documentation state
-
-Validation target:
-
-```text
-v3.5.1 lifecycle/adversarial tests
-v3.5.0 + v3.5.1 Semantic IR tests
-focused CSV / Semantic IR suite
-full source/fallback suite
-full native-build suite
-release and packaged-release checks
-```
 
 ## v3.5.0 — Formal Semantic IR Foundation
 
@@ -359,16 +345,6 @@ Preserved:
 - no per-row or per-cell TDS writes
 - no native storage writes, lock control, hot-path entry, or native C engine changes
 - original v3.5.2 implementation introduced no README/API-surface changes; the documentation refresh above supersedes that documentation state
-
-Validation target:
-
-```text
-v3.5.0 foundation/adversarial tests
-focused CSV / Semantic IR suite
-full source/fallback suite
-full native-build suite
-release and packaged-release checks
-```
 
 ## v3.4.11 — CSV Suite Closure / Semantic IR Handoff Contract
 
@@ -409,16 +385,6 @@ Preserved:
 - no native storage writes, lock control, or native C storage-engine changes during handoff preparation
 - README files and the API PDF remain unchanged
 
-Validation target:
-
-```text
-v3.4.11 closure/adversarial tests
-focused CSV suite
-full source/fallback suite
-full native-build suite
-release and packaged-release checks
-```
-
 ## v3.4.6 — CSV Native Scan Kernel Prototype
 
 Added the first optional CSV native scan-kernel sidecar/prototype behind the v3.4.5 readiness contract. The Python reference scanner remains the default-safe path; requested native execution uses the C sidecar when available, falls back cleanly when allowed, and fails closed when `force_native=True`.
@@ -451,15 +417,6 @@ Preserved:
 - no schema/type/entity inference
 - no semantic conclusions
 - no formal IR commitment
-
-Validation:
-
-```text
-v3.4.6 tests: 12 passed
-Focused CSV suite: 162 passed
-Full source/fallback suite: 565 passed, 11 skipped
-Native build smoke suite: 576 passed
-```
 
 ## v3.4.0 - CSV Native Storage Integration Beginning
 
@@ -597,14 +554,6 @@ Implemented:
 - partial final artifact detection
 - staged recovery over partial final state
 
-Validation target:
-
-```text
-CSV v3.2.0-v3.3.5 focused tests
-full release test suite
-release check
-```
-
 Preserved:
 
 - README.md unchanged
@@ -633,14 +582,6 @@ Implemented:
 - fail-closed scan-materialization reports for unsafe IDs
 - core manifest artifact-key envelope validation
 - optional scan-artifact key/readability envelope validation
-
-Validation target:
-
-```text
-CSV v3.2.0-v3.3.4 focused tests
-full release test suite
-release check
-```
 
 Preserved:
 
@@ -673,14 +614,6 @@ Implemented:
 - fail-closed pre-write validation when core artifacts drift
 - post-materialization validation against the current durable source
 
-Validation target:
-
-```text
-CSV v3.2.0-v3.3.3 focused tests
-full release test suite
-release check
-```
-
 Preserved:
 
 - README.md unchanged
@@ -706,14 +639,6 @@ Implemented:
 - fail-closed row-offset drift coverage
 - `benchmarks/benchmark_v332_csv_row_anchors.py`
 
-Validation target:
-
-```text
-CSV v3.2.0-v3.3.2 focused tests
-full release test suite
-release check
-```
-
 Preserved:
 
 - README.md unchanged
@@ -733,12 +658,6 @@ Preserved:
 - Added `benchmarks/benchmark_v331_csv_scan.py` for dependency-free local scan throughput checks.
 - Preserved the fixed CSV artifact write shape, README files, API PDF, and native C storage engine.
 
-Validation:
-
-```text
-CSV v3.2.0-v3.3.1 focused tests passed
-```
-
 ## v3.3.0 — CSV Scan Reference Foundation
 
 - Added `CSVScanProfile` and `CSVScanParityReport` as the first v3.3.x CSV scan/kernel reference models.
@@ -748,12 +667,6 @@ CSV v3.2.0-v3.3.1 focused tests passed
 - Preserved the v3.2.x fixed import artifact shape: one raw artifact, five derived JSON artifacts, and no per-cell writes.
 - Kept native C storage unchanged; this is the Python correctness reference for any future optional native CSV sidecar.
 - Kept README files and API surface PDF unchanged during the intermediate CSV feature branch.
-
-Validation:
-
-```text
-CSV v3.2.0-v3.3.0 focused tests passed
-```
 
 ## v3.2.3 — CSV Reloadability / Adversarial Corpus Pass
 
@@ -765,12 +678,6 @@ CSV v3.2.0-v3.3.0 focused tests passed
 - Preserved fixed artifact-write shape: one raw artifact, five derived JSON artifacts, and no per-cell writes.
 - Kept native C storage unchanged.
 - Kept README files and API surface PDF unchanged during the intermediate CSV feature branch.
-
-Validation:
-
-```text
-CSV v3.2.0-v3.2.3 focused tests passed
-```
 
 ## 3.2.0 - CSV Artifact Foundation
 
@@ -790,14 +697,6 @@ CSV v3.2.0-v3.2.3 focused tests passed
 - Added original-byte round-trip proof storage.
 - Preserved the native C storage/index hot path: CSV intelligence lives above storage, writes batch-style artifacts, and does not execute inside the native engine.
 - Added focused v3.2.0 tests and CSV foundation documentation.
-
-Validation:
-
-```text
-CSV foundation tests passed
-storage hardening regression coverage passed
-source-clean release check passed
-```
 
 ## 3.2.1 - CSV Foundation Performance & Shape Pass
 
@@ -824,14 +723,6 @@ source-clean release check passed
 - Improved optional PyQt5 Driver Studio visual consistency through safer minimum window sizing, dock layout behavior, panel minimums, group-box/help-label styling, and Manual Builder split/scroll containment.
 - Preserved Browser and Studio authority boundaries: no storage ownership, Registry trust mutation, driver approval/signing/activation, private-key storage, trusted VM authority execution, or policy bypass.
 
-Validation:
-
-```text
-393 passed, 11 skipped
-release check passed
-```
-
-
 ## 3.1.23 - Driver Studio Stress Scenario Matrix
 
 - Extended `staqtapp_tds.studio_pyqt5.operational_stress` with named stress scenarios and a default scenario matrix.
@@ -843,14 +734,6 @@ release check passed
 - Added scenario-matrix capability flags while preserving explicit denied authority flags.
 - Updated the API reference PDF under `tds_api_docs/` and linked it from both README files.
 - Preserved Studio and Browser authority boundaries: no approval, rejection, quarantine, signing, activation, Registry mutation, trusted VM execution, storage writes through Studio, private keys, or policy bypass.
-
-Validation:
-
-```text
-389 passed, 11 skipped
-release check passed
-```
-
 
 ## 3.1.22 - Driver Studio Operational Stress Harness
 
@@ -865,13 +748,6 @@ release check passed
 - Restored/verified README.md and README_ja.md cross-links.
 - Preserved Studio and Browser authority boundaries: no approval, rejection, quarantine, signing, activation, Registry mutation, trusted VM execution, storage writes through Studio, private keys, or policy bypass.
 
-Validation:
-
-```text
-382 passed, 11 skipped
-```
-
-
 ## 3.1.21 - Driver Studio Runtime Hardening
 
 - Strengthened the optional Driver Studio runtime around bounded live-event streams, drop accounting, and runtime warning payloads.
@@ -881,13 +757,6 @@ Validation:
 - Removed duplicate Studio factory/method definitions and preserved bridge/runtime/manual-builder compatibility.
 - Added focused v3.1.21 runtime-hardening tests for event retention gaps, bounded stream drop accounting, JSON-safe signal payloads, factory compatibility, and authority-boundary preservation.
 - Preserved Studio authority boundaries: no approval, rejection, quarantine, signing, activation, Registry mutation, trusted VM execution, storage writes, private keys, or policy bypass.
-
-Validation:
-
-```text
-375 passed, 11 skipped
-```
-
 
 ## 3.1.20 - Driver Studio Export Integrity Workflow
 
@@ -900,13 +769,6 @@ Validation:
 - Added intent-only review-safe export handoff gate and deterministic workflow hash.
 - Extended `StudioQtBridge` and `StudioLivePanelRuntime` with `export_integrity_workflow()` constructors.
 - Preserved Studio authority boundaries: no approval, rejection, quarantine, signing, activation, Registry mutation, trusted VM execution, storage writes, private keys, or policy bypass.
-
-Validation:
-
-```text
-367 passed, 11 skipped
-```
-
 
 ## 3.1.18 - Driver Studio Manual Builder UI Runtime
 
@@ -940,12 +802,6 @@ Validation:
 - Preserved Studio authority boundaries: no approval, rejection, quarantine, Registry approval calls, signing, activation, Registry mutation, VM authority execution, storage writes, private keys, or policy bypass.
 - Added v3.1.16 docs and tests.
 
-Validation:
-
-```text
-345 passed, 11 skipped
-```
-
 ## v3.1.15 - Driver Studio Evidence Timeline
 
 - Added `staqtapp_tds.studio_pyqt5.evidence_timeline`.
@@ -958,12 +814,6 @@ Validation:
 - Preserved Studio authority boundaries: no approval, rejection, quarantine, Registry approval calls, signing, activation, Registry mutation, VM authority execution, storage writes, private keys, or policy bypass.
 - Added v3.1.15 docs and tests.
 
-Validation:
-
-```text
-340 passed, 11 skipped
-```
-
 ## v3.1.14 - Driver Studio Review Workflow Console
 
 - Added `staqtapp_tds.studio_pyqt5.review_workflow`.
@@ -975,12 +825,6 @@ Validation:
 - Preserved Studio authority boundaries: no approval, rejection, quarantine, signing, activation, Registry mutation, VM authority execution, storage writes, private keys, or policy bypass.
 - Added v3.1.14 docs and tests.
 
-Validation:
-
-```text
-334 passed, 11 skipped
-```
-
 ## v3.1.13 - Driver Studio Live Panel Runtime
 
 - Added `staqtapp_tds.studio_pyqt5.runtime`.
@@ -991,12 +835,6 @@ Validation:
 - Added dirty-panel tracking, event-to-panel routing, selection-aware refresh coordination, and Qt model update payloads.
 - Preserved Studio authority boundaries: no approval, signing, activation, Registry mutation, VM authority execution, storage writes, private keys, or policy bypass.
 - Added v3.1.13 docs and tests.
-
-Validation:
-
-```text
-328 passed, 11 skipped
-```
 
 ## v3.1.12 - Driver Studio Live Cockpit Event Bridge
 
@@ -1010,12 +848,6 @@ Validation:
 - Preserved Studio authority boundaries: no approval, signing, activation, Registry mutation, VM authority execution, storage writes, private keys, or policy bypass.
 - Added v3.1.12 docs and tests.
 
-Validation:
-
-```text
-322 passed, 11 skipped
-```
-
 ## v3.1.11 - Driver Studio Hydrated Cockpit Panels
 
 - Added `staqtapp_tds.studio_pyqt5.hydration`.
@@ -1028,12 +860,6 @@ Validation:
 - Updated optional PyQt5 main-window rendering to consume hydrated panels when PyQt5 is available.
 - Preserved Studio authority boundaries: no approval, signing, activation, Registry mutation, VM authority execution, storage writes, private keys, or policy bypass.
 - Added v3.1.11 docs and tests.
-
-Validation:
-
-```text
-317 passed, 11 skipped
-```
 
 ## v3.1.10 - Driver Studio Manual Proposal Builder
 

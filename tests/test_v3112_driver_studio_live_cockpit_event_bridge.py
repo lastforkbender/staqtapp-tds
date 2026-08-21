@@ -1,6 +1,5 @@
 import copy
 
-from staqtapp_tds import __version__
 from staqtapp_tds.drivers import (
     DriverBatchReviewBoard,
     DriverFixtureCase,
@@ -106,10 +105,6 @@ def _task() -> StudioManualDriverTask:
         emit_limit=2,
         tags=("manual", "live"),
     )
-
-
-def test_v3112_version():
-    assert __version__ == "3.8.2"
 
 
 def test_live_bridge_capability_matrix_and_refresh_contracts_do_not_grant_authority():

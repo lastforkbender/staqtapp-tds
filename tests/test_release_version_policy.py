@@ -68,35 +68,3 @@ def test_tag_contract_is_exact_and_bound_to_source_version() -> None:
         validate_tag(source, source_version=source)
     with pytest.raises(ReleaseVersionError):
         validate_tag("v3.6.0", source_version="3.6.1")
-
-
-def test_release_workflows_have_no_hard_coded_post_release_identity() -> None:
-    release = (ROOT / ".github" / "workflows" / "release.yml").read_text(
-        encoding="utf-8"
-    )
-    smoke = (ROOT / ".github" / "workflows" / "pypi-smoke.yml").read_text(
-        encoding="utf-8"
-    )
-    assert ".post" not in release
-    assert ".post" not in smoke
-    assert "python scripts/release_version.py --verify-installed" in release
-    assert "name: staqtapp-tds-distributions" in release
-    assert "github.ref_type == 'tag'" in release
-    assert '--check-tag "$RELEASE_VERSION"' in smoke
-    assert "default:" not in smoke.split("inputs:", 1)[1].split("permissions:", 1)[0]
-
-
-def test_versioning_policy_requires_patch_increments_after_v353_post2() -> None:
-    policy = (ROOT / "docs" / "VERSIONING.md").read_text(encoding="utf-8")
-    normalized = " ".join(policy.split())
-    assert "The completed Foundation source identity is **v3.6.0**" in normalized
-    assert "current production architecture and PyPI identity is **v3.8.2**" in normalized
-    assert "system performance correction above v3.8.1" in normalized
-    assert "a non-releaseable source candidate" not in normalized
-    assert "3.8.2 is not advertised as an installable" not in normalized
-    assert (
-        "publication grants no Eaglegate execution, canary, promotion, activation, "
-        "token-acceptance, or KV-commit authority"
-    ) in normalized
-    assert "Staqtapp-TDS will not publish another `.postN` release" in normalized
-    assert "v3.6.0 -> v3.6.1 -> v3.6.2" in normalized

@@ -1,4 +1,3 @@
-from staqtapp_tds import __version__
 from staqtapp_tds.drivers import (
     DriverFoundry,
     DriverFoundryPolicy,
@@ -102,10 +101,6 @@ RECORDS = [
         "semantic_score": 0.60,
     },
 ]
-
-
-def test_v312_version():
-    assert __version__ == "3.8.2"
 
 
 def test_foundry_capability_matrix_denies_trust_authority():

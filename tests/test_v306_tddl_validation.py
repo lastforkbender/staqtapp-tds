@@ -1,6 +1,5 @@
 import pytest
 
-from staqtapp_tds import __version__
 from staqtapp_tds.drivers import (
     InstructionName,
     TDDLValidationError,
@@ -46,10 +45,6 @@ evolution:
   deny external_io
   max_delta = 2
 '''
-
-
-def test_v306_version():
-    assert __version__ == "3.8.2"
 
 
 def test_tddl_valid_search_driver_parses_to_ir():

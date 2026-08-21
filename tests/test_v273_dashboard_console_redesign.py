@@ -1,11 +1,6 @@
 from __future__ import annotations
 
-from staqtapp_tds import __version__
 from staqtapp_tds.admin.panel import AdminPanelServer, render_dashboard_html
-
-
-def test_v273_version():
-    assert __version__ == "3.8.2"
 
 
 def test_v273_dashboard_has_categorized_engineering_navigation():

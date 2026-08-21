@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from staqtapp_tds import __version__
 from staqtapp_tds.tds_filesystem import TDSFileSystem
 from staqtapp_tds.csv_layer import (
     CSV_SEMANTIC_IR_ALLOWED_TRANSITIONS,
@@ -155,7 +154,6 @@ def _request(
 
 
 def test_version_351_semantic_ir_lifecycle_contract():
-    assert __version__ == "3.8.2"
     assert CSV_SEMANTIC_IR_LIFECYCLE_VERSION == "1.0"
     assert CSV_SEMANTIC_IR_LIFECYCLE_PAYLOAD_BYTE_LIMIT == 524_288
     assert CSV_SEMANTIC_IR_MAX_TRANSITIONS == 256

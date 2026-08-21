@@ -1,6 +1,5 @@
 import json
 
-from staqtapp_tds import __version__
 from staqtapp_tds.studio_pyqt5 import (
     StudioLiveEventKind,
     StudioLivePanelRuntime,
@@ -16,10 +15,6 @@ from staqtapp_tds.studio_pyqt5 import (
 class OddValue:
     def __str__(self):
         return "odd-value"
-
-
-def test_v3121_version():
-    assert __version__ == "3.8.2"
 
 
 def test_live_event_bridge_accounts_for_bounded_stream_drops_without_mutation():

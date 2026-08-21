@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from staqtapp_tds import __version__
 from staqtapp_tds.tds_filesystem import TDSFileSystem
 from staqtapp_tds.csv_layer import (
     CSV_SEMANTIC_IR_CANDIDATE_CONTRACT_KEYS,
@@ -92,7 +91,6 @@ def _declarations() -> tuple[CSVSemanticIRDeclaration, ...]:
 
 
 def test_version_350_formal_semantic_ir_foundation_contract():
-    assert __version__ == "3.8.2"
     assert CSV_SEMANTIC_IR_VERSION == "1.0"
     assert CSV_SEMANTIC_IR_PAYLOAD_BYTE_LIMIT >= 131_072
     assert CSV_SEMANTIC_IR_MAX_PROPOSITIONS == 256

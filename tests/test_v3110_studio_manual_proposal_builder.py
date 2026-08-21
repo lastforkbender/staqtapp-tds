@@ -1,4 +1,3 @@
-from staqtapp_tds import __version__
 from staqtapp_tds.drivers import (
     DriverStudioManualProposalBuilder,
     FoundryStatus,
@@ -35,10 +34,6 @@ def _task() -> StudioManualDriverTask:
         emit_limit=2,
         tags=("manual", "studio"),
     )
-
-
-def test_v3110_version():
-    assert __version__ == "3.8.2"
 
 
 def test_manual_builder_capability_matrix_has_proposal_power_not_trust_authority():

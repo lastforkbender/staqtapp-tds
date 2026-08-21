@@ -1,7 +1,6 @@
 import copy
 from dataclasses import replace
 
-from staqtapp_tds import __version__
 from staqtapp_tds.drivers import (
     BytecodePackage,
     DriverExecutionEvidence,
@@ -144,10 +143,6 @@ def _active_registry_for(package: BytecodePackage) -> DriverRegistry:
     registry.attach_signature(record.manifest.driver_id, signature)
     registry.activate(record.manifest.driver_id)
     return registry
-
-
-def test_v313_version():
-    assert __version__ == "3.8.2"
 
 
 def test_runtime_manager_capability_matrix_denies_trust_authority_and_storage_writes():

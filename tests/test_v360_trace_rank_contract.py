@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
-from pathlib import Path
 
 import pytest
 
@@ -23,9 +22,6 @@ from staqtapp_tds.trace_rank import (
     validate_pinned_epoch,
     validate_request_shape,
 )
-
-ROOT = Path(__file__).resolve().parents[1]
-
 
 def _epoch(**overrides: str) -> ServingEpochIdentity:
     values = {
@@ -184,14 +180,3 @@ def test_baseline_manifest_root_binds_every_replay_identity() -> None:
         _baseline(baseline_configuration_root="sha256:config-v2").manifest_root
         != baseline.manifest_root
     )
-
-
-def test_v360_contract_and_clean_version_policy_are_recorded() -> None:
-    contract = (ROOT / "docs" / "120_v360_Foundation_Repair_Contract.md").read_text(
-        encoding="utf-8"
-    )
-    versioning = (ROOT / "docs" / "VERSIONING.md").read_text(encoding="utf-8")
-    assert "No learned serving" in contract or "no learned serving" in contract
-    assert "3.6.0" in contract
-    assert "Staqtapp-TDS will not publish another `.postN` release" in versioning
-    assert "v3.6.0 -> v3.6.1 -> v3.6.2" in versioning

@@ -6,12 +6,7 @@ from staqtapp_tds import (
     get_native_manager,
     native_capabilities_result,
     native_status_result,
-    __version__,
 )
-
-
-def test_v301_version():
-    assert __version__ == "3.8.2"
 
 
 def test_native_manager_status_is_tdsresult():

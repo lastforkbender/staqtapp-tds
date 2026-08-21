@@ -1,8 +1,25 @@
-# Staqtapp-TDS v3.8.2
+# Staqtapp-TDS v3.8.3
+
+## v3.8.3 PCSDQR — Paper Ceiling Software Development Quagmire Removal
+
+v3.8.3 removes process and repository weight that did not protect TDS behavior.
+Direct checks of runtime behavior, declared dependencies, supported platforms,
+package construction, and installed artifacts remain. Repeated validation
+chains, historical status ledgers and implementation journals, meta/prose tests,
+and unused source-archive bulk do not.
+
+PCSDQR changes no stored format or public API and widens no authority boundary.
+The v3.8.2 measured performance record remains visible below; its full
+reproducible measurements and commands remain in
+[`benchmarks/README.md`](benchmarks/README.md).
+
+> **Release status:** v3.8.3 is the production release. Eaglegate remains
+> shadow/target-only; PCSDQR grants no execution, canary, promotion, activation,
+> token-acceptance, or KV-commit authority.
 
 ## v3.8.2 measured performance corrections
 
-v3.8.2 corrects confirmed scaling failures across persistence and observation,
+v3.8.2 corrected confirmed scaling failures across persistence and observation,
 CSV evidence workflows, Generation Authority, Driver Foundry/VM/Studio
 orchestration, Trace Rank, and Eaglegate admission. Representative paired
 v3.8.1-to-v3.8.2 measurements required identical semantic results:
@@ -13,25 +30,16 @@ v3.8.1-to-v3.8.2 measurements required identical semantic results:
 | Persistence | For a 64 MiB raw payload, elapsed time improved by 8.98% and traced Python peak allocation fell from 67,129,697 B to 1,064,702 B. |
 | CSV / Generation | CSV scan plus row anchors was 3.15× faster; row-offset packing used 88.36% less traced Python peak allocation; eight cached root reads over a 4,096-payload manifest fell from 310.724119 ms to 0.006660 ms. |
 | Driver platform | Direct VM, managed VM, and Studio review workloads were 33.72%, 28.02%, and 73.41% faster. |
-| Trace Rank | Graph admission, byte admission, and public fail-closed materialization were 3.57×, 2.05×, and 1.63× faster. |
+| Trace Rank | Graph admission and byte admission were 3.57× and 2.05× faster; proof-bound public materialization measured 1.63× against its paired reference workload. |
 | Eaglegate | Warmed public admission was 13.79×–14.45× faster across the measured 1-, 3-, and 128-plan fixtures. |
 
-These workload-specific measurements were made on Linux x86-64 with CPython
-3.12.13 and GCC `-O3`; exact roots, hashes, bytes, or counters had to match.
-`tracemalloc` values describe traced Python allocation, not process RSS. No
-retained allocator speedup is claimed: the 306-process research qualifier was
-retired after proving operationally infeasible and produced no performance
-decision. Allocator correctness, ABI, and lifecycle coverage is provided by
-normal tests, sanitizers, compatibility matrices, distribution builds, and
-installed-package smoke tests. Full methods and results are recorded in
-`docs/135_v382_System_Performance_Corrections.md`.
-
-> **Release status:** v3.8.2 is the production release. It preserves stored
-> formats, canonical CSV bytes, public authority boundaries, Browser captures,
-> and important links. The correction grants no new Driver, Eaglegate,
-> execution, canary, promotion, activation, token-acceptance, or KV-commit
-> authority. The manual credentialed H100 workflow has not been executed and
-> remains required for hardware evidence; Eaglegate remains shadow/target-only.
+These workload-specific measurements compared v3.8.1 and v3.8.2 on Linux
+x86-64 with CPython 3.12.13 and GCC `-O3`; exact roots, hashes, bytes, or
+counters had to match. `tracemalloc` reports traced Python allocation, not
+process RSS. Eaglegate measures warmed public admission, and Trace proof-bound
+materialization is not a same-API baseline speedup. No allocator throughput
+claim is made. Full methods and results remain in
+[`benchmarks/README.md`](benchmarks/README.md).
 
 > **v3.6.0 Foundation substrate**
 >
@@ -49,7 +57,7 @@ installed-package smoke tests. Full methods and results are recorded in
 
 ## Browser Operations Console — all 19 pages
 
-These are 19 separate 1280×800 viewport captures from the packaged, localhost-only TDS Browser. Each capture was made after selecting the corresponding navigation control against a real release-qualification observer snapshot. Page 07 is the actual CSV Interpole Monitor in its `Monitor Ready` state. The images are shown vertically in Browser navigation order; they are not a stitched Dashboard image or a UI mock. For reliable PyPI rendering, the unchanged captures use immutable absolute HTTPS URLs; release CI verifies every remote PNG byte-for-byte and checks that all 19 URLs survive in the built wheel metadata before publication.
+These are 19 separate 1280×800 viewport captures from the packaged, localhost-only TDS Browser. Each capture was made after selecting the corresponding navigation control against a real observer snapshot. Page 07 is the actual CSV Interpole Monitor in its `Monitor Ready` state. The images are shown vertically in Browser navigation order; they are not a stitched Dashboard image or a UI mock. Their immutable absolute HTTPS URLs are retained for reliable PyPI rendering, and the corresponding local captures remain in navigation order under `docs/screenshots/browser_pages/`.
 
 <p align="center"><strong>01 — Dashboard</strong><br>
   <img src="https://raw.githubusercontent.com/lastforkbender/staqtapp-tds/v3.5.3/docs/screenshots/browser_pages/01-dashboard-1280x800.png" alt="Staqtapp-TDS Browser page 01, Dashboard, selected in the navigation" width="100%">
@@ -138,8 +146,11 @@ TDS is designed around a narrow storage hot path. Native indexing, lookup, persi
 ## Install
 
 ```bash
-# Current production PyPI release; includes both UIs
-python -m pip install staqtapp-tds==3.8.2
+# Current production core and HTML Browser
+python -m pip install staqtapp-tds==3.8.3
+
+# Add the optional PyQt5 Driver Studio cockpit
+python -m pip install "staqtapp-tds[gui]==3.8.3"
 
 # Launch the main TDS telemetry UI
 staqtapp-tds
@@ -148,7 +159,12 @@ staqtapp-tds
 staqtapp-tds-generation-audit
 ```
 
-Python 3.10 or newer, NumPy, and PyQt5 are required by the standard installation. Driver Studio is installed automatically, while `staqtapp-tds` launches the main HTML/CSS/JS telemetry Browser. The C extensions remain optional; supported operations retain deterministic Python fallback paths unless a caller explicitly forces native-only execution.
+Python 3.10 or newer and NumPy are required by the standard installation.
+`staqtapp-tds` launches the main HTML/CSS/JS telemetry Browser. PyQt5 is
+required only when constructing the optional Driver Studio cockpit and is
+installed through the `gui` extra. The C extensions remain optional; supported
+operations retain deterministic Python fallback paths unless a caller
+explicitly forces native-only execution.
 
 ## Core storage quick start
 
@@ -295,107 +311,35 @@ TDS intentionally distinguishes preparation, evidence, review, and authority:
 - Driver Studio observes, explains, prepares proposals, and routes review requests; it does not bypass Registry, Review Board, Runtime Manager, or signature policy.
 - Browser telemetry is snapshot-based and is not a storage control loop.
 
-## Validation status
+## Engineering validation
 
-The v3.8.2 production release corrects repeated whole-structure work across Core,
-observation, CSV/Generation, Driver, Trace Rank, and Eaglegate. Native automatic
-handle allocation uses its locked monotonic high-water invariant instead of
-scanning capacity; persistence indexes immutable sidecars once, decompresses
-once, publishes reload indexes atomically, and writes through a bounded buffer;
-JSON/telemetry retains exact counters and sampler compatibility while avoiding
-per-call records and duplicate tree/table scans; CSV workflows reuse
-authoritative hashes, scans, and verified chunks and route artifacts from the
-canonical CSV identity; exact immutable Generation manifests cache identities
-and use logarithmic payload lookup; Driver paths avoid redundant validation,
-table construction, and deep copies; Trace Rank admits exact records once and
-decode-normalizes non-exact subclasses before proof-scoped materialization; and
-Eaglegate reuses immutable admission identities and validated plan lookup. See
-`docs/135_v382_System_Performance_Corrections.md` for measured evidence,
-unchanged contracts, and deferred higher-risk work.
+The production contract is carried by executable code and focused behavioral
+tests. Storage and generation checks cover integrity, recovery, explicit
+activation, rollback, and destructive-operation boundaries. Native checks cover
+ABI admission, handle identity, input ownership, bounded diagnostics, and exact
+fallback semantics. Browser, telemetry, and Studio remain observers of copied
+state rather than release or storage authorities.
 
-The v3.8.1 release retains four explicit convergence boundaries. The v3.7
-Generation Authority publishes exact CSV and composite Eaglegate generations
-with head-root CAS, cross-process pins, deterministic recovery, rollback, and
-retirement. Eaglegate adds a non-widenable target-verification constitution,
-candidate-bound exactness/adapter evidence, and a single Generation-backed
-ServingEpoch lineage. CANARY and ACTIVE publication are rejected.
+The v3.8.3 PCSDQR release retains direct behavior, dependency, platform, build,
+and installed-package checks without chaining them through status ledgers or
+prose gates. Stored formats, public APIs, canonical identities, result codes,
+and authority boundaries are unchanged. Performance history and reproducible
+commands remain in `benchmarks/README.md`; current architecture and observer
+boundaries are in `docs/architecture/Architecture_Reference.md` and
+`docs/NATIVE_DIAGNOSTICS_ENGINE.md`.
 
-Phase 4 also provides `tds-packed-waypoint-csr-v1`, a bounded Trace Rank ABI v2
-binary graph with exact immutable source/row bindings and byte-identical
-decode/re-encode. The named-runtime adapter dynamically constructs real vLLM
-`0.26.0` target-only and EAGLE engines for exact pinned target/draft revisions,
-H100 SM90 BF16, standard rejection sampling, batch size one, fixed seeds, and
-1/2/3-token plans. Local injected-runtime gates pass; the manual credentialed
-H100 run remains required for hardware evidence. No production traffic,
-activation, direct KV-tensor equivalence, or in-flight cancellation claim is
-made. See `docs/130_v370_Atomic_Generation_Authority.md`,
-`docs/126_v380_Eaglegate_Generation_Authority.md`,
-`docs/131_v380_Eaglegate_Real_vLLM_Shadow.md`, and
-`docs/132_v380_Packed_Waypoint_CSR_Graph.md`.
+Generation Authority retains explicit publication CAS, pins, recovery,
+rollback, and retirement. Trace Rank remains bounded reference processing.
+Eaglegate remains target-only: CANARY and ACTIVE publication are rejected, and
+the manual credentialed H100 run remains required for hardware evidence. None
+of these surfaces grants production traffic, token-acceptance, or KV-commit
+authority.
 
-Phase 5 adds a bounded, deterministic Python Dijkstra reference over admitted
-packed graphs. It fixes integer cost, exclusion, tie, receipt, and replay truth
-without supplying a legal-edge authority, learned model, native hot path,
-execution grant, or ServingEpoch activation. The Browser now keeps exactly one
-of its 19 pages active, performs serialized visibility-aware polling, and
-avoids continuous blur and motion compositing. A separate Browser can consume
-bounded atomic snapshots from the explicit workspace mount without walking TDS
-directories or taking storage locks. See
-`docs/133_v381_Fixed_Point_Path_Reference_Oracle.md` and
-`docs/134_v381_Browser_Performance_Workspace_Telemetry.md`.
-
-The v3.6.0 Foundation source closes the native and authority repair train with
-a machine-checkable process-state ledger, a deterministic closure report, exact
-x86-64/AArch64 semantic parity, fail-closed lifecycle admission, sanitizer and
-fuzz qualification, and a deliberately narrow shared-runner no-regression
-claim. The named-reference-CPU and universal scaling claims remain false. See
-`DEV19_V360_FOUNDATION_CLOSURE_STATUS.txt` and
-`docs/129_v360_Foundation_Closure.md`.
-
-The historical v3.5.3 runtime release qualification is complete:
-
-- Phase 10 controlled activation, exact migration proof, and lossless rollback tests;
-- Phase 11 GC corruption, publication-window, replacement, interruption, concurrency, and accounting tests;
-- a 129-generation incremental/recovery/GC soak;
-- Python 3.10–3.14, Windows, macOS, Linux, and native-extension CI gates;
-- PEP 517 wheel/sdist, metadata, isolated-install, and source-hygiene gates.
-
-Evidence: 832 passed and 11 skipped in the pure monolithic suite; 843 passed in the native-active monolithic suite; and 157 passed in the overlapping v3.5.3/workflow/Browser/CSV qualification group. Both distribution artifacts passed `twine check`, archive-content inspection, and an isolated wheel activation/rollback/GC smoke test. Exact local, review-branch, tag, and publication details are recorded in `DEV11_RELEASE_QUALIFICATION_STATUS.txt`.
-
-Release `v3.5.3` was published from immutable tag [`v3.5.3`](https://github.com/lastforkbender/staqtapp-tds/tree/v3.5.3) at commit `84c253f2a7d68a20ddcab96e94cc107439ccdd32` after the complete pull-request, merged-`main`, and tag matrices passed. PyPI trusted publishing accepted both the universal wheel and source distribution with attestations. See [PyPI](https://pypi.org/project/staqtapp-tds/3.5.3/), the [publication workflow](https://github.com/lastforkbender/staqtapp-tds/actions/runs/29500270923), and the [GitHub Release](https://github.com/lastforkbender/staqtapp-tds/releases/tag/v3.5.3).
-
-Version `3.5.3.post1` was the corrective package presentation release. It keeps
-the qualified storage implementation, assigns the post-release package
-identity, admits that identity in existing Semantic IR compatibility records,
-and corrects the PyPI long description and source-archive status. Release
-hygiene now rejects repository-relative image or document targets before any
-distribution can be built.
-
-Version `3.5.3.post2` installs the main telemetry Browser and PyQt5 Driver
-Studio with every standard installation. The `staqtapp-tds` command launches
-the telemetry Browser; native C extensions remain opt-in. Its publication was
-restricted to the exact annotated `v3.5.3.post2` tag after the complete
-aggregate release gate succeeded.
-
-Version `3.8.0` carries the Phase 1–4 convergence while keeping Eaglegate's
-production boundary unchanged. Its release path additionally validates the
-PyPI long description from the built wheel and fetches every immutable Browser
-screenshot URL to require the expected PNG bytes before trusted publication.
-
-Version `3.8.1` adds the reference-only Phase 5 fixed-point path oracle and the
-Browser/workspace telemetry correction. It does not add Frontier execution or
-Eaglegate activation authority. Local qualification completed with 1,159 tests
-passed and 45 skipped, plus HTTP workspace and distribution-artifact smoke
-checks; production publication completed through the tag matrix.
-
-Version `3.8.2` is the production system-performance correction. It preserves
-the v3.8.1 stored formats, canonical CSV-byte identities, evidence identities,
-and authority boundaries, with regression sentinels for the changed paths.
-The reported measurements are workload-specific, not universal hardware
-claims. The retired 306-process allocator research qualifier produced no
-performance decision, so v3.8.2 makes no retained allocator-speedup claim;
-allocator correctness, ABI, and lifecycle behavior are covered by the normal
-test, sanitizer, compatibility, build, and installed-smoke gates.
+The preserved v3.5.3 release artifacts remain available at immutable tag
+[`v3.5.3`](https://github.com/lastforkbender/staqtapp-tds/tree/v3.5.3), on
+[PyPI](https://pypi.org/project/staqtapp-tds/3.5.3/), through the historical
+[publication workflow](https://github.com/lastforkbender/staqtapp-tds/actions/runs/29500270923),
+and in the corresponding [GitHub Release](https://github.com/lastforkbender/staqtapp-tds/releases/tag/v3.5.3).
 
 ## Repository map
 

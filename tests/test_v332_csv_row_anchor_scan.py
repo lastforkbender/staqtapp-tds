@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 
-from staqtapp_tds import TDSFileSystem, __version__
+from staqtapp_tds import TDSFileSystem
 from staqtapp_tds.csv_layer import (
     import_csv_bytes,
     load_csv_artifact,
@@ -12,10 +12,6 @@ from staqtapp_tds.csv_layer import (
     validate_csv_row_anchors,
 )
 from staqtapp_tds.csv_layer.dialect import detect_csv_dialect
-
-
-def test_version_332_csv_row_anchor_scan_pass():
-    assert __version__ == "3.8.2"
 
 
 def test_csv_row_anchor_profile_hashes_exact_logical_record_bytes():

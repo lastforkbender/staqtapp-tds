@@ -1,6 +1,5 @@
 import pytest
 
-from staqtapp_tds import __version__
 from staqtapp_tds.drivers import DriverVMRuntime, DriverVMSkeleton, VMState, compile_tddl
 
 SEARCH_DRIVER = '''
@@ -102,10 +101,6 @@ RECORDS = [
         "semantic_score": 1.0,
     },
 ]
-
-
-def test_v310_version():
-    assert __version__ == "3.8.2"
 
 
 def test_runtime_executes_validated_search_driver_deterministically():

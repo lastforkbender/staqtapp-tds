@@ -1,7 +1,6 @@
 import copy
 import json
 
-from staqtapp_tds import __version__
 from staqtapp_tds.drivers import (
     BatchReviewPolicy,
     DriverBatchReviewBoard,
@@ -118,10 +117,6 @@ def _bundle(report, *, registry_approved=False):
         created_at="2026-07-05T21:00:00Z",
         public_signature_metadata={str(report.driver_id): {"public_key_fingerprint": "SHA256:V317", "signature_status": "not_signed"}},
     )
-
-
-def test_v317_version():
-    assert __version__ == "3.8.2"
 
 
 def test_studio_readonly_capability_matrix_denies_mutating_authority():

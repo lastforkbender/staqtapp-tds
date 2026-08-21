@@ -1,1 +1,0 @@
-v3.6.0 candidate: native x86-64/AArch64 semantic projection and exact root comparison for checksum, UTF-8, CSV, handle, frozen packed-index, diagnostics, lifecycle, and compatibility Spiral truth; no learned serving or version bump.

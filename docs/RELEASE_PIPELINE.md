@@ -1,97 +1,78 @@
-# Automated Release Pipeline
+# Release Pipeline
 
-Staqtapp-TDS release automation began in v3.0.1. The v3.8.2 production
-pipeline builds and validates one source distribution and one universal Python
-wheel, then publishes them only from the exact annotated version tag through
-PyPI Trusted Publishing.
+TDS uses one bounded release path. A release proves the source, package, and
+installation being published; it does not re-run historical phase ceremonies or
+require old status ledgers.
 
-## Current release target
+The v3.8.3 PCSDQR scope retains direct behavior, declared-dependency,
+supported-platform, package-build, and installed-artifact checks. Documentation
+wording, historical journals, aggregate pass counts, and repeated validation
+wrappers are not release gates. The source distribution carries maintained
+runtime, build, documentation, example, and public-asset inputs rather than
+obsolete validation debris.
 
-The release contains a clean source distribution and a universal wheel. Source
-hygiene excludes compiled platform binaries such as `.so`, `.pyd`, `.dll`,
-`.dylib`, `.pyc`, `__pycache__`, and `.pytest_cache`. Optional native modules
-remain an explicit source-build choice; the published wheel retains the
-deterministic Python paths.
+## Release authority
 
-## Future platform wheel target
+The authoritative package version is
+`src/staqtapp_tds/version.py`. A production tag is the exact annotated
+`vMAJOR.MINOR.PATCH` tag for that source version, and its commit must belong to
+`main`. Publication must use artifacts built from the tagged commit.
 
-If TDS later publishes compiled wheels, the same pipeline structure can build
-artifacts for the main operating systems:
+## Required checks
 
-- Linux x86_64 / aarch64
-- Windows AMD64 / ARM64
-- macOS Apple Silicon / Intel
+Before a tag can publish, the release path should establish:
 
-The Native Engine Manager remains required even when wheels are used, because it verifies ABI and capability safety at runtime.
+- source version, package metadata, and tag identity agree;
+- the tagged commit belongs to `main`, whose ordinary CI owns the supported
+  Python, operating-system, and optional native behavior checks;
+- the source distribution and wheel build cleanly and pass metadata checks;
+- an isolated install imports the expected version and completes a core
+  persistence round trip;
+- the package description retains the intended Browser image targets and all
+  19 preserved local captures remain valid PNGs; and
+- no compiled binaries, bytecode, caches, or local build output leaked into the
+  source tree or source archive.
 
-## Release checks
+Each maintained check owns one concrete contract. Source/package/tag identity,
+package-description rendering, behavior, package construction, and
+installed-package smoke are checked directly instead of being wrapped in a
+second documentation or aggregate-status decision.
 
-`scripts/check_release.py` verifies:
+## Sequence
 
-- source, package, and exact-tag version consistency;
-- current English and Japanese release status and installation pins;
-- the 19 preserved Browser captures and PyPI-safe absolute targets;
-- no compiled binaries or generated cache/build artifacts in source;
-- required release evidence and versioned documentation; and
-- deterministic Foundation Closure and result-code documentation.
+1. Update the version and `CHANGELOG.md`.
+2. Run the bounded source, test, native, and package checks.
+3. Build one wheel and one source distribution from the qualified source.
+4. Create the annotated version tag only for that exact commit.
+5. Publish through PyPI Trusted Publishing after the direct checks pass.
+6. Install the public artifact and run a small production smoke test.
+7. Create the GitHub Release from the same tag and artifact identity.
 
-`scripts/check_pypi_readme.py` independently binds the exact ordered screenshot
-URLs to the 19 local 1280×800 PNGs. Before upload, it fetches each immutable URL
-and requires byte-identical PNG content, then inspects the built wheel's
-`METADATA` description to prove those URLs survived packaging.
+Published tags and artifacts are immutable. A correction receives a new patch
+version; it does not rewrite the prior release.
 
-The GitHub Actions workflow in `.github/workflows/release.yml` uses ordinary,
-bounded release testing as publication authority:
+## Performance evidence
 
-- the full monolithic suite on Python 3.10 through 3.14;
-- pure-Python validation on Linux, macOS, and Windows;
-- native-extension builds and the native test suite;
-- address, undefined-behavior, and thread sanitizers;
-- native lifecycle and free-threaded admission checks;
-- deterministic frozen-format fuzzing and exact x86-64/AArch64 semantic
-  parity; and
-- distribution building, `twine check`, installed-version verification, and
-  PyPI README/asset verification.
+Benchmarks are engineering evidence, not publication authority. Performance
+claims must name the workload, environment, baseline, repetitions, and output
+equivalence rule. Reproducible commands and current measurements live in
+`benchmarks/README.md`.
 
-There is no timing or performance benchmark publication gate. The performance
-figures in the v3.8.2 release notes are bounded engineering measurements, not
-release authority. Correctness regressions for the affected components remain
-covered by the normal semantic suites above.
+## Local preparation
 
-## Exact-source release controller
+Typical local preparation is intentionally short:
 
-A successful `release.yml` push run on `main` triggers the one-time
-`.github/workflows/v382-release-controller.yml`. The controller fails closed
-unless the run is successful, its `Release gates complete` aggregate succeeded,
-the run's head is still the exact tip of `main`, PyPI 3.8.2 is absent, and the
-`v3.8.2` tag does not exist. It then creates an annotated tag that peels to that
-exact qualified main commit and dispatches the tag workflow once.
+```bash
+python scripts/release_version.py
+python scripts/release_version.py --print-tag
+python scripts/check_pypi_readme.py
+python -m pytest -q
+python -m build
+python -m twine check dist/*
+```
 
-The controller writes an exact, run-bound attestation containing the repository,
-controller run and attempt, qualified run and commit SHA, dispatched release run,
-tag, and annotated tag-object SHA. The tag workflow accepts no defaults and
-revalidates that attestation, all three workflow identities, the successful
-main aggregate, the unchanged main tip, the annotated tag object, and PyPI
-absence before publication can proceed.
-
-## Trusted publication and public verification
-
-The `publish-pypi` job is protected by the `pypi` environment. After its approval
-and immediately before requesting an OIDC credential,
-`scripts/v382_release_provenance.py` repeats the complete controller, run, main,
-tag, artifact, and PyPI-absence proof. Publication has no `skip-existing` or
-credential-token fallback.
-
-After upload, the workflow requires PyPI to expose exactly the expected wheel
-and source archive with the validated filenames, package types, metadata,
-sizes, and SHA-256 hashes. It downloads the public `files.pythonhosted.org`
-objects and compares their bytes with the workflow artifacts.
-
-The parent release run then dispatches `.github/workflows/pypi-smoke.yml` with
-the exact version, qualified main SHA and run, parent release run, and annotated
-tag-object SHA. That workflow installs the exact production wheel on Linux,
-macOS, and Windows, performs a core round trip, and checks the live PyPI
-description and every public presentation target. The GitHub Release is created
-only after the parent-bound production smoke aggregate succeeds and all release
-and tag identities are revalidated. Workflow permissions are job-scoped and all
-third-party actions in the publication path are pinned to full commit SHAs.
+After installing the built artifact into an isolated environment, run
+`python scripts/release_version.py --verify-installed` and a core persistence
+smoke test. Optional native checks use a clean build with
+`STAQTAPP_TDS_BUILD_NATIVE=1`; sanitizer and compatibility checks report their
+own results directly.
