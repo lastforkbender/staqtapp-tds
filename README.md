@@ -1,12 +1,13 @@
-> **v3.8.1 fixed-point reference and telemetry release**
+> **v3.8.2 system performance correction candidate — NON-RELEASEABLE**
 >
-> This patch retains the Phase 1–4 convergence and adds the deterministic,
-> off-path Phase 5 fixed-point path reference oracle. It also makes the Browser
-> render one active page at a time, removes overlapping idle polling and costly
-> compositing, and adds an atomic workspace telemetry mount for a detached
-> Browser process. Eaglegate and Trace Rank remain off the production request
-> path with no canary, promotion, activation, execution, token-acceptance, or
-> KV-commit authority.
+> The user's system-wide request superseded the attached allocator-only
+> assessment as this audit branch's scope. The candidate corrects confirmed
+> scaling failures across the native handle allocator, persistence and
+> observation, CSV evidence workflows, Generation Authority, Driver
+> Foundry/VM/Studio orchestration, Trace Rank, and Eaglegate admission. Stored
+> formats, canonical CSV bytes, public authority boundaries, Browser captures,
+> and important links are unchanged. Performance evidence remains off the
+> functional and activation authority paths.
 
 > **v3.6.0 Foundation substrate**
 >
@@ -18,9 +19,9 @@
 >
 > At-rest encryption is not implemented. Requests using `DirFlags.ENCRYPTED` fail closed instead of storing plaintext. New v2 persistence files require their integrity sidecar. `.tds` input should be treated as trusted until explicit resource-budget hardening is complete. Native extensions are optional and are built only when `STAQTAPP_TDS_BUILD_NATIVE=1` is set.
 
-# Staqtapp-TDS v3.8.1
+# Staqtapp-TDS v3.8.2 release candidate
 
-> **Release status:** v3.8.1 is the current production PyPI release. Publication is permitted only from the exact `v3.8.1` tag after the complete aggregate release gate succeeds. The v3.6 Foundation, v3.7 Generation Authority, v3.8 Eaglegate/packed graph, Phase 5 fixed-point reference oracle, Browser idle-performance repair, and workspace telemetry mount are included. The manual credentialed H100 workflow has not been executed and remains required for hardware evidence; Eaglegate remains shadow/target-only and has no production activation authority.
+> **Release status:** v3.8.2 is a **NON-RELEASEABLE** source candidate under review, not a published package. v3.8.1 remains the current production PyPI release, so the install command below intentionally stays pinned to 3.8.1. Publication is blocked on retained randomized paired AB/BA native allocator evidence using the 32-byte-value wrapper as the primary path, telemetry/thread and unaffected-lookup cells, CPU/peak-RSS recording, supported-platform CI, and the complete release gate. The candidate adds performance corrections and regression evidence without granting new Driver, Eaglegate, execution, canary, promotion, activation, token-acceptance, or KV-commit authority. The manual credentialed H100 workflow has not been executed and remains required for hardware evidence; Eaglegate remains shadow/target-only.
 
 **Temporal Directory System - native-indexed `.tds` storage, controlled variables, trace ranking, CSV evidence operations, semantic review, and centralized observability for AI systems.**
 
@@ -276,6 +277,22 @@ TDS intentionally distinguishes preparation, evidence, review, and authority:
 
 ## Validation status
 
+The v3.8.2 source candidate corrects repeated whole-structure work across Core,
+observation, CSV/Generation, Driver, Trace Rank, and Eaglegate. Native automatic
+handle allocation uses its locked monotonic high-water invariant instead of
+scanning capacity; persistence indexes immutable sidecars once, decompresses
+once, publishes reload indexes atomically, and writes through a bounded buffer;
+JSON/telemetry retains exact counters and sampler compatibility while avoiding
+per-call records and duplicate tree/table scans; CSV workflows reuse
+authoritative hashes, scans, and verified chunks and route artifacts from the
+canonical CSV identity; exact immutable Generation manifests cache identities
+and use logarithmic payload lookup; Driver paths avoid redundant validation,
+table construction, and deep copies; Trace Rank admits exact records once and
+decode-normalizes non-exact subclasses before proof-scoped materialization; and
+Eaglegate reuses immutable admission identities and validated plan lookup. See
+`docs/135_v382_System_Performance_Corrections.md` for measured evidence,
+unchanged contracts, and deferred higher-risk work.
+
 The v3.8.1 release retains four explicit convergence boundaries. The v3.7
 Generation Authority publishes exact CSV and composite Eaglegate generations
 with head-root CAS, cross-process pins, deterministic recovery, rollback, and
@@ -350,6 +367,13 @@ Browser/workspace telemetry correction. It does not add Frontier execution or
 Eaglegate activation authority. Local qualification completed with 1,159 tests
 passed and 45 skipped, plus HTTP workspace and distribution-artifact smoke
 checks; production publication remains gated by the complete tag matrix.
+
+Version `3.8.2` is the current **NON-RELEASEABLE** source candidate for the
+bounded system performance correction. The correction is designed to preserve
+the v3.8.1 stored formats, canonical CSV-byte identities, evidence identities,
+and authority boundaries, with regression sentinels for the changed paths. Its
+local results do not constitute publication or a universal hardware-performance
+claim, and the native allocator release proof remains pending.
 
 ## Repository map
 

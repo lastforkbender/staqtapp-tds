@@ -124,6 +124,7 @@ def main() -> int:
         ROOT / "docs" / "132_v380_Packed_Waypoint_CSR_Graph.md",
         ROOT / "docs" / "133_v381_Fixed_Point_Path_Reference_Oracle.md",
         ROOT / "docs" / "134_v381_Browser_Performance_Workspace_Telemetry.md",
+        ROOT / "docs" / "135_v382_System_Performance_Corrections.md",
         ROOT / "src" / "staqtapp_tds" / "eaglegate" / "vllm_shadow.py",
         ROOT / "src" / "staqtapp_tds" / "trace_rank" / "graph.py",
         ROOT / "src" / "staqtapp_tds" / "trace_rank" / "planner.py",

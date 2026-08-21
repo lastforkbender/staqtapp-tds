@@ -27,6 +27,11 @@ identity is `3.8.1`. The credentialed H100 workflow has not
 been executed; publication grants no Eaglegate canary, promotion, or activation
 authority.
 
+The current source identity is **v3.8.2**, a non-releaseable source candidate
+for the widened system performance correction. Candidate status belongs to its branch and
+qualification evidence; `3.8.2` is not advertised as an installable production
+PyPI version until the complete tag matrix and trusted-publication gates pass.
+
 ## Operational rules
 
 1. A production tag is exactly `vMAJOR.MINOR.PATCH`.

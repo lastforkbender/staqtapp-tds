@@ -1,5 +1,38 @@
 # TDS Release Notes
 
+## v3.8.2 — System Performance Corrections (NON-RELEASEABLE Source Candidate)
+
+The user's system-wide audit request superseded the attached allocator-only
+assessment as the scope of this branch. This candidate therefore repairs
+confirmed scaling failures across native Core, persistence/telemetry, JSON
+observation, CSV evidence operations, Generation Authority, Driver
+Foundry/VM/Studio orchestration, Trace Rank, and Eaglegate admission. That wider
+scope does not relax the native allocator proof gate. The candidate changes no
+stored format, canonical CSV byte contract, public authority boundary, Browser
+capture, or important link. v3.8.1 remains the current production PyPI release.
+
+The correction removes quadratic automatic-handle allocation, repeated linear
+manifest payload lookup, repeated whole-source CSV scans and hashes, duplicate
+decompression and full-file persistence copies, repeated immutable manifest
+hashing, and redundant Driver validation/table/copy work. Review hardening also
+binds CSV artifact writes to the canonical CSV identity, publishes sidecar
+reload indexes atomically, admits only exact immutable Generation records for
+cached roots, preserves the custom observation sampler namespace, and
+decode-normalizes non-exact Trace graph records before sealing. Trace Rank uses
+a proof-scoped read seam only after admission; its public untrusted-input
+materializer remains fail closed. Eaglegate reuses immutable admission
+identities without changing target-only or shadow status. See
+`docs/135_v382_System_Performance_Corrections.md` for the local measurement summary and
+the higher-risk hypotheses deliberately deferred from this patch.
+
+This source candidate is **NON-RELEASEABLE**. Tagging and publication remain
+blocked on retained randomized paired AB/BA allocator evidence in clean
+worktrees, with the 32-byte-value wrapper as the primary path; diagnostics and
+telemetry, thread-count, and entry-count cells; unaffected lookup checks;
+recorded CPU and peak RSS; supported-platform CI; and the complete release
+gate. The current raw-C allocator number is a causal indication, not a release
+claim, and the exploratory paired benchmark JSON was not retained.
+
 ## v3.8.1 — Fixed-Point Reference and Live Workspace Telemetry
 
 This patch releases the off-path Phase 5 fixed-point path reference oracle and

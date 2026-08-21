@@ -1,6 +1,6 @@
 # Automated Release Pipeline
 
-Staqtapp-TDS release automation began in v3.0.1. The current v3.8.1 pipeline
+Staqtapp-TDS release automation began in v3.0.1. The current v3.8.2 source pipeline
 builds and validates a source distribution and a universal Python wheel, then
 publishes only from the exact version tag through PyPI Trusted Publishing.
 

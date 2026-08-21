@@ -53,7 +53,7 @@ evolution:
 
 
 def test_v307_version():
-    assert __version__ == "3.8.1"
+    assert __version__ == "3.8.2"
 
 
 def test_opcode_table_is_stable_for_first_native_vm_mapping():

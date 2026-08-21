@@ -1,8 +1,8 @@
-# Staqtapp-TDS v3.8.1
+# Staqtapp-TDS v3.8.2 release candidate
 
-> **Release status:** v3.8.1 は current production PyPI release です。Publication は complete aggregate release gate を通過した exact `v3.8.1` tag からのみ許可されます。v3.6 Foundation、v3.7 Generation Authority、v3.8 Eaglegate / packed graph、Phase 5 fixed-point reference oracle、Browser idle-performance 修正、workspace telemetry mount を含みます。Manual credentialed H100 workflow は未実行であり hardware evidence に引き続き必要です。Eaglegate は shadow / target-only のままで、production activation authority を持ちません。
+> **Release status:** v3.8.2 は review 中の **NON-RELEASEABLE** source candidate であり、published package ではありません。v3.8.1 が current production PyPI release のため、install command は意図的に 3.8.1 のままです。Publication は、32-byte value wrapper を primary path とする retained randomized paired AB/BA native allocator evidence、telemetry / thread / unaffected-lookup cell、CPU / peak-RSS 記録、supported-platform CI、complete release gate が完了するまで block されます。この candidate は Core、observation、CSV / Generation、Driver Foundry / VM / Studio、Trace Rank、Eaglegate admission の performance correction と regression evidence を追加しますが、新しい execution、canary、promotion、activation、token acceptance、KV commit authority は付与しません。Manual credentialed H100 workflow は未実行であり hardware evidence に引き続き必要です。Eaglegate は shadow / target-only のままです。
 
-> **v3.8.1 reference / telemetry release:** Phase 1–4 convergence を保持し、deterministic off-path Phase 5 fixed-point path reference oracle を追加します。Browser は 19 page のうち 1 page だけを active rendering し、polling は serialized / visibility-aware になりました。Detached Browser 向けに atomic workspace telemetry mount も追加します。Production request、canary、promotion、activation、execution、token acceptance、KV commit authority は含みません。
+> **v3.8.2 system performance correction candidate:** User の system-wide request は、この audit branch の scope として attached allocator-only assessment を supersede しました。Native handle allocator、persistence / telemetry、JSON observation、CSV evidence workflow、Generation Authority、Driver Foundry / VM / Studio orchestration、Trace Rank、Eaglegate admission の確認済み scaling failure を修正します。この wider scope は allocator proof gate を緩和しません。Stored format、canonical CSV byte、authority boundary、Browser capture、important link は変更しません。
 
 > **v3.6.0 Foundation substrate:** fail-closed native ABI / lifecycle、strict checksum / UTF-8 truth、generation-bound handle、bounded C11 diagnostics、immutable packed read、x86-64 / AArch64 semantic parity を保持します。
 
@@ -258,6 +258,18 @@ TDS は preparation、evidence、review、authority を明確に分離します�
 
 ## Validation status
 
+v3.8.2 source candidate は Core、observation、CSV / Generation、Driver、Trace
+Rank、Eaglegate における whole-structure work の重複を修正します。Native
+automatic handle allocation、sidecar lookup、decompression、bounded persistence
+write と atomic reload index publication、exact JSON / telemetry counter と
+sampler compatibility、CSV hash / scan / verified chunk reuse と canonical
+artifact routing、exact immutable Generation manifest identity / logarithmic
+payload lookup、Driver validation / contract table / deep copy、exact-record
+Trace admission と non-exact subclass の canonical normalization、immutable
+Eaglegate admission identity を対象にしています。測定 evidence、変更しない
+contract、deferred high-risk work は
+`docs/135_v382_System_Performance_Corrections.md` を参照してください。
+
 v3.8.1 release は Phase 1–4 の 4 boundary を保持します。v3.7 Generation
 Authority は exact CSV と composite Eaglegate generation を head-root CAS、
 cross-process pin、deterministic recovery、rollback、retirement で publish
@@ -316,6 +328,13 @@ telemetry correction を追加します。Frontier execution または Eaglegate
 activation authority は追加しません。Local qualification は 1,159 passed、
 45 skipped、HTTP workspace smoke、distribution artifact check を完了し、
 production publication は complete tag matrix によって gate されます。
+
+v3.8.2 は bounded system performance correction の current
+**NON-RELEASEABLE** source candidate です。Correction は v3.8.1 の stored
+format、canonical CSV-byte identity、evidence identity、authority boundary を
+保持するよう設計され、変更 path には regression sentinel があります。Local
+result は publication または universal hardware-performance claim ではなく、
+native allocator release proof は pending です。
 
 ## Repository map
 
