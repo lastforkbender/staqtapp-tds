@@ -9,17 +9,30 @@ from .artifacts import CSVDialectFingerprint
 
 
 def _line_terminator_sample(text: str) -> str:
-    rn = text.find("\r\n")
-    n = text.find("\n")
-    r = text.find("\r")
-    candidates = [(idx, term) for idx, term in ((rn, "\r\n"), (n, "\n"), (r, "\r")) if idx >= 0]
-    if not candidates:
+    # Search bounded windows so common early line endings stop immediately,
+    # while a newline-free source makes two C-level passes instead of the
+    # former three full-string searches.
+    window = 64 << 10
+    for start in range(0, len(text), window):
+        end = min(start + window, len(text))
+        lf = text.find("\n", start, end)
+        cr = text.find("\r", start, end)
+        if lf < 0 and cr < 0:
+            continue
+        if cr >= 0 and (lf < 0 or cr < lf):
+            if cr + 1 < len(text) and text[cr + 1] == "\n":
+                return "\r\n"
+            return "\r"
         return "\n"
-    return min(candidates, key=lambda item: item[0])[1]
+    return "\n"
 
 
 def _delimiter_score(text: str, delimiter: str) -> int:
     rows = [line for line in text.splitlines()[:20] if line.strip()]
+    return _delimiter_score_rows(rows, delimiter)
+
+
+def _delimiter_score_rows(rows: list[str], delimiter: str) -> int:
     if not rows:
         return 0
     counts = [line.count(delimiter) for line in rows]
@@ -37,6 +50,7 @@ def detect_csv_dialect(text: str, *, delimiters: Iterable[str] = (",", ";", "\t"
     still parseable CSV files.
     """
     sample = text[:65536]
+    delimiters = tuple(delimiters)
     warnings: list[str] = []
     try:
         sniffed = csv.Sniffer().sniff(sample, delimiters="".join(delimiters))
@@ -50,13 +64,18 @@ def detect_csv_dialect(text: str, *, delimiters: Iterable[str] = (",", ";", "\t"
         confidence = 0.92
     except Exception:
         source = "deterministic-fallback"
-        delimiter = max(delimiters, key=lambda d: _delimiter_score(sample, d))
+        rows = [line for line in sample.splitlines()[:20] if line.strip()]
+        scores = {
+            candidate: _delimiter_score_rows(rows, candidate)
+            for candidate in delimiters
+        }
+        delimiter = max(delimiters, key=scores.__getitem__)
         quotechar = '"'
         escapechar = None
         doublequote = True
         skipinitialspace = False
         quoting = int(csv.QUOTE_MINIMAL)
-        confidence = 0.60 if _delimiter_score(sample, delimiter) > 0 else 0.25
+        confidence = 0.60 if scores[delimiter] > 0 else 0.25
         warnings.append("sniffer_failed")
     try:
         has_header = bool(csv.Sniffer().has_header(sample))

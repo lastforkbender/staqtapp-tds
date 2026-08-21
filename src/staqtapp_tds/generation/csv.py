@@ -11,6 +11,7 @@ caller, including a BOM, mixed line endings, and bytes that are not UTF-8.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import hashlib
 import json
 import re
 import struct
@@ -444,13 +445,18 @@ def pack_row_offsets(
     digest = _root_digest("source_root", source_root)
     normalized = tuple(offsets)
     _require_int("row count", len(normalized), 0, _UINT63_MAX)
+    previous = -1
     for value in normalized:
         _require_int("row offset", value, 0, _UINT63_MAX)
+        if value <= previous:
+            raise GenerationContractError(
+                "row offsets are not canonical source row starts",
+                fault=GenerationFault.NONCANONICAL,
+            )
+        previous = value
     if normalized:
         if (
             normalized[0] != 0
-            or tuple(sorted(normalized)) != normalized
-            or len(set(normalized)) != len(normalized)
             or normalized[-1] >= source_size
         ):
             raise GenerationContractError(
@@ -462,7 +468,10 @@ def pack_row_offsets(
             "non-empty CSV source requires a row start",
             fault=GenerationFault.INCOMPLETE_GENERATION,
         )
-    header = _OFFSET_HEADER.pack(
+    result = bytearray(_OFFSET_HEADER.size + len(normalized) * _U64.size)
+    _OFFSET_HEADER.pack_into(
+        result,
+        0,
         _OFFSET_MAGIC,
         CSV_GENERATION_FORMAT_VERSION,
         0,
@@ -471,7 +480,11 @@ def pack_row_offsets(
         source_size,
         digest,
     )
-    return header + b"".join(_U64.pack(value) for value in normalized)
+    position = _OFFSET_HEADER.size
+    for value in normalized:
+        _U64.pack_into(result, position, value)
+        position += _U64.size
+    return bytes(result)
 
 
 def decode_row_offsets(data: bytes) -> tuple[int, int, str, tuple[int, ...]]:
@@ -537,6 +550,7 @@ def _build_row_anchors(
 ) -> tuple[CSVRowAnchor, ...]:
     indices = _select_anchor_indices(len(offsets), anchor_limit)
     result: list[CSVRowAnchor] = []
+    view = memoryview(source)
     for ordinal in indices:
         start = offsets[ordinal]
         end = offsets[ordinal + 1] if ordinal + 1 < len(offsets) else len(source)
@@ -545,7 +559,7 @@ def _build_row_anchors(
                 row_ordinal=ordinal,
                 start_offset=start,
                 end_offset=end,
-                content_root=bytes_root(source[start:end]),
+                content_root="sha256:" + hashlib.sha256(view[start:end]).hexdigest(),
             )
         )
     return tuple(result)
@@ -977,31 +991,47 @@ class CSVGenerationBinding:
         return result
 
 
-def _build_chunk_index(source: bytes, chunk_bytes: int) -> CSVChunkIndex:
+def _build_chunks(
+    source: bytes,
+    chunk_bytes: int,
+    *,
+    source_root: str,
+) -> tuple[CSVChunkIndex, dict[str, bytes]]:
+    """Build chunk identities and retain the exact bytes used to hash them."""
     chunks: list[CSVChunkIdentity] = []
+    payloads: dict[str, bytes] = {}
     for ordinal, start in enumerate(range(0, len(source), chunk_bytes)):
         end = min(start + chunk_bytes, len(source))
         raw = source[start:end]
+        payload_name = f"{CSV_CHUNK_PAYLOAD_PREFIX}{ordinal:08d}"
         chunks.append(
             CSVChunkIdentity(
                 ordinal=ordinal,
-                payload_name=f"{CSV_CHUNK_PAYLOAD_PREFIX}{ordinal:08d}",
+                payload_name=payload_name,
                 start_offset=start,
                 end_offset=end,
                 content_root=bytes_root(raw),
             )
         )
-    return CSVChunkIndex(
-        source_root=bytes_root(source),
-        source_size=len(source),
-        chunk_bytes=chunk_bytes,
-        chunks=tuple(chunks),
+        payloads[payload_name] = raw
+    return (
+        CSVChunkIndex(
+            source_root=source_root,
+            source_size=len(source),
+            chunk_bytes=chunk_bytes,
+            chunks=tuple(chunks),
+        ),
+        payloads,
     )
 
 
-def _qualification_roots(binding: CSVGenerationBinding) -> dict[str, str]:
+def _qualification_roots(
+    binding: CSVGenerationBinding,
+    *,
+    binding_root: str | None = None,
+) -> dict[str, str]:
     return {
-        CSV_BINDING_PAYLOAD: binding.binding_root,
+        CSV_BINDING_PAYLOAD: binding.binding_root if binding_root is None else binding_root,
         CSV_CHUNKS_PAYLOAD: binding.chunks_root,
         "csv.closure": binding.closure_root,
         CSV_DIALECT_PAYLOAD: binding.dialect_root,
@@ -1046,6 +1076,20 @@ def build_csv_generation_candidate(
             fault=GenerationFault.BOUND_EXCEEDED,
         )
 
+    # These bounds depend only on already validated scalar inputs. Reject them
+    # before the O(n) row-boundary oracle or any chunk materialization.
+    chunk_count = (len(source) + chunk_bytes - 1) // chunk_bytes if source else 0
+    if chunk_count > limits.max_chunks:
+        raise GenerationContractError(
+            "CSV chunk count exceeds its qualified bound",
+            fault=GenerationFault.BOUND_EXCEEDED,
+        )
+    if chunk_count + len(_CSV_FIXED_PAYLOADS) > store.limits.max_payloads:
+        raise GenerationContractError(
+            "CSV payload count exceeds the Generation Authority bound",
+            fault=GenerationFault.BOUND_EXCEEDED,
+        )
+
     selected_dialect = dialect or CSVDialect()
     if not isinstance(selected_dialect, CSVDialect):
         raise GenerationContractError("dialect must be a CSVDialect")
@@ -1065,17 +1109,11 @@ def build_csv_generation_candidate(
         )
 
     source_root = bytes_root(source)
-    chunk_index = _build_chunk_index(source, chunk_bytes)
-    if len(chunk_index.chunks) > limits.max_chunks:
-        raise GenerationContractError(
-            "CSV chunk count exceeds its qualified bound",
-            fault=GenerationFault.BOUND_EXCEEDED,
-        )
-    if len(chunk_index.chunks) + len(_CSV_FIXED_PAYLOADS) > store.limits.max_payloads:
-        raise GenerationContractError(
-            "CSV payload count exceeds the Generation Authority bound",
-            fault=GenerationFault.BOUND_EXCEEDED,
-        )
+    chunk_index, chunk_payloads = _build_chunks(
+        source,
+        chunk_bytes,
+        source_root=source_root,
+    )
 
     offsets_data = pack_row_offsets(
         offsets,
@@ -1115,10 +1153,12 @@ def build_csv_generation_candidate(
         closure_root=closure_root,
         evidence_root=evidence_root,
     )
+    binding_data = binding.canonical_bytes()
+    binding_root = bytes_root(binding_data)
 
     payloads: dict[str, bytes] = {
         CSV_SOURCE_PAYLOAD: source,
-        CSV_BINDING_PAYLOAD: binding.canonical_bytes(),
+        CSV_BINDING_PAYLOAD: binding_data,
         CSV_CHUNKS_PAYLOAD: chunk_index_data,
         CSV_PARSER_PAYLOAD: CSV_REFERENCE_PARSER_BYTES,
         CSV_DIALECT_PAYLOAD: dialect_data,
@@ -1134,8 +1174,8 @@ def build_csv_generation_candidate(
         CSV_ROW_OFFSETS_PAYLOAD: "application/octet-stream",
         CSV_ROW_ANCHORS_PAYLOAD: "application/octet-stream",
     }
+    payloads.update(chunk_payloads)
     for chunk in chunk_index.chunks:
-        payloads[chunk.payload_name] = source[chunk.start_offset : chunk.end_offset]
         media_types[chunk.payload_name] = "application/octet-stream"
 
     selected_metadata = dict(metadata or {})
@@ -1150,7 +1190,7 @@ def build_csv_generation_candidate(
         media_types=media_types,
         authoritative_payload=CSV_SOURCE_PAYLOAD,
         parent_generation_root=parent_generation_root,
-        qualifications=_qualification_roots(binding),
+        qualifications=_qualification_roots(binding, binding_root=binding_root),
         metadata=selected_metadata,
     )
 
@@ -1233,7 +1273,8 @@ def load_csv_generation(lease: GenerationLease) -> LoadedCSVGeneration:
             fault=GenerationFault.IDENTITY_MISMATCH,
         )
 
-    _require_payload_root(identities, CSV_BINDING_PAYLOAD, binding.binding_root)
+    binding_root = binding.binding_root
+    _require_payload_root(identities, CSV_BINDING_PAYLOAD, binding_root)
     _require_payload_root(identities, CSV_SOURCE_PAYLOAD, binding.source_root)
     _require_payload_root(identities, CSV_CHUNKS_PAYLOAD, binding.chunks_root)
     _require_payload_root(identities, CSV_PARSER_PAYLOAD, binding.parser_root)
@@ -1252,7 +1293,7 @@ def load_csv_generation(lease: GenerationLease) -> LoadedCSVGeneration:
     qualifications = {
         item.name: item.evidence_root for item in lease.manifest.qualifications
     }
-    if qualifications != _qualification_roots(binding):
+    if qualifications != _qualification_roots(binding, binding_root=binding_root):
         raise GenerationContractError(
             "CSV qualification roots do not match the generation binding",
             fault=GenerationFault.IDENTITY_MISMATCH,
@@ -1296,29 +1337,28 @@ def load_csv_generation(lease: GenerationLease) -> LoadedCSVGeneration:
     for chunk in chunk_index.chunks:
         _require_payload_root(identities, chunk.payload_name, chunk.content_root)
 
-    reconstructed_parts: list[bytes] = []
+    # ``GenerationLease.read_payload`` already verifies each payload against
+    # the manifest root.  The CSV binding above ties those manifest roots to
+    # every chunk identity, so compare each verified chunk directly with its
+    # authoritative source span instead of hashing it again and retaining all
+    # chunks for a second full-source join.
+    source = lease.read_payload(CSV_SOURCE_PAYLOAD)
+    if len(source) != binding.source_size:
+        raise GenerationContractError(
+            "CSV chunks do not reconstruct the byte-identical source",
+            fault=GenerationFault.IDENTITY_MISMATCH,
+        )
+    source_view = memoryview(source)
     for chunk in chunk_index.chunks:
         raw = lease.read_payload(chunk.payload_name)
         if (
             len(raw) != chunk.end_offset - chunk.start_offset
-            or bytes_root(raw) != chunk.content_root
+            or source_view[chunk.start_offset : chunk.end_offset] != raw
         ):
             raise GenerationContractError(
                 f"CSV chunk identity mismatch: {chunk.payload_name}",
                 fault=GenerationFault.IDENTITY_MISMATCH,
             )
-        reconstructed_parts.append(raw)
-    reconstructed = b"".join(reconstructed_parts)
-    source = lease.read_payload(CSV_SOURCE_PAYLOAD)
-    if (
-        len(source) != binding.source_size
-        or bytes_root(source) != binding.source_root
-        or reconstructed != source
-    ):
-        raise GenerationContractError(
-            "CSV chunks do not reconstruct the byte-identical source",
-            fault=GenerationFault.IDENTITY_MISMATCH,
-        )
 
     offsets_data = lease.read_payload(CSV_ROW_OFFSETS_PAYLOAD)
     row_count, source_size, source_root, offsets = decode_row_offsets(offsets_data)

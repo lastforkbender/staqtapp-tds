@@ -31,6 +31,7 @@ from .generation_contract import (
     GenerationHead,
     GenerationLifecycleReceipt,
     GenerationManifest,
+    GenerationPayload,
     GenerationPublicationRecord,
     GenerationState,
     PublicationAction,
@@ -63,6 +64,37 @@ FAILURE_BOUNDARIES = (
 )
 
 
+def _find_payload_identity(
+    payloads: tuple[GenerationPayload, ...],
+    name: str,
+) -> GenerationPayload | None:
+    """Find one identity in the manifest's canonical name order.
+
+    ``GenerationManifest`` requires payload identities to be sorted by name and
+    unique.  A lease can read thousands of chunk payloads from one manifest, so
+    linearly rescanning the complete tuple for every read turns that workload
+    quadratic.  Binary search preserves the immutable manifest representation
+    and avoids adding per-lease cache state.
+    """
+
+    if not isinstance(name, str):
+        return None
+    low = 0
+    high = len(payloads)
+    while low < high:
+        middle = (low + high) // 2
+        identity = payloads[middle]
+        if identity.name < name:
+            low = middle + 1
+        else:
+            high = middle
+    if low < len(payloads):
+        identity = payloads[low]
+        if identity.name == name:
+            return identity
+    return None
+
+
 class GenerationStoreError(RuntimeError):
     def __init__(
         self,
@@ -85,10 +117,14 @@ class GenerationCandidate:
     payloads: tuple[tuple[str, bytes], ...]
 
     def __post_init__(self) -> None:
-        if tuple(sorted(self.payloads, key=lambda item: item[0])) != self.payloads:
-            raise GenerationContractError("candidate payloads must be sorted")
-        if tuple(name for name, _ in self.payloads) != tuple(
-            item.name for item in self.manifest.payloads
+        previous_name: str | None = None
+        for name, _ in self.payloads:
+            if previous_name is not None and name < previous_name:
+                raise GenerationContractError("candidate payloads must be sorted")
+            previous_name = name
+        if len(self.payloads) != len(self.manifest.payloads) or any(
+            name != item.name
+            for (name, _), item in zip(self.payloads, self.manifest.payloads)
         ):
             raise GenerationContractError(
                 "candidate payload names do not match manifest",
@@ -698,13 +734,15 @@ class AtomicGenerationStore:
         candidate: GenerationCandidate,
     ) -> tuple[GenerationManifest, GenerationLifecycleReceipt]:
         manifest = candidate.manifest
+        manifest_bytes = manifest.canonical_bytes()
+        generation_root = manifest.generation_root
         self._validate_manifest_limits(
             manifest,
-            encoded_size=len(manifest.canonical_bytes()),
+            encoded_size=len(manifest_bytes),
         )
-        generation_dir = self._generation_dir(manifest.generation_root)
+        generation_dir = self._generation_dir(generation_root)
         if generation_dir.exists():
-            loaded, published = self.verify_generation(manifest.generation_root)
+            loaded, published = self.verify_generation(generation_root)
             if loaded != manifest:
                 raise GenerationStoreError(
                     "existing generation identity mismatch",
@@ -721,7 +759,7 @@ class AtomicGenerationStore:
             stage_dir.mkdir(parents=False, exist_ok=False)
             receipts_dir = stage_dir / "receipts"
             receipts_dir.mkdir()
-            self._write_small_file(stage_dir / "manifest.json", manifest.canonical_bytes())
+            self._write_small_file(stage_dir / "manifest.json", manifest_bytes)
             for receipt in receipts:
                 name = f"{receipt.sequence:03d}-{receipt.state.value}.json"
                 self._write_small_file(
@@ -735,7 +773,7 @@ class AtomicGenerationStore:
             except OSError:
                 if not generation_dir.exists():
                     raise
-                loaded, published = self.verify_generation(manifest.generation_root)
+                loaded, published = self.verify_generation(generation_root)
                 if loaded != manifest:
                     raise GenerationStoreError(
                         "concurrent generation publication mismatch",
@@ -747,7 +785,7 @@ class AtomicGenerationStore:
         finally:
             if stage_dir.exists():
                 shutil.rmtree(stage_dir, ignore_errors=True)
-        return self.verify_generation(manifest.generation_root)
+        return self.verify_generation(generation_root)
 
     def verify_staged_generation(
         self,
@@ -1157,6 +1195,8 @@ class AtomicGenerationStore:
         require_root("expected_head_root", expected_head_root, optional=True)
         manifest, published = self._materialize_generation(candidate)
         namespace = manifest.namespace
+        generation_root = manifest.generation_root
+        manifest_root = manifest.manifest_root
         with self._namespace_lock(namespace):
             recovery = self._recover_locked(namespace)
             head = recovery.head
@@ -1187,8 +1227,8 @@ class AtomicGenerationStore:
                 if previous_record
                 else 1,
                 action=PublicationAction.PUBLISH,
-                generation_root=manifest.generation_root,
-                manifest_root=manifest.manifest_root,
+                generation_root=generation_root,
+                manifest_root=manifest_root,
                 published_receipt_root=published.receipt_root,
                 previous_generation_root=current_root,
                 predecessor_record_root=previous_record.record_root
@@ -1390,7 +1430,7 @@ class AtomicGenerationStore:
             return self._pins.get(generation_root, 0)
 
     def _read_payload(self, manifest: GenerationManifest, name: str) -> bytes:
-        identity = next((item for item in manifest.payloads if item.name == name), None)
+        identity = _find_payload_identity(manifest.payloads, name)
         if identity is None:
             raise KeyError(name)
         if identity.size > self.limits.max_single_payload_bytes:

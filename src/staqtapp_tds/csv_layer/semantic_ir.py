@@ -46,6 +46,7 @@ CSV_SEMANTIC_IR_COMPATIBLE_RELEASE_VERSIONS: tuple[str, ...] = (
     "3.7.0",
     "3.8.0",
     "3.8.1",
+    "3.8.2",
 )
 CSV_SEMANTIC_IR_PAYLOAD_BYTE_LIMIT = 131_072
 CSV_SEMANTIC_IR_MAX_PROPOSITIONS = 256
@@ -629,6 +630,18 @@ def _valid_text(value: str, *, max_chars: int) -> bool:
     return all(ch >= " " and ch != "\x7f" for ch in value)
 
 
+def _duplicate_strings(values: Iterable[str]) -> tuple[str, ...]:
+    """Return sorted duplicates in one pass rather than repeated tuple scans."""
+    seen: set[str] = set()
+    duplicates: set[str] = set()
+    for value in values:
+        if value in seen:
+            duplicates.add(value)
+        else:
+            seen.add(value)
+    return tuple(sorted(duplicates))
+
+
 def _value_fingerprint(value: Any) -> str:
     if isinstance(value, bytes):
         return hashlib.sha256(value).hexdigest()
@@ -999,7 +1012,7 @@ def prepare_csv_semantic_ir_candidate(
             propositions.append(proposition)
 
     proposition_ids = tuple(item.proposition_id for item in propositions)
-    duplicates = tuple(sorted({value for value in proposition_ids if proposition_ids.count(value) > 1}))
+    duplicates = _duplicate_strings(proposition_ids)
     aggregate_errors.extend(f"duplicate_proposition_id:{value}" for value in duplicates)
 
     state_after = _directory_state_fingerprint(directory, safe_id)
@@ -1110,7 +1123,7 @@ def validate_csv_semantic_ir_candidate(
                     errors.append(f"semantic_ir_evidence_ref_contract_missing:{token}")
 
     ids = tuple(item.proposition_id for item in obj.propositions)
-    duplicate_ids = tuple(sorted({value for value in ids if ids.count(value) > 1}))
+    duplicate_ids = _duplicate_strings(ids)
     errors.extend(f"duplicate_proposition_id:{value}" for value in duplicate_ids)
 
     if obj.ir_version != CSV_SEMANTIC_IR_VERSION:

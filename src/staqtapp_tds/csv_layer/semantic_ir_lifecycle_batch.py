@@ -159,6 +159,17 @@ def _canonical_hash(value: Any) -> str:
     return hashlib.sha256(_canonical_json_bytes(value)).hexdigest()
 
 
+def _duplicate_strings(values: tuple[str, ...]) -> list[str]:
+    seen: set[str] = set()
+    duplicates: set[str] = set()
+    for value in values:
+        if value in seen:
+            duplicates.add(value)
+        else:
+            seen.add(value)
+    return sorted(duplicates)
+
+
 def _request_projection(
     request: CSVSemanticIRTransitionRequest | Mapping[str, Any],
 ) -> dict[str, Any]:
@@ -1342,15 +1353,9 @@ def prepare_csv_semantic_ir_transition_batch(
     authorization_ids = tuple(
         item.request.authorization.authorization_id for item in items
     )
-    duplicate_transition_ids = sorted(
-        {value for value in transition_ids if transition_ids.count(value) > 1}
-    )
-    duplicate_proposition_ids = sorted(
-        {value for value in proposition_ids if proposition_ids.count(value) > 1}
-    )
-    duplicate_authorization_ids = sorted(
-        {value for value in authorization_ids if authorization_ids.count(value) > 1}
-    )
+    duplicate_transition_ids = _duplicate_strings(transition_ids)
+    duplicate_proposition_ids = _duplicate_strings(proposition_ids)
+    duplicate_authorization_ids = _duplicate_strings(authorization_ids)
     errors.extend(
         f"transition_batch_duplicate_transition_id:{value}"
         for value in duplicate_transition_ids

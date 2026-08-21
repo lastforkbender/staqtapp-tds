@@ -10,7 +10,7 @@ from staqtapp_tds.tds_filesystem import TDSDirectory
 
 from .artifacts import CSVDialectFingerprint, CSVRoundTripReport
 from .dialect import dialect_to_csv_kwargs
-from .manifest import artifact_keys, read_rows, sha256_hex
+from .manifest import artifact_keys, iter_rows, sha256_hex
 from .importer import load_csv_manifest
 
 
@@ -28,7 +28,6 @@ def export_canonical_csv(directory: TDSDirectory, csv_id: str, *, lineterminator
     manifest = load_csv_manifest(directory, csv_id)
     text = export_original_csv(directory, csv_id)
     dialect = manifest.dialect
-    rows = read_rows(text, dialect)
     out = io.StringIO()
     kwargs = dialect_to_csv_kwargs(CSVDialectFingerprint(
         delimiter=dialect.delimiter,
@@ -43,7 +42,9 @@ def export_canonical_csv(directory: TDSDirectory, csv_id: str, *, lineterminator
         source="canonical-export",
     ))
     writer = csv.writer(out, lineterminator=lineterminator, **kwargs)
-    writer.writerows(rows)
+    # csv.writer accepts an iterator.  Keeping rows lazy avoids a second
+    # complete in-memory representation of large CSV sources.
+    writer.writerows(iter_rows(text, dialect))
     return out.getvalue()
 
 

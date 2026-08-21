@@ -8,17 +8,54 @@ import pytest
 from staqtapp_tds.generation.generation_contract import (
     GENERATION_AUTHORITY,
     GenerationFault,
+    GenerationPayload,
 )
 from staqtapp_tds.generation.generation_store import (
     FAILURE_BOUNDARIES,
     AtomicGenerationStore,
     GenerationPublicationConflict,
     GenerationStoreError,
+    _find_payload_identity,
 )
 
 
 class InjectedFailure(RuntimeError):
     pass
+
+
+class CountingPayloads:
+    def __init__(self, values):
+        self.values = values
+        self.accesses = 0
+
+    def __len__(self):
+        return len(self.values)
+
+    def __getitem__(self, index):
+        self.accesses += 1
+        return self.values[index]
+
+
+def test_manifest_payload_lookup_is_logarithmic():
+    payloads = tuple(
+        GenerationPayload(
+            name=f"chunk-{index:05d}",
+            media_type="application/octet-stream",
+            size=0,
+            content_root="sha256:" + "0" * 64,
+        )
+        for index in range(4096)
+    )
+    counted = CountingPayloads(payloads)
+
+    found = _find_payload_identity(counted, "chunk-04095")
+
+    assert found is payloads[-1]
+    assert counted.accesses <= 14
+
+    counted.accesses = 0
+    assert _find_payload_identity(counted, "chunk-missing") is None
+    assert counted.accesses <= 14
 
 
 def candidate(
@@ -60,6 +97,8 @@ def test_publish_current_and_exact_authoritative_roundtrip(tmp_path: Path):
         assert lease.generation_root == result.manifest.generation_root
         assert lease.read_payload("source") == b"id,name\n1,Ada\n"
         assert lease.read_payload("offsets") == (14).to_bytes(8, "little")
+        with pytest.raises(KeyError):
+            lease.read_payload(None)  # type: ignore[arg-type]
     assert store.pin_count(result.manifest.generation_root) == 0
     assert GENERATION_AUTHORITY.semantic_authority is False
 

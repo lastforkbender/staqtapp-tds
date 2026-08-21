@@ -18,15 +18,16 @@ from typing import Any
 from staqtapp_tds.result import TDSResult
 from staqtapp_tds.tds_filesystem import TDSDirectory
 
-from .artifacts import CSVDialectFingerprint
+from .artifacts import CSVDialectFingerprint, CSVRowOffsetMap
 from .importer import load_csv_manifest
 from .manifest import artifact_keys, validate_csv_id
 from .row_offsets import pack_csv_row_offsets
 from .scanner import (
     CSVRowAnchorProfile,
-    scan_csv_row_anchors,
-    validate_csv_row_anchors,
-    validate_csv_scan_profile,
+    _compare_row_anchors_to_artifacts,
+    _compare_scan_profile_to_artifacts,
+    _row_anchors_from_scan_profile,
+    scan_csv_bytes,
 )
 from .native_scan import (
     CSV_NATIVE_SCAN_KERNEL_BACKEND,
@@ -414,10 +415,32 @@ def prepare_csv_native_row_anchor_kernel(
         raw_value = directory.read_value(artifact_keys(safe_id)["raw"])
         if not isinstance(raw_value, str):
             raise TypeError("CSV raw artifact is not text")
+        row_value = directory.read_value(artifact_keys(safe_id)["row_offsets"])
+        if not isinstance(row_value, dict):
+            raise TypeError("CSV row-offset artifact is not a JSON object")
+        row_map = CSVRowOffsetMap.from_mapping(row_value)
         raw = raw_value.encode(manifest.encoding)
-        reference_profile = scan_csv_row_anchors(raw, manifest.dialect, encoding=manifest.encoding, chunk_size=chunk_size)
-        scan_parity = validate_csv_scan_profile(directory, safe_id, chunk_size=chunk_size)
-        row_anchor_parity = validate_csv_row_anchors(directory, safe_id, chunk_size=chunk_size)
+        reference_scan = scan_csv_bytes(
+            raw,
+            manifest.dialect,
+            encoding=manifest.encoding,
+            chunk_size=chunk_size,
+        )
+        reference_profile = _row_anchors_from_scan_profile(raw, reference_scan)
+        scan_parity = _compare_scan_profile_to_artifacts(
+            safe_id,
+            reference_scan,
+            manifest,
+            row_map,
+            chunk_size=chunk_size,
+        )
+        row_anchor_parity = _compare_row_anchors_to_artifacts(
+            safe_id,
+            reference_profile,
+            manifest,
+            row_map,
+            chunk_size=chunk_size,
+        )
     except Exception as exc:
         return _empty_native_row_anchor_report(
             safe_id,

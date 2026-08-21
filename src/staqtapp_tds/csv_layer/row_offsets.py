@@ -122,11 +122,27 @@ def build_row_offset_map(
     raw: bytes | None = None,
 ) -> CSVRowOffsetMap:
     source = raw if raw is not None else text.encode(encoding)
+    return _build_row_offset_map_from_bytes(
+        source,
+        dialect,
+        encoding=encoding,
+        source_hash=hashlib.sha256(source).hexdigest(),
+    )
+
+
+def _build_row_offset_map_from_bytes(
+    source: bytes,
+    dialect: CSVDialectFingerprint,
+    *,
+    encoding: str,
+    source_hash: str,
+) -> CSVRowOffsetMap:
+    """Build a row map from bytes whose digest was computed by this workflow."""
     offsets = logical_record_offsets_bytes(source, dialect, encoding=encoding)
     return CSVRowOffsetMap(
         encoding=encoding,
         row_offsets=offsets,
         row_count=len(offsets),
-        source_hash=hashlib.sha256(source).hexdigest(),
+        source_hash=source_hash,
         logical_records=True,
     )

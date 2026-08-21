@@ -13,6 +13,7 @@ from staqtapp_tds.csv_layer import (
     scan_csv_row_anchors,
     validate_materialized_csv_scan_artifacts,
 )
+from staqtapp_tds.csv_layer.manifest import artifact_keys
 
 
 class CountingDirectory(TDSDirectory):
@@ -31,7 +32,7 @@ class CountingDirectory(TDSDirectory):
 
 
 def test_version_333_csv_scan_artifact_materialization():
-    assert __version__ == "3.8.1"
+    assert __version__ == "3.8.2"
 
 
 def test_csv_scan_artifacts_materialize_as_optional_derived_artifacts():
@@ -148,3 +149,49 @@ def test_csv_scan_materialization_fails_closed_before_writing_when_core_artifact
         pass
     else:
         raise AssertionError("scan profile should not be written when core artifacts drift")
+
+
+def test_csv_scan_materialization_cannot_be_redirected_by_manifest_keys():
+    fs = TDSFileSystem("root")
+    manifest = import_csv_bytes(
+        fs.root,
+        b"a,b\n1,2\n3,4\n",
+        source_name="redirected_offsets.csv",
+    )
+    core_keys = artifact_keys(manifest.csv_id)
+    valid_offsets = fs.root.read_value(core_keys["row_offsets"])
+    attacker_key = f"csv__{manifest.csv_id}__attacker_offsets.json"
+    fs.root.write_json(
+        attacker_key,
+        valid_offsets,
+        overwrite=True,
+        provenance="DERIVED",
+    )
+
+    stored_manifest = fs.root.read_value(core_keys["manifest"])
+    stored_manifest["artifact_keys"]["row_offsets"] = attacker_key
+    fs.root.write_json(
+        core_keys["manifest"],
+        stored_manifest,
+        overwrite=True,
+        provenance="DERIVED",
+    )
+    corrupt_offsets = dict(valid_offsets)
+    corrupt_offsets["row_offsets"] = [0, 1, 2]
+    fs.root.write_json(
+        core_keys["row_offsets"],
+        corrupt_offsets,
+        overwrite=True,
+        provenance="DERIVED",
+    )
+
+    report = materialize_csv_scan_artifacts(
+        fs.root,
+        manifest.csv_id,
+        include_row_anchors=True,
+        chunk_size=2,
+    )
+
+    assert report.ok is False
+    assert report.write_count == 0
+    assert "scan_row_offsets_mismatch" in report.errors
