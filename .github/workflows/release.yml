@@ -1598,7 +1598,7 @@ jobs:
       inputs.qualified_run_id == '32485115821' &&
       inputs.controller_run_id == '32485555450' &&
       inputs.controller_run_attempt == '1' &&
-      inputs.release_run_id != ''
+      inputs.release_run_id == '32493678825'
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -1725,6 +1725,7 @@ jobs:
     name: >-
       ${{ matrix.os }} v3.8.2 ${{ inputs.mode == 'v382_postpublish_resume' && 'no-upload finalization' || 'recovery PyPI' }} smoke
     if: >-
+      always() &&
       needs.v382-recovery-verify.result == 'success' &&
       github.event_name == 'workflow_dispatch' &&
       github.ref_type == 'branch' &&
