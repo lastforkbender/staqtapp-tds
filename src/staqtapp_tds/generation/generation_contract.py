@@ -73,7 +73,7 @@ class GenerationContractError(ValueError):
 
 
 def _require_int(name: str, value: int, minimum: int, maximum: int) -> int:
-    if isinstance(value, bool) or not isinstance(value, int):
+    if type(value) is not int:
         raise GenerationContractError(f"{name} must be an integer")
     if value < minimum or value > maximum:
         raise GenerationContractError(
@@ -84,7 +84,7 @@ def _require_int(name: str, value: int, minimum: int, maximum: int) -> int:
 
 
 def _require_name(name: str, value: str) -> str:
-    if not isinstance(value, str) or not _NAME_RE.fullmatch(value):
+    if type(value) is not str or not _NAME_RE.fullmatch(value):
         raise GenerationContractError(f"{name} is not canonical")
     return value
 
@@ -92,7 +92,7 @@ def _require_name(name: str, value: str) -> str:
 def require_root(name: str, value: str | None, *, optional: bool = False) -> str | None:
     if optional and value is None:
         return None
-    if not isinstance(value, str) or not _ROOT_RE.fullmatch(value):
+    if type(value) is not str or not _ROOT_RE.fullmatch(value):
         raise GenerationContractError(
             f"{name} must be a canonical sha256 root",
             fault=GenerationFault.IDENTITY_MISMATCH,
@@ -111,13 +111,21 @@ def canonical_json_bytes(value: Mapping[str, Any] | Sequence[Any]) -> bytes:
 
 
 def canonical_root(domain: str, value: Mapping[str, Any] | Sequence[Any]) -> str:
+    return canonical_root_bytes(domain, canonical_json_bytes(value))
+
+
+def canonical_root_bytes(domain: str, encoded: bytes) -> str:
+    """Hash an already canonical JSON representation under ``domain``."""
+
     domain_bytes = _require_name("root domain", domain).encode("ascii")
-    digest = hashlib.sha256(_DOMAIN + domain_bytes + b"\x00" + canonical_json_bytes(value))
+    if type(encoded) is not bytes:
+        raise GenerationContractError("canonical root input must be exact bytes")
+    digest = hashlib.sha256(_DOMAIN + domain_bytes + b"\x00" + encoded)
     return f"sha256:{digest.hexdigest()}"
 
 
 def bytes_root(data: bytes) -> str:
-    if not isinstance(data, bytes):
+    if type(data) is not bytes:
         raise GenerationContractError("payload data must be exact bytes")
     return f"sha256:{hashlib.sha256(data).hexdigest()}"
 
@@ -182,7 +190,7 @@ class GenerationPayload:
         _require_name("payload media_type", self.media_type)
         _require_int("payload size", self.size, 0, _UINT63_MAX)
         require_root("payload content_root", self.content_root)
-        if not isinstance(self.authoritative, bool):
+        if type(self.authoritative) is not bool:
             raise GenerationContractError("payload authoritative must be boolean")
 
     def canonical_dict(self) -> dict[str, Any]:
@@ -234,8 +242,14 @@ class QualificationRoot:
         return cls(name=value["name"], evidence_root=value["evidence_root"])
 
 
+class _ManifestRootCacheSlots:
+    """Private derived roots that are not part of the dataclass contract."""
+
+    __slots__ = ("_generation_root_cache", "_manifest_root_cache")
+
+
 @dataclass(frozen=True, slots=True)
-class GenerationManifest:
+class GenerationManifest(_ManifestRootCacheSlots):
     namespace: str
     parent_generation_root: str | None
     payloads: tuple[GenerationPayload, ...]
@@ -246,45 +260,69 @@ class GenerationManifest:
     contract_id: str = GENERATION_CONTRACT_ID
 
     def __post_init__(self) -> None:
+        if type(self) is not GenerationManifest:
+            raise GenerationContractError("manifest must be an exact GenerationManifest")
         _require_name("namespace", self.namespace)
         require_root(
             "parent_generation_root",
             self.parent_generation_root,
             optional=True,
         )
+        if type(self.format_version) is not int:
+            raise GenerationContractError("generation format version must be an integer")
         if self.format_version != GENERATION_FORMAT_VERSION:
             raise GenerationContractError("unsupported generation format version")
-        if self.contract_id != GENERATION_CONTRACT_ID:
+        if type(self.contract_id) is not str or self.contract_id != GENERATION_CONTRACT_ID:
             raise GenerationContractError("unsupported generation contract")
-        if not isinstance(self.payloads, tuple) or not self.payloads:
+        if type(self.payloads) is not tuple or not self.payloads:
             raise GenerationContractError("generation requires at least one payload")
-        if not isinstance(self.qualifications, tuple):
+        if any(type(item) is not GenerationPayload for item in self.payloads):
+            raise GenerationContractError(
+                "payloads must contain exact immutable GenerationPayload records"
+            )
+        if type(self.qualifications) is not tuple:
             raise GenerationContractError("qualifications must be a tuple")
-        if not isinstance(self.metadata, tuple):
+        if any(type(item) is not QualificationRoot for item in self.qualifications):
+            raise GenerationContractError(
+                "qualifications must contain exact immutable QualificationRoot records"
+            )
+        if type(self.metadata) is not tuple:
             raise GenerationContractError("metadata must be a tuple")
-        if tuple(sorted(self.payloads, key=lambda item: item.name)) != self.payloads:
+        if type(self.limits) is not QualifiedGenerationLimits:
             raise GenerationContractError(
-                "payloads must be sorted by canonical name",
-                fault=GenerationFault.NONCANONICAL,
+                "limits must be an exact immutable QualifiedGenerationLimits"
             )
-        payload_names = tuple(item.name for item in self.payloads)
-        if len(set(payload_names)) != len(payload_names):
-            raise GenerationContractError("duplicate payload name")
-        if tuple(sorted(self.qualifications, key=lambda item: item.name)) != self.qualifications:
-            raise GenerationContractError(
-                "qualifications must be sorted by canonical name",
-                fault=GenerationFault.NONCANONICAL,
-            )
-        qualification_names = tuple(item.name for item in self.qualifications)
-        if len(set(qualification_names)) != len(qualification_names):
-            raise GenerationContractError("duplicate qualification name")
+        previous_name: str | None = None
+        for item in self.payloads:
+            name = item.name
+            if previous_name is not None:
+                if name < previous_name:
+                    raise GenerationContractError(
+                        "payloads must be sorted by canonical name",
+                        fault=GenerationFault.NONCANONICAL,
+                    )
+                if name == previous_name:
+                    raise GenerationContractError("duplicate payload name")
+            previous_name = name
+        previous_name = None
+        for item in self.qualifications:
+            name = item.name
+            if previous_name is not None:
+                if name < previous_name:
+                    raise GenerationContractError(
+                        "qualifications must be sorted by canonical name",
+                        fault=GenerationFault.NONCANONICAL,
+                    )
+                if name == previous_name:
+                    raise GenerationContractError("duplicate qualification name")
+            previous_name = name
         normalized_metadata: list[tuple[str, str]] = []
         for entry in self.metadata:
             if (
-                not isinstance(entry, tuple)
+                type(entry) is not tuple
                 or len(entry) != 2
-                or not isinstance(entry[0], str)
-                or not isinstance(entry[1], str)
+                or type(entry[0]) is not str
+                or type(entry[1]) is not str
             ):
                 raise GenerationContractError("metadata entries must be string pairs")
             key = _require_name("metadata key", entry[0])
@@ -292,13 +330,17 @@ class GenerationManifest:
             if not value or value != value.strip() or len(value.encode("utf-8")) > 4096:
                 raise GenerationContractError("metadata value is not canonical")
             normalized_metadata.append((key, value))
-        if tuple(sorted(normalized_metadata)) != self.metadata:
-            raise GenerationContractError(
-                "metadata must be sorted and unique",
-                fault=GenerationFault.NONCANONICAL,
-            )
-        if len({key for key, _ in self.metadata}) != len(self.metadata):
-            raise GenerationContractError("duplicate metadata key")
+        previous_entry: tuple[str, str] | None = None
+        for entry in normalized_metadata:
+            if previous_entry is not None:
+                if entry < previous_entry:
+                    raise GenerationContractError(
+                        "metadata must be sorted and unique",
+                        fault=GenerationFault.NONCANONICAL,
+                    )
+                if entry[0] == previous_entry[0]:
+                    raise GenerationContractError("duplicate metadata key")
+            previous_entry = entry
         if len(self.payloads) > self.limits.max_payloads:
             raise GenerationContractError(
                 "payload count exceeds qualified limit",
@@ -333,10 +375,60 @@ class GenerationManifest:
             raise GenerationContractError(
                 "a generation may declare at most one authoritative source payload"
             )
-        if len(self.canonical_bytes()) > self.limits.max_manifest_bytes:
+        manifest_bytes = self.canonical_bytes()
+        if len(manifest_bytes) > self.limits.max_manifest_bytes:
             raise GenerationContractError(
                 "manifest exceeds qualified limit",
                 fault=GenerationFault.BOUND_EXCEEDED,
+            )
+        # Root identities are pure functions of this frozen record.  Computing
+        # them once prevents lifecycle construction, publication, pinning, and
+        # chunk reads from repeatedly serializing and hashing a large manifest.
+        manifest_root = canonical_root_bytes("manifest", manifest_bytes)
+        object.__setattr__(self, "_manifest_root_cache", manifest_root)
+        object.__setattr__(
+            self,
+            "_generation_root_cache",
+            canonical_root(
+                "generation",
+                {
+                    "manifest_root": manifest_root,
+                    "namespace": self.namespace,
+                    "parent_generation_root": self.parent_generation_root,
+                    "payload_roots": [item.payload_root for item in self.payloads],
+                    "qualification_roots": [
+                        item.qualification_root for item in self.qualifications
+                    ],
+                },
+            ),
+        )
+
+    def _ensure_root_caches(self) -> None:
+        """Restore private derived slots omitted by copy/pickle protocols."""
+
+        try:
+            object.__getattribute__(self, "_generation_root_cache")
+        except AttributeError:
+            manifest_bytes = self.canonical_bytes()
+            manifest_root = canonical_root_bytes("manifest", manifest_bytes)
+            object.__setattr__(self, "_manifest_root_cache", manifest_root)
+            object.__setattr__(
+                self,
+                "_generation_root_cache",
+                canonical_root(
+                    "generation",
+                    {
+                        "manifest_root": manifest_root,
+                        "namespace": self.namespace,
+                        "parent_generation_root": self.parent_generation_root,
+                        "payload_roots": [
+                            item.payload_root for item in self.payloads
+                        ],
+                        "qualification_roots": [
+                            item.qualification_root for item in self.qualifications
+                        ],
+                    },
+                ),
             )
 
     def canonical_dict(self) -> dict[str, Any]:
@@ -358,22 +450,13 @@ class GenerationManifest:
 
     @property
     def manifest_root(self) -> str:
-        return canonical_root("manifest", self.canonical_dict())
+        self._ensure_root_caches()
+        return self._manifest_root_cache
 
     @property
     def generation_root(self) -> str:
-        return canonical_root(
-            "generation",
-            {
-                "manifest_root": self.manifest_root,
-                "namespace": self.namespace,
-                "parent_generation_root": self.parent_generation_root,
-                "payload_roots": [item.payload_root for item in self.payloads],
-                "qualification_roots": [
-                    item.qualification_root for item in self.qualifications
-                ],
-            },
-        )
+        self._ensure_root_caches()
+        return self._generation_root_cache
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> "GenerationManifest":
@@ -722,10 +805,15 @@ def build_lifecycle_chain(
     target = GENERATION_LIFECYCLE.index(through.value)
     result: list[GenerationLifecycleReceipt] = []
     predecessor: str | None = None
+    # The manifest is immutable.  Its roots can be expensive for chunked
+    # generations because they bind every payload identity, so compute each
+    # root once for the complete receipt chain rather than once per state.
+    generation_root = manifest.generation_root
+    manifest_root = manifest.manifest_root
     for sequence, state_value in enumerate(GENERATION_LIFECYCLE[: target + 1]):
         receipt = GenerationLifecycleReceipt(
-            generation_root=manifest.generation_root,
-            manifest_root=manifest.manifest_root,
+            generation_root=generation_root,
+            manifest_root=manifest_root,
             state=GenerationState(state_value),
             sequence=sequence,
             predecessor_receipt_root=predecessor,
@@ -755,6 +843,8 @@ def validate_lifecycle_chain(
             fault=GenerationFault.INCOMPLETE_GENERATION,
         )
     predecessor: str | None = None
+    generation_root = manifest.generation_root
+    manifest_root = manifest.manifest_root
     for index, state_value in enumerate(expected_states):
         receipt = receipts[index]
         if receipt.state.value != state_value or receipt.sequence != index:
@@ -763,8 +853,8 @@ def validate_lifecycle_chain(
                 fault=GenerationFault.NONCANONICAL,
             )
         if (
-            receipt.generation_root != manifest.generation_root
-            or receipt.manifest_root != manifest.manifest_root
+            receipt.generation_root != generation_root
+            or receipt.manifest_root != manifest_root
             or receipt.predecessor_receipt_root != predecessor
         ):
             raise GenerationContractError(

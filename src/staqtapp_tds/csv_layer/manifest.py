@@ -11,7 +11,7 @@ from typing import Iterable, Iterator
 
 from .artifacts import CSVImportManifest, CSVImportReport, CSV_LAYER_VERSION
 from .dialect import CSVDialectFingerprint, dialect_to_csv_kwargs
-from .row_offsets import build_row_offset_map
+from .row_offsets import _build_row_offset_map_from_bytes
 
 CSV_ID_MAX_LENGTH = 128
 _CSV_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
@@ -54,9 +54,14 @@ def sha256_hex(data: bytes) -> str:
 
 
 def safe_csv_id(source_name: str, raw: bytes) -> str:
+    return _safe_csv_id_from_hash(source_name, sha256_hex(raw))
+
+
+def _safe_csv_id_from_hash(source_name: str, raw_hash: str) -> str:
+    """Build a safe ID from an already-computed authoritative-byte hash."""
     stem = Path(source_name or "csv_source").stem or "csv_source"
     safe = _SAFE_ID_RE.sub("_", stem).strip("._-") or "csv_source"
-    suffix = sha256_hex(raw)[:12]
+    suffix = raw_hash[:12]
     max_stem = max(1, CSV_ID_MAX_LENGTH - len(suffix) - 1)
     safe = safe[:max_stem].rstrip("._-") or "csv_source"
     return validate_csv_id(f"{safe}_{suffix}")
@@ -110,11 +115,26 @@ def build_manifest(
     csv_id: str | None = None,
 ) -> tuple[CSVImportManifest, CSVImportReport, dict[str, object]]:
     """Build manifest/report/hash artifacts without touching storage."""
-    real_csv_id = validate_csv_id(csv_id) if csv_id is not None else safe_csv_id(source_name, raw)
-    keys = artifact_keys(real_csv_id)
-    row_offsets = build_row_offset_map(text, dialect, encoding=encoding, raw=raw)
-    row_count, column_count = row_count_and_column_count(text, dialect)
+    # The source identity is shared by the generated ID, row-offset map,
+    # manifest, report, and content-hash artifact.  Compute it once rather than
+    # making three full passes over large sources.
+    # Reject an explicit unsafe identifier before performing an O(n) source
+    # hash. Valid requests still share exactly one authoritative digest.
+    validated_csv_id = validate_csv_id(csv_id) if csv_id is not None else None
     raw_hash = sha256_hex(raw)
+    real_csv_id = (
+        validated_csv_id
+        if validated_csv_id is not None
+        else _safe_csv_id_from_hash(source_name, raw_hash)
+    )
+    keys = artifact_keys(real_csv_id)
+    row_offsets = _build_row_offset_map_from_bytes(
+        raw,
+        dialect,
+        encoding=encoding,
+        source_hash=raw_hash,
+    )
+    row_count, column_count = row_count_and_column_count(text, dialect)
     warnings: list[str] = []
     if row_offsets.row_count != row_count:
         warnings.append("row_offset_count_differs_from_csv_reader_count")

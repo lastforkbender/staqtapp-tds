@@ -88,6 +88,17 @@ class EntryIndex:
     def stats(self) -> Any:
         return self._impl.stats() if hasattr(self._impl, "stats") else EntryIndexStats(self.backend_name, len(self), -1, -1)
 
+    def telemetry_stats(self) -> Tuple[Any, dict]:
+        """Return index and execution stats from one backend observation.
+
+        Native backends use one full table scan to shape both views. Portable
+        or third-party backends retain the existing independent-method fallback.
+        """
+        if hasattr(self._impl, "telemetry_stats"):
+            stats, execution = self._impl.telemetry_stats()
+            return stats, dict(execution)
+        return self.stats(), self.native_execution_stats()
+
     def native_execution_stats(self) -> dict:
         if hasattr(self._impl, "native_execution_stats"):
             return dict(self._impl.native_execution_stats())

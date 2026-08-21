@@ -4,6 +4,7 @@ include V353_POST1_PYPI_PRESENTATION_STATUS.txt
 recursive-include src *.py *.c *.h *.html *.css *.js *.svg *.json
 recursive-include docs *
 recursive-include examples *
+recursive-include benchmarks *.py
 recursive-include scripts *
 recursive-include tools *
 recursive-include tds_api_docs *

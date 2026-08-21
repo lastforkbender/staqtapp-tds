@@ -24,8 +24,14 @@ from .contract import (
 from .plans import EaglegatePlan, EaglegateSpeculationEpoch
 
 
+class _RequestRootCacheSlot:
+    """Keep the derived root out of dataclass fields and canonical payloads."""
+
+    __slots__ = ("_request_class_root_cache",)
+
+
 @dataclass(frozen=True, slots=True)
-class EaglegateRequestClass:
+class EaglegateRequestClass(_RequestRootCacheSlot):
     identity_root: str
     sampler_class: EaglegateSamplerClass
     batch_size: int
@@ -44,6 +50,11 @@ class EaglegateRequestClass:
         _int("kv_pressure_ppm", self.kv_pressure_ppm, 0, 1_000_000)
         _int("request_bucket", self.request_bucket, 0, 9_999)
         _ascii("deadline_class", self.deadline_class)
+        object.__setattr__(
+            self,
+            "_request_class_root_cache",
+            _canonical_root("request-class", self.canonical_dict()),
+        )
 
     def canonical_dict(self) -> dict[str, Any]:
         return {
@@ -61,7 +72,12 @@ class EaglegateRequestClass:
 
     @property
     def request_class_root(self) -> str:
-        return _canonical_root("request-class", self.canonical_dict())
+        try:
+            return self._request_class_root_cache
+        except AttributeError:
+            value = _canonical_root("request-class", self.canonical_dict())
+            object.__setattr__(self, "_request_class_root_cache", value)
+            return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,7 +175,7 @@ def evaluate_admission(
         raise EaglegateContractError("invalid admission value type")
     epoch_root = epoch.epoch_root
     request_root = request.request_class_root
-    identity_root = epoch.identity.identity_root
+    identity_root = epoch.identity_root
     if (
         request.identity_root != identity_root
         or health.identity_root != identity_root

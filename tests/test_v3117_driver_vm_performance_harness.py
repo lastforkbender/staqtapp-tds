@@ -83,7 +83,7 @@ def _native_runner_alias(package, snapshot, policy):
 
 
 def test_v3117_version():
-    assert __version__ == "3.8.1"
+    assert __version__ == "3.8.2"
 
 
 def test_performance_harness_is_opt_in_and_not_a_hot_path_hook():
@@ -96,6 +96,7 @@ def test_performance_harness_is_opt_in_and_not_a_hot_path_hook():
     assert matrix["auto_runs_in_driver_vm_execute"] is False
     assert matrix["auto_runs_in_runtime_manager"] is False
     assert matrix["normal_python_vm_hot_path_changed"] is False
+    assert matrix["normal_python_vm_hot_path_instrumented_by_harness"] is False
     assert matrix["future_native_c_conversion_target"] is True
     assert matrix["approve_driver"] is False
     assert matrix["call_registry_approve"] is False

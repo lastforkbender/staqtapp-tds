@@ -53,6 +53,7 @@ FILE_HDR_SIZE    = struct.calcsize(FILE_HDR_FMT)    # 44 bytes
 SLOT_FIXED_FMT   = '>QQIHH'
 SLOT_FIXED_SIZE  = struct.calcsize(SLOT_FIXED_FMT)  # 24 bytes
 _DETACH_READER_SNAPSHOTS = os.name == 'nt'
+_PERSIST_WRITE_BUFFER_SIZE = 1024 * 1024
 
 
 class TDSPersistenceIntegrityError(ValueError):
@@ -82,6 +83,40 @@ def _write_all(fd: int, data: bytes | bytearray | memoryview) -> None:
         if n <= 0:
             _raise_integrity(TDSResultCode.PERSIST_WRITE_ERROR, "Short write while emitting TDS persistence file", written=written, expected=total)
         written += n
+
+
+def _write_chunks_buffered(
+    fd: int,
+    chunks,
+    *,
+    buffer_size: int = _PERSIST_WRITE_BUFFER_SIZE,
+) -> None:
+    """Write a chunk sequence with bounded memory and buffered syscalls.
+
+    ``chunks`` may contain the fixed header, immutable payload byte strings,
+    and index bytes.  The buffered file object caps aggregation memory while
+    avoiding both a full-file join/copy and one system call per small slot.
+    ``closefd=False`` leaves ownership of the descriptor with the caller so it
+    can retain the existing fsync/close discipline.
+    """
+    stream = os.fdopen(fd, 'wb', buffering=max(1, int(buffer_size)), closefd=False)
+    try:
+        for data in chunks:
+            view = memoryview(data)
+            written = 0
+            while written < len(view):
+                n = stream.write(view[written:])
+                if n is None or n <= 0:
+                    _raise_integrity(
+                        TDSResultCode.PERSIST_WRITE_ERROR,
+                        "Short buffered write while emitting TDS persistence file",
+                        written=written,
+                        expected=len(view),
+                    )
+                written += n
+        stream.flush()
+    finally:
+        stream.close()
 
 
 def _fsync_parent_dir(path: Path) -> None:
@@ -289,7 +324,11 @@ class SlotIndex:
         return b''.join(parts)
 
     @classmethod
-    def from_bytes(cls, buf: bytes, slot_count: int) -> 'SlotIndex':
+    def from_bytes(
+        cls,
+        buf: bytes | bytearray | memoryview,
+        slot_count: int,
+    ) -> 'SlotIndex':
         """Parse a v1 slot index with fail-closed structural validation.
 
         Older builds silently stopped when a fixed record was missing and sliced
@@ -299,7 +338,11 @@ class SlotIndex:
         match the key, names must be unique, and no trailing bytes are accepted.
         """
         idx = cls()
-        mv = memoryview(buf)
+        # Reuse a caller-owned view rather than exporting a second pointer from
+        # an mmap.  The caller can then deterministically release its one view
+        # even when structural validation raises and retains this frame in the
+        # exception traceback.
+        mv = buf if isinstance(buf, memoryview) else memoryview(buf)
         cursor = 0
         seen: set[str] = set()
         for record_no in range(int(slot_count)):
@@ -378,7 +421,10 @@ class TDSReader:
         self.path = Path(path)
         if not self.path.exists():
             raise FileNotFoundError(f"TDS file not found: {self.path}")
-        self._lock  = threading.Lock()
+        # Reads bind index, sidecar metadata, and backing bytes to one snapshot.
+        # Reload therefore cannot splice a record/hash from one epoch onto the
+        # mmap from another epoch.
+        self._lock  = threading.RLock()
         self._f:  Any = None
         self._mm: Any = None
         self._hdr: dict = {}
@@ -386,6 +432,8 @@ class TDSReader:
         self._file_size = 0
         self._sidecar_meta: dict[str, Any] = {}
         self._entry_meta: dict[str, dict[str, Any]] = {}
+        self._meta_by_slot: dict[str, dict[str, Any]] = {}
+        self._meta_by_short_name: dict[str, dict[str, Any]] = {}
         self._open()
 
     def _open(self) -> None:
@@ -433,6 +481,10 @@ class TDSReader:
         handle = self._f
         self._mm = None
         self._f = None
+        self._close_backing_handles(backing, handle)
+
+    @staticmethod
+    def _close_backing_handles(backing: Any, handle: Any) -> None:
         try:
             close_backing = getattr(backing, 'close', None)
             if close_backing is not None:
@@ -469,8 +521,13 @@ class TDSReader:
     def _load_index(self) -> SlotIndex:
         idx_off = int(self._hdr['index_offset'])
         slot_count = int(self._hdr['slot_count'])
-        idx_bytes = bytes(self._mm[idx_off:self._file_size])
-        return SlotIndex.from_bytes(idx_bytes, slot_count)
+        backing_view = memoryview(self._mm)
+        index_view = backing_view[idx_off:self._file_size]
+        try:
+            return SlotIndex.from_bytes(index_view, slot_count)
+        finally:
+            index_view.release()
+            backing_view.release()
 
     def _validate_slot_geometry(self) -> None:
         data_off = int(self._hdr['data_offset'])
@@ -490,11 +547,17 @@ class TDSReader:
 
     def _load_sidecar(self) -> None:
         meta_path = self.path.with_suffix('.tds.meta')
-        self._sidecar_meta = {}
-        self._entry_meta = {}
+        sidecar_meta: dict[str, Any] = {}
+        entry_meta: dict[str, dict[str, Any]] = {}
+        meta_by_slot: dict[str, dict[str, Any]] = {}
+        meta_by_short_name: dict[str, dict[str, Any]] = {}
         if not meta_path.exists():
             if int(self._hdr.get('version', 1)) >= 2:
                 _raise_integrity(TDSResultCode.PERSIST_SIDECAR_CORRUPT, 'Required TDS v2 integrity sidecar is missing', meta_path=str(meta_path))
+            self._sidecar_meta = sidecar_meta
+            self._entry_meta = entry_meta
+            self._meta_by_slot = meta_by_slot
+            self._meta_by_short_name = meta_by_short_name
             return
         try:
             meta, _json_backend = loads_strict(meta_path.read_bytes(), expected_type=dict)
@@ -524,34 +587,81 @@ class TDSReader:
         entries = meta.get('entries', {}) or {}
         if not isinstance(entries, dict):
             _raise_integrity(TDSResultCode.PERSIST_SIDECAR_CORRUPT, "TDS sidecar entries field is not an object", meta_path=str(meta_path))
-        self._sidecar_meta = meta
-        self._entry_meta = {str(k): dict(v) for k, v in entries.items() if isinstance(v, dict)}
+        sidecar_meta = meta
+        entry_meta = {
+            str(k): dict(v) for k, v in entries.items() if isinstance(v, dict)
+        }
+        # Sidecar metadata is immutable for the lifetime of this reader
+        # snapshot.  Index it once so random reads do not linearly scan every
+        # metadata record.  setdefault preserves the legacy first-match rule
+        # if a malformed/legacy sidecar repeats a slot_key.
+        for short_name, item_meta in entry_meta.items():
+            meta_by_short_name[short_name] = item_meta
+            slot_key = str(item_meta.get('slot_key', ''))
+            if slot_key:
+                meta_by_slot.setdefault(slot_key, item_meta)
+        # Publish the fully indexed metadata state only after construction.
+        self._sidecar_meta = sidecar_meta
+        self._entry_meta = entry_meta
+        self._meta_by_slot = meta_by_slot
+        self._meta_by_short_name = meta_by_short_name
 
     def reload(self) -> None:
+        old_backing: Any = None
+        old_handle: Any = None
         with self._lock:
-            self._release_backing()
-            self._open()
+            # Validate a complete replacement reader before publishing any of
+            # its state. A corrupt replacement therefore leaves this reader's
+            # existing snapshot usable instead of splicing/clearing fields.
+            replacement = TDSReader(self.path)
+            old_backing = self._mm
+            old_handle = self._f
+            for name in (
+                "_f",
+                "_mm",
+                "_hdr",
+                "_idx",
+                "_file_size",
+                "_sidecar_meta",
+                "_entry_meta",
+                "_meta_by_slot",
+                "_meta_by_short_name",
+            ):
+                setattr(self, name, getattr(replacement, name))
+            # Ownership of the validated backing moved to self. Detach the
+            # temporary object so later cleanup cannot close the live epoch.
+            replacement._f = None
+            replacement._mm = None
+        # No read can still reference the old mmap: every read copies its
+        # stored bytes while holding _lock. Closing after publication keeps the
+        # lock's critical section limited to validation and the atomic swap.
+        try:
+            self._close_backing_handles(old_backing, old_handle)
+        except Exception:
+            # Cleanup of an already superseded snapshot cannot make a
+            # successful, fully published reload appear to have failed.
+            pass
 
     def _short_name(self, slot_key: str) -> str:
         return slot_key.rsplit('/', 1)[-1]
 
     def _meta_for_slot(self, slot_key: str) -> dict[str, Any]:
-        for name, meta in self._entry_meta.items():
-            if str(meta.get('slot_key', '')) == slot_key:
-                return meta
-        return self._entry_meta.get(self._short_name(slot_key), {})
+        meta = self._meta_by_slot.get(slot_key)
+        if meta is not None:
+            return meta
+        return self._meta_by_short_name.get(self._short_name(slot_key), {})
 
     def _stored_payload(self, rec: SlotRecord) -> bytes:
-        data_base = int(self._hdr['data_offset'])
-        abs_off = data_base + int(rec.offset)
-        abs_end = abs_off + int(rec.length)
-        if abs_off < data_base or abs_end > int(self._hdr['index_offset']) or abs_end > self._file_size:
-            _raise_integrity(
-                TDSResultCode.PERSIST_SLOT_BOUNDS_ERROR,
-                "Slot payload range failed read-time bounds validation",
-                name=rec.name, abs_off=abs_off, abs_end=abs_end, index_offset=int(self._hdr['index_offset']), file_size=self._file_size,
-            )
         with self._lock:
+            data_base = int(self._hdr['data_offset'])
+            abs_off = data_base + int(rec.offset)
+            abs_end = abs_off + int(rec.length)
+            if abs_off < data_base or abs_end > int(self._hdr['index_offset']) or abs_end > self._file_size:
+                _raise_integrity(
+                    TDSResultCode.PERSIST_SLOT_BOUNDS_ERROR,
+                    "Slot payload range failed read-time bounds validation",
+                    name=rec.name, abs_off=abs_off, abs_end=abs_end, index_offset=int(self._hdr['index_offset']), file_size=self._file_size,
+                )
             payload = bytes(self._mm[abs_off:abs_end])
         if len(payload) != int(rec.length):
             _raise_integrity(
@@ -594,27 +704,53 @@ class TDSReader:
             )
         return None
 
-    def read(self, name: str, *, codec: str | None = None, content_hash: str | None = None) -> Any:
-        rec = self._idx.lookup(name)
-        if rec is None:
-            raise KeyError(f"Entry '{name}' not found in {self.path.name!r}")
-        meta = self._meta_for_slot(name)
-        effective_codec = str(codec if codec is not None else meta.get('codec', '') or '')
-        expected_hash = str(content_hash if content_hash is not None else meta.get('content_hash', '') or '')
-        stored = self._stored_payload(rec)
-        plain_raw = self._plain_payload_for_hash(stored, FmtID(rec.fmt_id), effective_codec)
+    def _snapshot_read_input(
+        self,
+        name: str,
+        *,
+        codec: str | None = None,
+        content_hash: str | None = None,
+    ) -> tuple[str, bytes, int, str, str]:
+        with self._lock:
+            rec = self._idx.lookup(name)
+            if rec is None:
+                raise KeyError(f"Entry '{name}' not found in {self.path.name!r}")
+            meta = self._meta_for_slot(name)
+            effective_codec = str(codec if codec is not None else meta.get('codec', '') or '')
+            expected_hash = str(content_hash if content_hash is not None else meta.get('content_hash', '') or '')
+            stored = self._stored_payload(rec)
+            return name, stored, int(rec.fmt_id), effective_codec, expected_hash
+
+    def _read_snapshot(self, snapshot: tuple[str, bytes, int, str, str]) -> Any:
+        name, stored, fmt_id_value, effective_codec, expected_hash = snapshot
+        fmt_id = FmtID(fmt_id_value)
+        plain_raw = self._plain_payload_for_hash(stored, fmt_id, effective_codec)
         if isinstance(plain_raw, TDSResult):
             return plain_raw
         hash_failure = self._validate_payload_hash(name, plain_raw, expected_hash)
         if hash_failure is not None:
             return hash_failure
-        return _deserialize_payload(stored, FmtID(rec.fmt_id), effective_codec)
+        # plain_raw has already been decompressed for integrity validation.
+        # Decode the base format directly instead of decompressing the same
+        # stored payload a second time.
+        return _deserialize_payload(
+            plain_raw,
+            fmt_id,
+            effective_codec,
+            already_decompressed=True,
+        )
+
+    def read(self, name: str, *, codec: str | None = None, content_hash: str | None = None) -> Any:
+        return self._read_snapshot(
+            self._snapshot_read_input(name, codec=codec, content_hash=content_hash)
+        )
 
     def read_raw(self, name: str) -> bytes:
-        rec = self._idx.lookup(name)
-        if rec is None:
-            raise KeyError(name)
-        return self._stored_payload(rec)
+        with self._lock:
+            rec = self._idx.lookup(name)
+            if rec is None:
+                raise KeyError(name)
+            return self._stored_payload(rec)
 
     def read_result(self, name: str) -> TDSResult:
         """Public non-halting persistence read surface: always return TDSResult."""
@@ -629,10 +765,15 @@ class TDSReader:
             return TDSResult.from_exception(TDSResultCode.PERSIST_READ_ERROR, exc, name=name, path=str(self.path))
 
     def read_many(self, names: List[str]) -> Dict[str, Any]:
+        # Bind every requested record, metadata entry, and stored byte slice to
+        # one reader epoch before parallel decode. A concurrent reload cannot
+        # produce a mixed-snapshot batch.
+        with self._lock:
+            snapshots = [self._snapshot_read_input(name) for name in names]
         pool = ConcurrencyPool.acquire()
-        def _one(n):
-            return (n, self.read(n))
-        return dict(pool.map_parallel(_one, names))
+        def _one(snapshot):
+            return (snapshot[0], self._read_snapshot(snapshot))
+        return dict(pool.map_parallel(_one, snapshots))
 
     def read_many_result(self, names: List[str]) -> TDSResult:
         """Public non-halting batch persistence read surface."""
@@ -646,13 +787,16 @@ class TDSReader:
             return TDSResult.from_exception(TDSResultCode.PERSIST_BATCH_READ_ERROR, exc, path=str(self.path), meta={"count": len(names)})
 
     def keys(self) -> List[str]:
-        return [r.name for r in self._idx.all_records()]
+        with self._lock:
+            return [r.name for r in self._idx.all_records()]
 
     def __len__(self) -> int:
-        return len(self._idx)
+        with self._lock:
+            return len(self._idx)
 
     def __contains__(self, name: str) -> bool:
-        return self._idx.lookup(name) is not None
+        with self._lock:
+            return self._idx.lookup(name) is not None
 
     def close(self) -> None:
         with self._lock:
@@ -678,9 +822,8 @@ class TDSWriter:
     Atomic writer: shadow file -> fsync -> rename.
 
     
-    - _finalise(): pre-allocates a bytearray for the full file and writes
-      blocks in-place via memoryview slices, then does a single os.write().
-      Avoids repeated b''.join() overhead on large directories.
+    - _finalise(): writes the header, immutable payloads, and index through a
+      bounded buffer. This avoids full-file copies without one syscall per slot.
     - write_parallel(): futures submitted as ordered batch; result list
       preserves original entry order.
     """
@@ -775,27 +918,27 @@ class TDSWriter:
         discipline and describes only the entries actually serialized into the
         just-committed data block.
         """
-        data_block = b''.join(s.payload for s in snapshot)
         index_block = idx.to_bytes()
         data_offset = FILE_HDR_SIZE
-        index_offset = data_offset + len(data_block)
+        payload_size = sum(len(s.payload) for s in snapshot)
+        index_offset = data_offset + payload_size
         file_header = _build_file_header(len(idx), index_offset, data_offset)
         header_meta = _parse_file_header(file_header)
 
-        total = len(file_header) + len(data_block) + len(index_block)
-        buf = bytearray(total)
-        mv = memoryview(buf)
-        pos = 0
-        mv[pos: pos + len(file_header)] = file_header; pos += len(file_header)
-        mv[pos: pos + len(data_block)] = data_block; pos += len(data_block)
-        mv[pos: pos + len(index_block)] = index_block
+        total = len(file_header) + payload_size + len(index_block)
 
         try:
             fd = open_binary_fd(
                 self._shadow, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600
             )
             try:
-                _write_all(fd, buf)
+                def _file_chunks():
+                    yield file_header
+                    for slot in snapshot:
+                        yield slot.payload
+                    yield index_block
+
+                _write_chunks_buffered(fd, _file_chunks())
                 os.fsync(fd)
             finally:
                 os.close(fd)

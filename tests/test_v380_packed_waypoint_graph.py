@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import copy
 import hashlib
+import pickle
 import struct
-from dataclasses import replace
+import zlib
+from dataclasses import asdict, fields, replace
 
 import pytest
+import staqtapp_tds.trace_rank.graph as packed_graph_module
 
 from staqtapp_tds.trace_rank.graph import (
     CSR_OFFSET_RECORD_SIZE,
@@ -190,6 +194,43 @@ def test_build_is_byte_identical_and_decode_reencode_is_exact() -> None:
     assert decoded.to_bytes(sources) == first_blob
 
 
+def test_fixture_packed_bytes_retain_the_v380_golden_identity() -> None:
+    graph, sources = fixture_graph()
+    blob = graph.to_bytes(sources)
+
+    assert len(blob) == 752
+    assert hashlib.sha256(blob).hexdigest() == (
+        "8375decdb4da0a5addb63320fc8cdc2adfc5f146bbbb2599d855966689f06f9f"
+    )
+
+
+def test_source_root_caches_do_not_change_the_public_dataclass_shape() -> None:
+    _graph, sources = fixture_graph()
+    source = sources[0]
+
+    assert tuple(item.name for item in fields(source)) == (
+        "generation_root",
+        "source_bytes",
+        "row_offsets",
+    )
+    assert set(asdict(source)) == {"generation_root", "source_bytes", "row_offsets"}
+
+
+@pytest.mark.parametrize("copier", [copy.copy, copy.deepcopy, pickle.dumps])
+def test_source_root_caches_survive_standard_copy_protocols(copier) -> None:
+    _graph, sources = fixture_graph()
+    source = sources[0]
+
+    if copier is pickle.dumps:
+        copied = pickle.loads(copier(source))
+    else:
+        copied = copier(source)
+
+    assert copied == source
+    assert copied.source_root == source.source_root
+    assert copied.row_offsets_root == source.row_offsets_root
+
+
 def test_waypoint_exactly_round_trips_authoritative_row_spans() -> None:
     graph, sources = fixture_graph()
 
@@ -338,6 +379,102 @@ def test_decode_rejects_truncation_trailing_bytes_and_corruption() -> None:
     with pytest.raises(PackedGraphError) as error:
         PackedWaypointGraph.from_bytes(bytes(corrupted), sources)
     assert error.value.fault is PackedGraphFault.INTEGRITY_FAILURE
+
+
+def _reseal_noncanonical_payload(payload: bytearray) -> bytes:
+    values = packed_graph_module._HEADER.unpack_from(payload, 0)
+    counts = tuple(values[18:23])
+    offsets = tuple(values[23:29])
+    zero_header = packed_graph_module._pack_header(
+        total_size=values[16],
+        hard_mask_universe=values[17],
+        counts=counts,
+        offsets=offsets,
+        server_namespace_digest=values[29],
+        feature_schema_digest=values[30],
+    )
+    material = zero_header + bytes(payload[HEADER_SIZE:])
+    header = packed_graph_module._pack_header(
+        total_size=values[16],
+        hard_mask_universe=values[17],
+        counts=counts,
+        offsets=offsets,
+        server_namespace_digest=values[29],
+        feature_schema_digest=values[30],
+        content_digest=hashlib.sha256(material).digest(),
+        content_crc32=zlib.crc32(material) & ((1 << 32) - 1),
+    )
+    payload[:HEADER_SIZE] = header
+    return bytes(payload)
+
+
+@pytest.mark.parametrize(
+    ("offset_index", "record_size"),
+    (
+        (26, WAYPOINT_RECORD_SIZE),
+        (28, EDGE_RECORD_SIZE),
+    ),
+)
+def test_decode_rejects_integrity_valid_nonzero_record_padding(
+    offset_index: int,
+    record_size: int,
+) -> None:
+    graph, sources = fixture_graph()
+    malformed = bytearray(graph.to_bytes(sources))
+    header = packed_graph_module._HEADER.unpack_from(malformed, 0)
+    malformed[header[offset_index] + record_size - 1] = 1
+
+    with pytest.raises(PackedGraphError) as error:
+        PackedWaypointGraph.from_bytes(
+            _reseal_noncanonical_payload(malformed),
+            sources,
+        )
+
+    assert error.value.fault is PackedGraphFault.NONCANONICAL
+
+
+def test_decode_still_rejects_integrity_valid_cross_record_ordering() -> None:
+    graph, sources = fixture_graph()
+    malformed = bytearray(graph.to_bytes(sources))
+    header = packed_graph_module._HEADER.unpack_from(malformed, 0)
+    waypoint_offset = header[26]
+    first = bytes(malformed[waypoint_offset : waypoint_offset + WAYPOINT_RECORD_SIZE])
+    second = bytes(
+        malformed[
+            waypoint_offset + WAYPOINT_RECORD_SIZE :
+            waypoint_offset + 2 * WAYPOINT_RECORD_SIZE
+        ]
+    )
+    malformed[waypoint_offset : waypoint_offset + WAYPOINT_RECORD_SIZE] = second
+    malformed[
+        waypoint_offset + WAYPOINT_RECORD_SIZE :
+        waypoint_offset + 2 * WAYPOINT_RECORD_SIZE
+    ] = first
+
+    with pytest.raises(PackedGraphError) as error:
+        PackedWaypointGraph.from_bytes(
+            _reseal_noncanonical_payload(malformed),
+            sources,
+        )
+
+    assert error.value.fault is PackedGraphFault.NONCANONICAL
+
+
+def test_decode_still_rejects_integrity_valid_cross_record_reference() -> None:
+    graph, sources = fixture_graph()
+    malformed = bytearray(graph.to_bytes(sources))
+    header = packed_graph_module._HEADER.unpack_from(malformed, 0)
+    waypoint_offset = header[26]
+    # feature_index is the first uint32 after the four uint64 spans.
+    struct.pack_into("<I", malformed, waypoint_offset + 52, len(graph.feature_blocks))
+
+    with pytest.raises(PackedGraphError) as error:
+        PackedWaypointGraph.from_bytes(
+            _reseal_noncanonical_payload(malformed),
+            sources,
+        )
+
+    assert error.value.fault is PackedGraphFault.REFERENCE_ERROR
 
 
 def test_decode_rejects_unknown_version_and_record_width_before_records() -> None:

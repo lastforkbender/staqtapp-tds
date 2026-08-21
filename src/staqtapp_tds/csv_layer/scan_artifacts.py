@@ -14,15 +14,16 @@ from typing import Any, Mapping
 from staqtapp_tds.result import TDSResult
 from staqtapp_tds.tds_filesystem import TDSDirectory
 
+from .artifacts import CSVRowOffsetMap
 from .importer import load_csv_manifest
 from .manifest import artifact_keys, validate_csv_id
 from .scanner import (
     CSVRowAnchorProfile,
     CSVScanProfile,
+    _compare_row_anchors_to_artifacts,
+    _compare_scan_profile_to_artifacts,
+    _row_anchors_from_scan_profile,
     scan_csv_bytes,
-    scan_csv_row_anchors,
-    validate_csv_row_anchors,
-    validate_csv_scan_profile,
 )
 
 
@@ -192,13 +193,41 @@ def materialize_csv_scan_artifacts(
     checked = ["manifest", "raw", "row_offsets"]
     errors: list[str] = []
 
-    scan_parity = validate_csv_scan_profile(directory, csv_id, chunk_size=chunk_size)
+    raw, manifest = _read_raw_bytes(directory, csv_id)
+    # Durable manifests are evidence, not routing authority. Resolve the core
+    # artifact namespace from the admitted csv_id so a tampered manifest cannot
+    # redirect validation to an attacker-controlled row-offset object.
+    row_value = directory.read_value(artifact_keys(csv_id)["row_offsets"])
+    if not isinstance(row_value, dict):
+        raise TypeError("CSV row-offset artifact 'row_offsets' is not a JSON object")
+    row_map = CSVRowOffsetMap.from_mapping(row_value)
+    profile = scan_csv_bytes(
+        raw,
+        manifest.dialect,
+        encoding=manifest.encoding,
+        chunk_size=chunk_size,
+    )
+    scan_parity = _compare_scan_profile_to_artifacts(
+        csv_id,
+        profile,
+        manifest,
+        row_map,
+        chunk_size=chunk_size,
+    )
     if not scan_parity.ok:
         errors.extend(scan_parity.errors)
 
     anchor_parity = None
+    anchors = None
     if include_row_anchors:
-        anchor_parity = validate_csv_row_anchors(directory, csv_id, chunk_size=chunk_size)
+        anchors = _row_anchors_from_scan_profile(raw, profile)
+        anchor_parity = _compare_row_anchors_to_artifacts(
+            csv_id,
+            anchors,
+            manifest,
+            row_map,
+            chunk_size=chunk_size,
+        )
         if not anchor_parity.ok:
             errors.extend(anchor_parity.errors)
 
@@ -222,12 +251,6 @@ def materialize_csv_scan_artifacts(
             chunk_size=chunk_size,
             errors=tuple(dict.fromkeys(errors)),
         )
-
-    raw, manifest = _read_raw_bytes(directory, csv_id)
-    profile = scan_csv_bytes(raw, manifest.dialect, encoding=manifest.encoding, chunk_size=chunk_size)
-    anchors = None
-    if include_row_anchors:
-        anchors = scan_csv_row_anchors(raw, manifest.dialect, encoding=manifest.encoding, chunk_size=chunk_size)
 
     write_count = 0
     _require_write(directory.write_json(keys["scan_profile"], profile.to_dict(), overwrite=overwrite, provenance="DERIVED"), keys["scan_profile"])
@@ -277,7 +300,7 @@ def validate_materialized_csv_scan_artifacts(
     raw, manifest = _read_raw_bytes(directory, csv_id)
     fresh_profile = scan_csv_bytes(raw, manifest.dialect, encoding=manifest.encoding, chunk_size=chunk_size)
     stored_profile = load_csv_scan_profile(directory, csv_id)
-    scan_profile_match = stored_profile.to_dict() == fresh_profile.to_dict()
+    scan_profile_match = stored_profile == fresh_profile
     if not scan_profile_match:
         if stored_profile.raw_sha256 != fresh_profile.raw_sha256:
             errors.append("materialized_scan_profile_raw_sha256_mismatch")
@@ -285,17 +308,17 @@ def validate_materialized_csv_scan_artifacts(
             errors.append("materialized_scan_profile_row_offsets_mismatch")
         if stored_profile.row_count != fresh_profile.row_count:
             errors.append("materialized_scan_profile_row_count_mismatch")
-        if stored_profile.to_dict() != fresh_profile.to_dict() and not errors:
+        if not errors:
             errors.append("materialized_scan_profile_shape_mismatch")
 
     row_anchor_profile_match = not require_row_anchors
     row_anchor_hash_count = 0
     if require_row_anchors:
         checked.append("row_anchor_profile")
-        fresh_anchors = scan_csv_row_anchors(raw, manifest.dialect, encoding=manifest.encoding, chunk_size=chunk_size)
+        fresh_anchors = _row_anchors_from_scan_profile(raw, fresh_profile)
         stored_anchors = load_csv_row_anchor_profile(directory, csv_id)
         row_anchor_hash_count = stored_anchors.row_count
-        row_anchor_profile_match = stored_anchors.to_dict() == fresh_anchors.to_dict()
+        row_anchor_profile_match = stored_anchors == fresh_anchors
         if not row_anchor_profile_match:
             if stored_anchors.raw_sha256 != fresh_anchors.raw_sha256:
                 errors.append("materialized_row_anchor_raw_sha256_mismatch")
@@ -305,7 +328,7 @@ def validate_materialized_csv_scan_artifacts(
                 errors.append("materialized_row_anchor_hashes_mismatch")
             if stored_anchors.row_count != fresh_anchors.row_count:
                 errors.append("materialized_row_anchor_count_mismatch")
-            if stored_anchors.to_dict() != fresh_anchors.to_dict() and not any(error.startswith("materialized_row_anchor") for error in errors):
+            if not any(error.startswith("materialized_row_anchor") for error in errors):
                 errors.append("materialized_row_anchor_shape_mismatch")
 
     return CSVScanArtifactReport(

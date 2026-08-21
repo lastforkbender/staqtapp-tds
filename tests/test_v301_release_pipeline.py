@@ -84,9 +84,9 @@ def test_publishing_is_single_gated_trusted_publishing_job():
     ):
         assert f"- {required_job}" in aggregate
     assert "needs: release-gates-complete" in workflow
-    assert "if: github.ref_type == 'tag'" in workflow
+    assert "github.ref_type == 'tag'" in workflow
     assert "id-token: write" in workflow
-    assert "pypa/gh-action-pypi-publish@v1.14.0" in workflow
+    assert "pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b" in workflow
     assert "PYPI_TOKEN" not in workflow
     assert "twine upload" not in workflow
 

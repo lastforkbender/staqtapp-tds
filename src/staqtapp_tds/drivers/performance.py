@@ -372,7 +372,10 @@ def driver_vm_performance_capability_matrix(
         "opt_in_only": True,
         "auto_runs_in_driver_vm_execute": False,
         "auto_runs_in_runtime_manager": False,
+        # Legacy key: the opt-in harness does not install hooks into normal VM
+        # execution. It does not claim that this release made no VM changes.
         "normal_python_vm_hot_path_changed": False,
+        "normal_python_vm_hot_path_instrumented_by_harness": False,
         "direct_python_vm_backend": True,
         "managed_python_vm_backend": resolved.include_managed_runtime,
         "native_c_vm_backend_slot": True,
@@ -402,7 +405,9 @@ def driver_vm_performance_capability_matrix(
 def _execute_python_vm(package: BytecodePackage, snapshot: Mapping[str, Any], policy: DriverVMPerformancePolicy) -> DriverVMResult:
     vm = DriverVMRuntime(max_instructions=policy.max_instructions, max_cost=policy.max_cost)
     vm.load(package)
-    return vm.execute(copy.deepcopy(snapshot))
+    # DriverVMRuntime owns its immutable input snapshot; an additional harness
+    # copy only measures the benchmark wrapper rather than the VM.
+    return vm.execute(snapshot)
 
 
 def _execute_managed_python_vm(
@@ -411,7 +416,8 @@ def _execute_managed_python_vm(
     runtime_policy: RuntimeManagerPolicy,
 ) -> DriverVMResult | None:
     manager = DriverRuntimeManager(policy=runtime_policy)
-    evidence = manager.execute_package(package, copy.deepcopy(snapshot))
+    # Runtime Manager performs its own bounded snapshot normalization/copy.
+    evidence = manager.execute_package(package, snapshot)
     return evidence.vm_result
 
 
@@ -437,7 +443,7 @@ def _timed_managed_python_vm(
 ) -> DriverVMPerformanceRun:
     start = time.perf_counter_ns()
     manager = DriverRuntimeManager(policy=runtime_policy)
-    evidence = manager.execute_package(package, copy.deepcopy(snapshot))
+    evidence = manager.execute_package(package, snapshot)
     elapsed = max(1, time.perf_counter_ns() - start)
     result = evidence.vm_result
     if result is None:
@@ -482,8 +488,12 @@ def _timed_native_vm(
     *,
     iteration: int,
 ) -> DriverVMPerformanceRun:
+    # A pluggable native runner is not part of the trusted Python VM contract.
+    # Include its required isolation copy in the timed boundary so backend
+    # comparisons cover the same caller-to-detached-result envelope.
     start = time.perf_counter_ns()
-    result = runner(package, copy.deepcopy(snapshot), policy)
+    run_snapshot = copy.deepcopy(snapshot)
+    result = runner(package, run_snapshot, policy)
     elapsed = max(1, time.perf_counter_ns() - start)
     return _run_from_vm_result(DriverVMPerformanceBackend.NATIVE_C_VM, iteration, elapsed, result)
 

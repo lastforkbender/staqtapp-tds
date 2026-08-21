@@ -18,8 +18,7 @@ from enum import Enum
 from typing import Any, Mapping, Sequence
 
 from .audit import audit_vm_contract
-from .bytecode import BytecodePackage, validate_bytecode_package
-from .manifest import DriverManifest
+from .bytecode import BytecodePackage
 from .registry import DriverRegistry, DriverState, RegistryError
 from .signature import SignatureVerdict
 from .tddl import TDDLValidationError
@@ -265,7 +264,9 @@ class DriverRuntimeManager:
 
     def _package_gate(self, package: BytecodePackage) -> RuntimeManagerFault | None:
         try:
-            validate_bytecode_package(package)
+            # The contract audit begins with full bytecode/hash validation.
+            # Calling the validator separately here serialized and hashed the
+            # complete package twice before any policy gate was evaluated.
             audit_vm_contract(package)
         except (TDDLValidationError, ValueError) as exc:
             return RuntimeManagerFault("runtime.package_rejected", str(exc))

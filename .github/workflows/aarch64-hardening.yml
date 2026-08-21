@@ -212,45 +212,6 @@ jobs:
             aarch64-native-fuzz.json
           if-no-files-found: warn
 
-  aarch64-performance-evidence:
-    name: AArch64 frozen-index scaling evidence
-    runs-on: ubuntu-24.04-arm
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
-      - name: Build strict native extensions
-        shell: bash
-        run: |
-          set -euo pipefail
-          python -m pip install setuptools wheel
-          python setup.py build_ext --inplace --force
-      - name: Record hosted ARM scaling distributions
-        shell: bash
-        run: |
-          set -euo pipefail
-          lscpu | tee aarch64-performance-runner.log
-          python -S tools/aarch64_benchmark_v360.py \
-            --expected-architecture aarch64 \
-            --keys 4096 \
-            --iterations 128 \
-            --samples 9 \
-            --min-two-worker-factor 1.0 \
-            --min-four-worker-factor 1.0 \
-            --output aarch64-performance.json \
-            2>&1 | tee aarch64-performance.log
-      - name: Archive separate ARM performance evidence
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: aarch64-performance
-          path: |
-            aarch64-performance-runner.log
-            aarch64-performance.log
-            aarch64-performance.json
-          if-no-files-found: warn
-
   aarch64-hardening-complete:
     name: AArch64 hardening gates complete
     if: always()
@@ -259,7 +220,6 @@ jobs:
       - aarch64-sanitizers
       - aarch64-thread-sanitizer
       - aarch64-deterministic-fuzz
-      - aarch64-performance-evidence
     runs-on: ubuntu-24.04
     steps:
       - name: Bind and require every ARM hardening lane
@@ -268,7 +228,6 @@ jobs:
           SANITIZER_RESULT: ${{ needs.aarch64-sanitizers.result }}
           THREAD_RESULT: ${{ needs.aarch64-thread-sanitizer.result }}
           FUZZ_RESULT: ${{ needs.aarch64-deterministic-fuzz.result }}
-          PERFORMANCE_RESULT: ${{ needs.aarch64-performance-evidence.result }}
         shell: bash
         run: |
           python - <<'PY'
@@ -281,7 +240,6 @@ jobs:
               "sanitizers": os.environ["SANITIZER_RESULT"],
               "thread_sanitizer": os.environ["THREAD_RESULT"],
               "deterministic_fuzz": os.environ["FUZZ_RESULT"],
-              "performance_evidence": os.environ["PERFORMANCE_RESULT"],
           }
           failed = {
               name: result

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any
 
 from .contract import (
@@ -23,6 +24,22 @@ from .contract import (
     _int,
     _root,
 )
+
+
+class _EpochCacheSlots:
+    """Private, non-dataclass slots for derived immutable epoch state.
+
+    Keeping these slots on a plain base class prevents implementation caches from
+    changing dataclass equality, hashing, ``asdict()``, or the public constructor.
+    """
+
+    __slots__ = (
+        "_epoch_root_cache",
+        "_identity_root_cache",
+        "_plan_roots_cache",
+        "_plans_by_id_cache",
+        "_policy_root_cache",
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,7 +228,7 @@ class EaglegateQualificationSummary:
 
 
 @dataclass(frozen=True, slots=True)
-class EaglegateSpeculationEpoch:
+class EaglegateSpeculationEpoch(_EpochCacheSlots):
     generation: int
     identity: EaglegateIdentity
     plans: tuple[EaglegatePlan, ...]
@@ -221,13 +238,13 @@ class EaglegateSpeculationEpoch:
 
     def __post_init__(self) -> None:
         _int("generation", self.generation, 1)
-        if not isinstance(self.identity, EaglegateIdentity):
+        if type(self.identity) is not EaglegateIdentity:
             raise EaglegateContractError("identity has wrong type")
-        if not isinstance(self.plans, tuple) or not self.plans:
+        if type(self.plans) is not tuple or not self.plans:
             raise EaglegateContractError("plans must be a non-empty tuple")
-        if any(not isinstance(plan, EaglegatePlan) for plan in self.plans):
+        if any(type(plan) is not EaglegatePlan for plan in self.plans):
             raise EaglegateContractError("plans contain invalid values")
-        if not isinstance(self.policy, EaglegateAdmissionPolicy):
+        if type(self.policy) is not EaglegateAdmissionPolicy:
             raise EaglegateContractError("policy has wrong type")
         ids = tuple(plan.plan_id for plan in self.plans)
         roots = tuple(plan.plan_root for plan in self.plans)
@@ -236,7 +253,8 @@ class EaglegateSpeculationEpoch:
                 "plans must have unique ids and roots",
                 fault=EaglegateFault.NONCANONICAL,
             )
-        if any(value not in ids for value in self.policy.plan_order):
+        plans_by_id = dict(zip(ids, self.plans))
+        if any(value not in plans_by_id for value in self.policy.plan_order):
             raise EaglegateContractError(
                 "policy references an unknown plan",
                 fault=EaglegateFault.IDENTITY_MISMATCH,
@@ -249,46 +267,91 @@ class EaglegateSpeculationEpoch:
                     "canary/active epochs require qualification",
                     fault=EaglegateFault.QUALIFICATION_REQUIRED,
                 )
+        self._rebuild_derived_caches()
 
-    def canonical_dict(self) -> dict[str, Any]:
+    def _rebuild_derived_caches(self) -> None:
+        """Recompute every cache exclusively from validated public fields."""
+
+        roots = tuple(plan.plan_root for plan in self.plans)
+        plans_by_id = {plan.plan_id: plan for plan in self.plans}
+        object.__setattr__(self, "_identity_root_cache", self.identity.identity_root)
+        object.__setattr__(self, "_plan_roots_cache", roots)
+        object.__setattr__(self, "_plans_by_id_cache", MappingProxyType(plans_by_id))
+        object.__setattr__(self, "_policy_root_cache", self.policy.policy_root)
+        object.__setattr__(
+            self,
+            "_epoch_root_cache",
+            _canonical_root("epoch", self._canonical_dict_from_cache()),
+        )
+
+    def _ensure_derived_caches(self) -> None:
+        """Restore derived slots omitted by copy/pickle protocols."""
+
+        try:
+            object.__getattribute__(self, "_epoch_root_cache")
+        except AttributeError:
+            self._rebuild_derived_caches()
+
+    def _canonical_dict_from_cache(self) -> dict[str, Any]:
         return {
             "contract_id": EAGLEGATE_CONTRACT_ID,
             "format_version": EAGLEGATE_FORMAT_VERSION,
             "authority_root": EAGLEGATE_AUTHORITY.authority_root,
             "generation": self.generation,
             "identity": self.identity.canonical_dict(),
-            "identity_root": self.identity.identity_root,
+            "identity_root": self._identity_root_cache,
             "plans": [plan.canonical_dict() for plan in self.plans],
-            "plan_roots": [plan.plan_root for plan in self.plans],
+            "plan_roots": list(self._plan_roots_cache),
             "policy": self.policy.canonical_dict(),
-            "policy_root": self.policy.policy_root,
+            "policy_root": self._policy_root_cache,
             "qualification_root": self.qualification_root,
             "previous_epoch_root": self.previous_epoch_root,
         }
 
+    def canonical_dict(self) -> dict[str, Any]:
+        self._ensure_derived_caches()
+        return self._canonical_dict_from_cache()
+
     @property
     def epoch_root(self) -> str:
-        return _canonical_root("epoch", self.canonical_dict())
+        self._ensure_derived_caches()
+        return self._epoch_root_cache
+
+    @property
+    def identity_root(self) -> str:
+        self._ensure_derived_caches()
+        return self._identity_root_cache
+
+    @property
+    def plan_roots(self) -> tuple[str, ...]:
+        self._ensure_derived_caches()
+        return self._plan_roots_cache
+
+    @property
+    def policy_root(self) -> str:
+        self._ensure_derived_caches()
+        return self._policy_root_cache
 
     def plan_by_id(self, plan_id: str) -> EaglegatePlan:
-        for plan in self.plans:
-            if plan.plan_id == plan_id:
-                return plan
-        raise EaglegateContractError(
-            "unknown plan", fault=EaglegateFault.IDENTITY_MISMATCH
-        )
+        self._ensure_derived_caches()
+        try:
+            return self._plans_by_id_cache[plan_id]
+        except (KeyError, TypeError) as exc:
+            raise EaglegateContractError(
+                "unknown plan", fault=EaglegateFault.IDENTITY_MISMATCH
+            ) from exc
 
 
 def validate_qualification_for_epoch(
     epoch: EaglegateSpeculationEpoch,
     qualification: EaglegateQualificationSummary,
 ) -> EaglegateQualificationSummary:
-    if qualification.identity_root != epoch.identity.identity_root:
+    if qualification.identity_root != epoch.identity_root:
         raise EaglegateContractError(
             "qualification identity mismatch",
             fault=EaglegateFault.IDENTITY_MISMATCH,
         )
-    if qualification.plan_roots != tuple(plan.plan_root for plan in epoch.plans):
+    if qualification.plan_roots != epoch.plan_roots:
         raise EaglegateContractError(
             "qualification plan mismatch", fault=EaglegateFault.IDENTITY_MISMATCH
         )

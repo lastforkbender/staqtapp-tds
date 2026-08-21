@@ -88,11 +88,14 @@ def links(text: str):
 
 def test_english_readme_reports_exact_current_release_status():
     text = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert "# Staqtapp-TDS v3.8.1" in text
-    assert "v3.8.1 is the current production PyPI release" in text
-    assert "python -m pip install staqtapp-tds==3.6.0" not in text
-    assert "python -m pip install staqtapp-tds==3.8.1" in text
+    assert "# Staqtapp-TDS v3.8.2" in text.splitlines()
+    assert "# Staqtapp-TDS v3.8.2 release candidate" not in text
     assert "source candidate under review, not a published package" not in text
+    assert "NON-RELEASEABLE" not in text
+    assert "v3.8.2 is the production release" in text
+    assert "python -m pip install staqtapp-tds==3.6.0" not in text
+    assert "python -m pip install staqtapp-tds==3.8.1" not in text
+    assert "python -m pip install staqtapp-tds==3.8.2" in text
     assert "`docs/130_v370_Atomic_Generation_Authority.md`" in text
     assert "src/staqtapp_tds/generation/" in text
     assert "src/staqtapp_tds/eaglegate/" in text
@@ -105,11 +108,15 @@ def test_english_readme_reports_exact_current_release_status():
 
 def test_japanese_readme_reports_exact_current_release_status():
     text = (ROOT / "README_ja.md").read_text(encoding="utf-8")
-    assert "# Staqtapp-TDS v3.8.1" in text
-    assert "v3.8.1 は current production PyPI release" in text
-    assert "python -m pip install staqtapp-tds==3.6.0" not in text
-    assert "python -m pip install staqtapp-tds==3.8.1" in text
+    normalized = " ".join(text.replace(">", " ").split())
+    assert "# Staqtapp-TDS v3.8.2" in text.splitlines()
+    assert "# Staqtapp-TDS v3.8.2 release candidate" not in text
     assert "published package ではありません" not in text
+    assert "NON-RELEASEABLE" not in text
+    assert "v3.8.2 は production release" in text
+    assert "python -m pip install staqtapp-tds==3.6.0" not in text
+    assert "python -m pip install staqtapp-tds==3.8.1" not in text
+    assert "python -m pip install staqtapp-tds==3.8.2" in text
     assert "`docs/130_v370_Atomic_Generation_Authority.md`" in text
     assert "src/staqtapp_tds/generation/" in text
     assert "src/staqtapp_tds/eaglegate/" in text
@@ -117,7 +124,7 @@ def test_japanese_readme_reports_exact_current_release_status():
     assert "`docs/131_v380_Eaglegate_Real_vLLM_Shadow.md`" in text
     assert "`docs/132_v380_Packed_Waypoint_CSR_Graph.md`" in text
     assert "Manual credentialed H100 workflow は未実行" in text
-    assert "Eaglegate は shadow / target-only のまま" in text
+    assert "Eaglegate は shadow / target-only のまま" in normalized
 
 
 def test_all_19_english_screenshots_and_important_links_are_preserved():

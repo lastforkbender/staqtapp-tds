@@ -231,8 +231,13 @@ class DriverStudioAdminReviewActions:
             )
 
         evidence_bundle_hash = console.bundle_hash
+        queue_by_driver = _queue_records_by_driver(console)
         request_decisions = tuple(
-            _recorded_decision(request, console=console, evidence_bundle_hash=evidence_bundle_hash)
+            _recorded_decision(
+                request,
+                record=queue_by_driver.get(request.driver_id, {}),
+                evidence_bundle_hash=evidence_bundle_hash,
+            )
             for request in requests
         )
 
@@ -418,20 +423,46 @@ def _review_action_value(value: ReviewAction | str) -> ReviewAction:
 def _record_for_driver(console: DriverStudioConsoleSnapshot, driver_id: str | None) -> Mapping[str, Any]:
     if driver_id is None:
         return {}
-    for item in console.to_dict().get("queue", ()):  # queue has stable review_hash/regression hashes.
-        if item.get("driver_id") == driver_id:
-            return item
+    for item in console.queue:
+        if item.driver_id == driver_id:
+            return _queue_record(item)
     return {}
+
+
+def _queue_records_by_driver(console: DriverStudioConsoleSnapshot) -> Mapping[str, Mapping[str, Any]]:
+    """Index queue evidence once while preserving first-record lookup semantics."""
+
+    indexed: dict[str, Mapping[str, Any]] = {}
+    for item in console.queue:
+        if item.driver_id:
+            indexed.setdefault(item.driver_id, _queue_record(item))
+    return indexed
+
+
+def _queue_record(item: Any) -> Mapping[str, Any]:
+    return {
+        "driver_id": item.driver_id,
+        "driver_version": item.driver_version,
+        "decision_status": item.decision_status,
+        "risk_level": item.risk_level,
+        "final_action": item.final_action,
+        "registry_state_before": item.registry_state_before,
+        "registry_state_after": item.registry_state_after,
+        "package_hash": item.package_hash,
+        "regression_report_hash": item.regression_report_hash,
+        "review_hash": item.review_hash,
+        "selected": item.selected,
+        "needs_attention": item.needs_attention,
+    }
 
 
 def _recorded_decision(
     request: StudioReviewActionRequest,
     *,
-    console: DriverStudioConsoleSnapshot,
+    record: Mapping[str, Any],
     evidence_bundle_hash: str | None,
 ) -> StudioReviewActionDecision:
     action = _review_action_value(request.requested_action)
-    record = _record_for_driver(console, request.driver_id)
     return _action_decision(
         driver_id=request.driver_id,
         requested_action=action,

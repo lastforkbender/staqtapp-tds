@@ -83,11 +83,12 @@ policy. The workflow does not silently mark an unsupported sanitizer as success.
 The seed, case count, result digests, architecture, source commit, and authority
 flags are archived.
 
-### Hosted ARM scaling evidence
+### Historical hosted ARM scaling evidence
 
-`tools/aarch64_benchmark_v360.py` records one-, two-, and four-worker packed
-lookup distributions on the native four-core ARM runner. It requires aggregate
-no-regression relative to one worker, but this is intentionally labeled:
+For the original v3.6.0 qualification,
+`tools/aarch64_benchmark_v360.py` recorded one-, two-, and four-worker packed
+lookup distributions on the native four-core ARM runner. It required aggregate
+no-regression relative to one worker, but was intentionally labeled:
 
 ```text
 shared-runner-no-regression
@@ -99,16 +100,20 @@ CPU, pinned workload and artifact roots, repeated samples, variance, and a
 confidence interval. Hosted-runner evidence may reject a regression; it cannot
 establish the final performance claim or authorize release.
 
+Beginning with v3.8.2, this helper remains available for optional engineering
+investigation but is retired from recurring pull-request, `main`, and release
+CI. No timing or scaling threshold is part of the current ARM aggregate.
+
 ## Aggregate gate
 
-The ARM hardening aggregate succeeds only when all five lanes succeed:
+The recurring ARM hardening aggregate succeeds only when all four non-timing
+lanes succeed:
 
 ```text
 native deterministic soak
 AddressSanitizer + UndefinedBehaviorSanitizer
 ThreadSanitizer
 10,000-case deterministic fuzz
-one/two/four-worker performance evidence
 ```
 
 Every output declares:
@@ -126,8 +131,8 @@ change policy, authorize storage, or enable learned Trace Ranking.
 Failures are preserved at the earliest invalid stage. A corrected candidate
 receives new source and evidence identities; a passing rerun does not overwrite
 an earlier failure. ARM mismatch, sanitizer fault, malformed-format acceptance,
-caller-output mutation, semantic drift, concurrency fault, or aggregate scaling
-regression blocks this tranche.
+caller-output mutation, semantic drift, or concurrency fault blocks the
+recurring hardening workflow.
 
 ## Release posture
 
@@ -139,7 +144,7 @@ do not create another `.postN` release.
 
 ## First qualified native ARM result
 
-The initial complete hardening run was GitHub Actions run `30662625269` on
+The initial complete five-lane hardening run was GitHub Actions run `30662625269` on
 merge candidate `1ac010b18e0a33a15454f8c97731b391c3313efb`. Every ARM lane
 passed. The official deterministic soak profile is now pinned to:
 
@@ -163,5 +168,5 @@ shared-runner evidence, not the final named-reference-CPU claim.
 The 10,000-case deterministic fuzz lane rejected all 10,000 malformed packed
 requests before output mutation and all 10,000 malformed UTF-8 fixtures.
 AddressSanitizer, UndefinedBehaviorSanitizer, ThreadSanitizer, the ARM
-subinterpreter rejection harness, and the aggregate ARM hardening gate all
-passed.
+subinterpreter rejection harness, and the historical five-lane aggregate ARM
+hardening gate all passed.

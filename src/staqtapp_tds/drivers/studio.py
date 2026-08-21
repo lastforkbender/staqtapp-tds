@@ -14,12 +14,12 @@ from enum import Enum
 from typing import Any, Mapping, Sequence
 
 from .audit import audit_vm_contract
-from .bytecode import BytecodePackage, compile_tddl
+from .bytecode import BytecodePackage, _parse_and_compile_tddl
 from .evidence import DriverEvidenceBundle, EvidenceBundleExporter, EvidenceIntegrityStatus
 from .manifest import DriverManifest
 from .registry import DriverRegistry, DriverState
 from .signature import SignaturePolicy, SignatureVerdict, sign_payload
-from .tddl import TDDLValidationError, instruction_specs, parse_tddl
+from .tddl import TDDLValidationError, instruction_specs
 from .vm import DriverVMSkeleton, VMState
 
 
@@ -128,7 +128,7 @@ def run_studio_quick_test(
     session.pass_gate(StudioGate.LEARN)
     results.append(StudioGateResult(StudioGate.LEARN, True, "instruction reference available"))
 
-    program = parse_tddl(source)
+    program, package = _parse_and_compile_tddl(source)
     session.pass_gate(StudioGate.SYNTAX)
     results.append(StudioGateResult(StudioGate.SYNTAX, True, f"parsed {len(program.instructions)} instructions"))
 
@@ -137,7 +137,6 @@ def run_studio_quick_test(
     session.pass_gate(StudioGate.CAPABILITIES)
     results.append(StudioGateResult(StudioGate.CAPABILITIES, True, f"{len(program.capabilities)} capabilities declared"))
 
-    package = compile_tddl(program)
     session.pass_gate(StudioGate.BYTECODE)
     results.append(StudioGateResult(StudioGate.BYTECODE, True, f"compiled package {package.package_hash[:12]}"))
 
@@ -404,20 +403,35 @@ class DriverStudioReadOnlyConsole:
         records = tuple(_as_mapping(record) for record in payload.get("records", ()))
         events = tuple(_as_mapping(event) for event in _as_mapping(payload.get("audit_trail", {})).get("events", ()))
         selected = _resolve_selected_driver(records, selected_driver_id)
+        selected_records = _selected_records(records, selected)
         matrix = self.capability_matrix()
         queue = tuple(_queue_item(record, selected) for record in records)
         risk_cards = tuple(_risk_card(record, matrix) for record in records)
         event_rows = tuple(_event_row(event) for event in events)
+        timeline_panel = _evidence_timeline_panel(
+            payload,
+            records,
+            events,
+            selected,
+            selected_records=selected_records,
+        )
         panels = (
             _queue_panel(queue),
             _evidence_bundle_panel(payload, status),
             _audit_trail_panel(payload, events),
-            _evidence_timeline_panel(payload, records, events, selected),
-            _fixture_replay_panel(records, selected),
+            timeline_panel,
+            _fixture_replay_panel(records, selected, selected_records=selected_records),
             _risk_card_panel(risk_cards, selected),
-            _registry_state_panel(records, events, selected),
+            _registry_state_panel(records, events, selected, selected_records=selected_records),
             _export_integrity_panel(payload, integrity),
-            _export_audit_console_panel(payload, records, events, selected),
+            _export_audit_console_panel(
+                payload,
+                records,
+                events,
+                selected,
+                selected_records=selected_records,
+                timeline_rows=timeline_panel.rows,
+            ),
             _manual_driver_builder_panel(selected),
             _event_console_panel(event_rows),
         )
@@ -502,10 +516,16 @@ def _console_reason(payload: Mapping[str, Any], integrity: EvidenceIntegrityStat
 
 
 def _resolve_selected_driver(records: Sequence[Mapping[str, Any]], selected_driver_id: str | None) -> str | None:
-    ids = tuple(_optional_text(record.get("driver_id")) for record in records if record.get("driver_id") is not None)
-    if selected_driver_id and selected_driver_id in ids:
-        return selected_driver_id
-    return ids[0] if ids else None
+    first: str | None = None
+    for record in records:
+        if record.get("driver_id") is None:
+            continue
+        driver_id = _optional_text(record.get("driver_id"))
+        if first is None:
+            first = driver_id
+        if selected_driver_id and driver_id == selected_driver_id:
+            return selected_driver_id
+    return first
 
 
 def _queue_item(record: Mapping[str, Any], selected_driver_id: str | None) -> DriverStudioQueueItem:
@@ -636,12 +656,15 @@ def _evidence_timeline_panel(
     records: Sequence[Mapping[str, Any]],
     events: Sequence[Mapping[str, Any]],
     selected_driver_id: str | None,
+    *,
+    selected_records: Sequence[Mapping[str, Any]] | None = None,
 ) -> DriverStudioPanelSnapshot:
     """Build a chronological trust-history panel without granting authority."""
 
     rows: list[Mapping[str, Any]] = []
     manifest = _as_mapping(payload.get("manifest", {}))
-    for record in _selected_records(records, selected_driver_id):
+    resolved_records = selected_records if selected_records is not None else _selected_records(records, selected_driver_id)
+    for record in resolved_records:
         driver_id = _optional_text(record.get("driver_id"))
         rows.extend(
             _lifecycle_rows_for_record(
@@ -855,10 +878,15 @@ def _stage_order(stage: str) -> int:
     return order.get(stage, 99)
 
 
-def _fixture_replay_panel(records: Sequence[Mapping[str, Any]], selected_driver_id: str | None) -> DriverStudioPanelSnapshot:
-    selected_records = _selected_records(records, selected_driver_id)
+def _fixture_replay_panel(
+    records: Sequence[Mapping[str, Any]],
+    selected_driver_id: str | None,
+    *,
+    selected_records: Sequence[Mapping[str, Any]] | None = None,
+) -> DriverStudioPanelSnapshot:
+    resolved_records = selected_records if selected_records is not None else _selected_records(records, selected_driver_id)
     rows: list[Mapping[str, Any]] = []
-    for record in selected_records:
+    for record in resolved_records:
         for fixture in record.get("fixture_results", ()):
             rows.append(dict(_as_mapping(fixture), driver_id=record.get("driver_id")))
     passed = sum(1 for row in rows if bool(row.get("passed")))
@@ -888,9 +916,16 @@ def _risk_card_panel(risk_cards: Sequence[DriverStudioRiskCard], selected_driver
     )
 
 
-def _registry_state_panel(records: Sequence[Mapping[str, Any]], events: Sequence[Mapping[str, Any]], selected_driver_id: str | None) -> DriverStudioPanelSnapshot:
+def _registry_state_panel(
+    records: Sequence[Mapping[str, Any]],
+    events: Sequence[Mapping[str, Any]],
+    selected_driver_id: str | None,
+    *,
+    selected_records: Sequence[Mapping[str, Any]] | None = None,
+) -> DriverStudioPanelSnapshot:
     rows: list[Mapping[str, Any]] = []
-    for record in _selected_records(records, selected_driver_id):
+    resolved_records = selected_records if selected_records is not None else _selected_records(records, selected_driver_id)
+    for record in resolved_records:
         rows.append(
             {
                 "driver_id": record.get("driver_id"),
@@ -946,6 +981,9 @@ def _export_audit_console_panel(
     records: Sequence[Mapping[str, Any]],
     events: Sequence[Mapping[str, Any]],
     selected_driver_id: str | None,
+    *,
+    selected_records: Sequence[Mapping[str, Any]] | None = None,
+    timeline_rows: Sequence[Mapping[str, Any]] | None = None,
 ) -> DriverStudioPanelSnapshot:
     """Build a selected-driver export/audit preparation panel.
 
@@ -954,12 +992,14 @@ def _export_audit_console_panel(
     storage.
     """
 
-    selected_records = _selected_records(records, selected_driver_id)
-    timeline_rows = tuple(_as_mapping(row) for row in _evidence_timeline_panel(payload, records, events, selected_driver_id).rows)
+    resolved_records = selected_records if selected_records is not None else _selected_records(records, selected_driver_id)
+    if timeline_rows is None:
+        timeline_rows = _evidence_timeline_panel(payload, records, events, selected_driver_id).rows
+    timeline_rows = tuple(_as_mapping(row) for row in timeline_rows)
     audit_events = tuple(_as_mapping(event) for event in events)
     registry_rows = tuple(row for row in timeline_rows if str(row.get("stage")) in {"registry-approval-requested", "approved", "signed", "active", "observed-active"})
     rows: list[Mapping[str, Any]] = []
-    for record in selected_records:
+    for record in resolved_records:
         driver_id = _optional_text(record.get("driver_id"))
         driver_timeline = tuple(row for row in timeline_rows if row.get("driver_id") in {None, driver_id})
         driver_registry = tuple(row for row in registry_rows if row.get("driver_id") in {None, driver_id})

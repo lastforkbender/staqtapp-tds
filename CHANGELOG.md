@@ -1,3 +1,53 @@
+# v3.8.2 — System performance corrections
+
+The user's wider system audit request superseded the attached allocator-only
+assessment as this release's scope. Released a semantics-preserving correction
+across confirmed Core, persistence, observation, CSV, Generation Authority,
+Driver, Trace Rank, and Eaglegate hot paths. Stored formats, canonical CSV-byte
+identities, evidence identities, and authority boundaries remain unchanged.
+
+- Removed the redundant capacity scan from locked monotonic native automatic
+  handle allocation while retaining explicit-handle collision checks.
+- Reduced empty native index capacity from 4,096 to 1,024 slots, combined exact
+  telemetry updates under one lock acquisition, indexed persistence sidecars
+  once, published complete reload indexes atomically, decompressed stored values
+  once, and replaced full-file writer copies with bounded buffering and
+  fail-closed partial-write handling.
+- Reused authoritative CSV hashes and scan profiles, streamed canonical export,
+  made row-offset packing and duplicate detection linear, preflighted chunk
+  bounds, removed redundant verified-chunk hashing and reconstruction, and
+  derived scan artifact destinations from the canonical CSV identity.
+- Admitted exact immutable Generation records before caching manifest roots and
+  changed repeated linear sorted-payload lookup to binary search.
+- Reused immediately validated TDDL programs, removed duplicate Runtime Manager
+  validation, made VM instruction-cost lookup constant-time, and reduced
+  redundant Driver VM/Studio copying and whole-console construction.
+- Replaced per-codec immutable statistics construction and duplicate telemetry
+  tree/table scans with exact primitive counters and combined observation while
+  preserving custom sampler names and legacy per-index failure keys.
+- Reduced exact-record Trace Rank admission to one structure/source validation
+  pass, canonicalized non-exact subclasses before sealing, and added a
+  proof-scoped materializer while retaining the public fail-closed path and
+  exact packed bytes.
+- Cached immutable Eaglegate admission identities outside dataclass state and
+  indexed validated plans without widening target-only/shadow authority.
+- Added subsystem regression sentinels and reproducible native allocator,
+  persistence-writer, CSV/Generation, Driver, observation, Eaglegate, and Trace
+  Rank benchmarks.
+- Completed the post-review aggregate suite with 1,283 passed / 1 skipped in
+  native-active mode and 1,230 passed / 49 skipped in pure-Python mode; release
+  sanity, source hygiene, bytecode compilation, and pure-wheel smoke checks pass.
+- Retired the 306-process allocator research qualifier after it proved
+  operationally infeasible. It produced no performance decision, so v3.8.2
+  makes no retained allocator-speedup claim. Allocator correctness, ABI, and
+  lifecycle coverage instead remains within the normal tests, sanitizers,
+  supported-platform compatibility matrices, distribution builds, and
+  installed-package smoke tests.
+- Preserved Eaglegate as shadow/target-only with no new execution, canary,
+  promotion, activation, token-acceptance, or KV-commit authority. The manual
+  credentialed H100 workflow remains unexecuted and required for hardware
+  evidence.
+
 # v3.8.1 — Fixed-point path reference, Browser performance, and workspace telemetry
 
 Released the Phase 5 reference objective and repaired the packaged Browser's

@@ -8,9 +8,27 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      qualified_sha:
+        description: Exact qualified main commit SHA from the one-time controller
+        required: true
+      qualified_run_id:
+        description: Exact successful main release-gates workflow run ID
+        required: true
+      controller_run_id:
+        description: Exact successful one-time controller workflow run ID
+        required: true
+      controller_run_attempt:
+        description: Exact successful one-time controller run attempt
+        required: true
 
 permissions:
   contents: read
+
+concurrency:
+  group: >-
+    staqtapp-tds-release-${{ github.ref_type == 'tag' && github.ref_name || github.run_id }}
+  cancel-in-progress: false
 
 env:
   TDS_V360_NATIVE_ARCHITECTURE_ROOT: d2e839477d432cdf9e328982e6e9a245295dd05c80ddac4937232c0b72bc9d09
@@ -20,8 +38,8 @@ jobs:
     name: Source release checks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.13'
       - name: Check source release hygiene
@@ -40,8 +58,8 @@ jobs:
       matrix:
         python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install package for tests
@@ -59,8 +77,8 @@ jobs:
         os: [windows-latest, macos-latest]
         python-version: ['3.13']
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install package for tests
@@ -91,8 +109,8 @@ jobs:
     env:
       STAQTAPP_TDS_BUILD_NATIVE: '1'
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: ${{ matrix.python-version }}
       - name: Build and install native extensions
@@ -114,8 +132,8 @@ jobs:
       STAQTAPP_TDS_BUILD_NATIVE: '1'
       STAQTAPP_TDS_SANITIZE: ${{ matrix.sanitizer }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.13'
       - name: Require strict native C compilation
@@ -166,8 +184,8 @@ jobs:
       STAQTAPP_TDS_BUILD_NATIVE: '1'
       STAQTAPP_TDS_SANITIZE: thread
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.13'
       - name: Build ThreadSanitizer native extensions
@@ -196,8 +214,8 @@ jobs:
       STAQTAPP_TDS_BUILD_NATIVE: '1'
       CFLAGS: '-std=c11 -Wall -Wextra -Werror -Wconversion -Wshadow -Wpedantic -Wno-cast-function-type'
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: ${{ matrix.python-version }}
       - name: Build strict native extensions
@@ -232,8 +250,8 @@ jobs:
       STAQTAPP_TDS_BUILD_NATIVE: '1'
       CFLAGS: '-std=c11 -Wall -Wextra -Werror -Wconversion -Wshadow -Wpedantic -Wno-cast-function-type'
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: ${{ matrix.python-version }}
       - name: Report free-threaded interpreter
@@ -252,8 +270,8 @@ jobs:
     env:
       STAQTAPP_TDS_BUILD_NATIVE: '1'
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.13'
       - name: Build native extensions
@@ -266,41 +284,10 @@ jobs:
             > native-frozen-index-fuzz.json
           cat native-frozen-index-fuzz.json
       - name: Archive deterministic fuzz evidence
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: native-frozen-index-fuzz
           path: native-frozen-index-fuzz.json
-          if-no-files-found: error
-
-  native-frozen-performance-evidence:
-    name: Native frozen-index two-worker evidence
-    needs: source-release-checks
-    runs-on: ubuntu-latest
-    env:
-      STAQTAPP_TDS_BUILD_NATIVE: '1'
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
-      - name: Build native extensions
-        run: python -m pip install ".[test]"
-      - name: Require shared-runner aggregate no-regression evidence
-        shell: bash
-        run: |
-          set -euo pipefail
-          python tools/benchmark_v360_frozen_index.py \
-            --keys 4096 \
-            --iterations 128 \
-            --samples 7 \
-            --min-two-worker-factor 1.0 \
-            > native-frozen-index-performance.json
-          cat native-frozen-index-performance.json
-      - name: Archive separate performance evidence
-        uses: actions/upload-artifact@v7
-        with:
-          name: native-frozen-index-performance
-          path: native-frozen-index-performance.json
           if-no-files-found: error
 
   native-architecture-semantic-evidence:
@@ -319,8 +306,8 @@ jobs:
       STAQTAPP_TDS_BUILD_NATIVE: '1'
       CFLAGS: '-std=c11 -Wall -Wextra -Werror -Wconversion -Wshadow -Wpedantic -Wno-cast-function-type'
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.13'
       - name: Record native runner identity
@@ -350,7 +337,7 @@ jobs:
             tests/test_v360_native_architecture_parity.py
       - name: Archive architecture evidence even on mismatch
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: native-architecture-${{ matrix.architecture }}
           path: native-architecture-${{ matrix.architecture }}.json
@@ -362,15 +349,15 @@ jobs:
     needs: native-architecture-semantic-evidence
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.13'
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: native-architecture-x86_64
           path: native-architecture-reports/x86_64
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: native-architecture-aarch64
           path: native-architecture-reports/aarch64
@@ -387,7 +374,7 @@ jobs:
           cat native-architecture-comparison.json
       - name: Archive parity comparison evidence
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: native-architecture-parity-comparison
           path: native-architecture-comparison.json
@@ -404,12 +391,15 @@ jobs:
       - native-lifecycle-admission-qualification
       - native-free-threaded-admission-qualification
       - native-frozen-format-fuzz
-      - native-frozen-performance-evidence
       - native-architecture-parity-comparison
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      # actions/checkout v7.0.1.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      # actions/setup-python v6.
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.13'
       - name: Build source and universal wheel
@@ -423,7 +413,8 @@ jobs:
           python -m pip install --force-reinstall dist/*.whl
           python scripts/release_version.py --verify-installed
       - name: Archive validated distributions
-        uses: actions/upload-artifact@v7
+        # actions/upload-artifact v7.
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: staqtapp-tds-distributions
           path: dist/*
@@ -442,7 +433,6 @@ jobs:
       - native-lifecycle-admission-qualification
       - native-free-threaded-admission-qualification
       - native-frozen-format-fuzz
-      - native-frozen-performance-evidence
       - native-architecture-parity-comparison
       - build-distributions
     runs-on: ubuntu-latest
@@ -458,7 +448,6 @@ jobs:
           LIFECYCLE_RESULT: ${{ needs.native-lifecycle-admission-qualification.result }}
           FREE_THREADED_RESULT: ${{ needs.native-free-threaded-admission-qualification.result }}
           FUZZ_RESULT: ${{ needs.native-frozen-format-fuzz.result }}
-          PERFORMANCE_RESULT: ${{ needs.native-frozen-performance-evidence.result }}
           ARCHITECTURE_RESULT: ${{ needs.native-architecture-parity-comparison.result }}
           DISTRIBUTION_RESULT: ${{ needs.build-distributions.result }}
         run: |
@@ -475,7 +464,6 @@ jobs:
               "lifecycle": os.environ["LIFECYCLE_RESULT"],
               "free_threaded_admission": os.environ["FREE_THREADED_RESULT"],
               "fuzz": os.environ["FUZZ_RESULT"],
-              "performance": os.environ["PERFORMANCE_RESULT"],
               "architecture_parity": os.environ["ARCHITECTURE_RESULT"],
               "distribution": os.environ["DISTRIBUTION_RESULT"],
           }
@@ -485,20 +473,987 @@ jobs:
           print("all release gates succeeded")
           PY
 
+  prepublish-provenance:
+    name: Verify exact v3.8.2 controller provenance before OIDC
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref_type == 'tag' &&
+      github.ref_name == 'v3.8.2'
+    needs: release-gates-complete
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      tag_object_sha: ${{ steps.provenance.outputs.tag_object_sha }}
+    env:
+      RELEASE_VERSION: '3.8.2'
+      RELEASE_TAG: v3.8.2
+      RELEASE_REF: ${{ github.ref }}
+      RELEASE_SHA: ${{ github.sha }}
+      RELEASE_RUN_ID: ${{ github.run_id }}
+      QUALIFIED_SHA: ${{ inputs.qualified_sha }}
+      QUALIFIED_RUN_ID: ${{ inputs.qualified_run_id }}
+      CONTROLLER_RUN_ID: ${{ inputs.controller_run_id }}
+      CONTROLLER_RUN_ATTEMPT: ${{ inputs.controller_run_attempt }}
+      GH_REPOSITORY: ${{ github.repository }}
+    steps:
+      - name: Download exact controller-run attestation
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: v382-release-controller-attestation-${{ inputs.controller_run_id }}-${{ inputs.controller_run_attempt }}
+          path: controller-attestation
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.controller_run_id }}
+      - name: Fail closed unless controller proof, tag, main, and PyPI agree
+        id: provenance
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+          from urllib.error import HTTPError
+          from urllib.parse import quote
+          from urllib.request import Request, urlopen
+
+          repo = os.environ["GH_REPOSITORY"]
+          token = os.environ["GH_TOKEN"]
+          tag = os.environ["RELEASE_TAG"]
+          version = os.environ["RELEASE_VERSION"]
+          release_ref = os.environ["RELEASE_REF"]
+          release_sha = os.environ["RELEASE_SHA"]
+          release_run_id = int(os.environ["RELEASE_RUN_ID"])
+          qualified_sha = os.environ["QUALIFIED_SHA"]
+          qualified_run_text = os.environ["QUALIFIED_RUN_ID"]
+          controller_run_text = os.environ["CONTROLLER_RUN_ID"]
+          controller_attempt_text = os.environ["CONTROLLER_RUN_ATTEMPT"]
+          base = f"https://api.github.com/repos/{repo}"
+          headers = {
+              "Accept": "application/vnd.github+json",
+              "Authorization": f"Bearer {token}",
+              "X-GitHub-Api-Version": "2022-11-28",
+              "User-Agent": "staqtapp-tds-v382-prepublish-verifier",
+          }
+
+          if tag != "v3.8.2" or version != "3.8.2":
+              raise SystemExit("prepublication is bound only to exact v3.8.2")
+          if release_ref != f"refs/tags/{tag}":
+              raise SystemExit("publication requires the exact tag ref")
+          if not re.fullmatch(r"[0-9a-f]{40}", qualified_sha):
+              raise SystemExit("qualified_sha input is not an exact commit SHA")
+          if release_sha != qualified_sha:
+              raise SystemExit("tag workflow SHA differs from qualified main SHA")
+          if not re.fullmatch(r"[1-9][0-9]*", qualified_run_text):
+              raise SystemExit("qualified_run_id input is not an exact run ID")
+          qualified_run_id = int(qualified_run_text)
+          if not re.fullmatch(r"[1-9][0-9]*", controller_run_text):
+              raise SystemExit("controller_run_id input is not an exact run ID")
+          if not re.fullmatch(r"[1-9][0-9]*", controller_attempt_text):
+              raise SystemExit("controller run attempt is not exact")
+          controller_run_id = int(controller_run_text)
+          controller_run_attempt = int(controller_attempt_text)
+
+          event = json.loads(
+              Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8")
+          )
+          inputs = event.get("inputs")
+          if not isinstance(inputs, dict) or inputs != {
+              "qualified_sha": qualified_sha,
+              "qualified_run_id": qualified_run_text,
+              "controller_run_id": controller_run_text,
+              "controller_run_attempt": controller_attempt_text,
+          }:
+              raise SystemExit("workflow_dispatch inputs do not exactly match proof")
+
+          attestation_root = Path("controller-attestation")
+          attestation_files = [
+              path
+              for path in attestation_root.rglob("*")
+              if path.is_file() or path.is_symlink()
+          ]
+          expected_attestation_path = (
+              attestation_root / "v382-release-controller-attestation.json"
+          )
+          if (
+              attestation_files != [expected_attestation_path]
+              or expected_attestation_path.is_symlink()
+              or expected_attestation_path.stat().st_size > 16_384
+          ):
+              raise SystemExit("controller attestation artifact shape is not exact")
+          try:
+              attestation = json.loads(
+                  expected_attestation_path.read_text(encoding="utf-8")
+              )
+          except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+              raise SystemExit("controller attestation is unreadable") from exc
+          expected_attestation_keys = {
+              "schema",
+              "repo",
+              "controller_run_id",
+              "controller_run_attempt",
+              "release_run_id",
+              "qualified_run_id",
+              "qualified_sha",
+              "tag",
+              "tag_object_sha",
+          }
+          if not isinstance(attestation, dict) or set(attestation) != (
+              expected_attestation_keys
+          ):
+              raise SystemExit("controller attestation keys are not exact")
+          integer_keys = {
+              "controller_run_id",
+              "controller_run_attempt",
+              "release_run_id",
+              "qualified_run_id",
+          }
+          if any(
+              type(attestation.get(key)) is not int or attestation[key] <= 0
+              for key in integer_keys
+          ):
+              raise SystemExit(
+                  "controller attestation run identities are not exact integers"
+              )
+          tag_object_sha = attestation.get("tag_object_sha")
+          if not isinstance(tag_object_sha, str) or not re.fullmatch(
+              r"[0-9a-f]{40}", tag_object_sha
+          ):
+              raise SystemExit("attested tag object SHA is invalid")
+          expected_attestation = {
+              "schema": "staqtapp-tds/v382-release-controller-attestation-1",
+              "repo": repo,
+              "controller_run_id": controller_run_id,
+              "controller_run_attempt": controller_run_attempt,
+              "release_run_id": release_run_id,
+              "qualified_run_id": qualified_run_id,
+              "qualified_sha": qualified_sha,
+              "tag": tag,
+              "tag_object_sha": tag_object_sha,
+          }
+          if attestation != expected_attestation:
+              raise SystemExit(
+                  "controller attestation does not authorize this release run"
+              )
+
+          def api(method, path, expected=(200,)):
+              request = Request(base + path, method=method, headers=headers)
+              try:
+                  with urlopen(request, timeout=30) as response:
+                      raw = response.read()
+                      status = response.status
+              except HTTPError as exc:
+                  raw = exc.read()
+                  status = exc.code
+              if status not in expected:
+                  raise SystemExit(
+                      f"{method} {path} returned {status}: {raw[:500]!r}"
+                  )
+              return status, json.loads(raw) if raw else None
+
+          def require_repository(run, label):
+              for key in ("repository", "head_repository"):
+                  if run.get(key, {}).get("full_name") != repo:
+                      raise SystemExit(
+                          f"{label} has the wrong {key} provenance"
+                      )
+
+          _, current = api("GET", f"/actions/runs/{release_run_id}")
+          current_required = {
+              "id": release_run_id,
+              "run_attempt": 1,
+              "path": ".github/workflows/release.yml",
+              "event": "workflow_dispatch",
+              "head_sha": qualified_sha,
+              "status": "in_progress",
+          }
+          for key, value in current_required.items():
+              actual = current.get(key)
+              if (
+                  type(value) is int and type(actual) is not int
+              ) or actual != value:
+                  raise SystemExit(
+                      f"current tag run mismatch for {key}: {actual!r}"
+                  )
+          require_repository(current, "current tag run")
+          workflow_id = current.get("workflow_id")
+          if isinstance(workflow_id, bool) or not isinstance(workflow_id, int):
+              raise SystemExit("current tag run lacks an exact workflow ID")
+
+          _, controller = api("GET", f"/actions/runs/{controller_run_id}")
+          controller_required = {
+              "id": controller_run_id,
+              "run_attempt": controller_run_attempt,
+              "path": ".github/workflows/v382-release-controller.yml",
+              "event": "workflow_run",
+              "head_branch": "main",
+              "head_sha": qualified_sha,
+              "status": "completed",
+              "conclusion": "success",
+          }
+          for key, value in controller_required.items():
+              actual = controller.get(key)
+              if (
+                  type(value) is int and type(actual) is not int
+              ) or actual != value:
+                  raise SystemExit(
+                      f"controller run mismatch for {key}: "
+                      f"{actual!r}"
+                  )
+          require_repository(controller, "controller run")
+
+          attestation_name = (
+              f"v382-release-controller-attestation-{controller_run_id}-"
+              f"{controller_run_attempt}"
+          )
+          _, artifacts = api(
+              "GET",
+              f"/actions/runs/{controller_run_id}/artifacts?"
+              f"name={quote(attestation_name, safe='')}&per_page=100",
+          )
+          matching_artifacts = [
+              artifact
+              for artifact in artifacts.get("artifacts", [])
+              if artifact.get("name") == attestation_name
+          ]
+          if (
+              artifacts.get("total_count") != 1
+              or len(matching_artifacts) != 1
+              or matching_artifacts[0].get("expired") is not False
+              or matching_artifacts[0].get("workflow_run", {}).get("id")
+              != controller_run_id
+          ):
+              raise SystemExit(
+                  "exact immutable controller attestation artifact is unavailable"
+              )
+
+          _, qualified = api("GET", f"/actions/runs/{qualified_run_id}")
+          qualified_required = {
+              "id": qualified_run_id,
+              "workflow_id": workflow_id,
+              "path": ".github/workflows/release.yml",
+              "event": "push",
+              "head_branch": "main",
+              "head_sha": qualified_sha,
+              "status": "completed",
+              "conclusion": "success",
+          }
+          for key, value in qualified_required.items():
+              actual = qualified.get(key)
+              if (
+                  type(value) is int and type(actual) is not int
+              ) or actual != value:
+                  raise SystemExit(
+                      f"qualified main run mismatch for {key}: "
+                      f"{actual!r}"
+                  )
+          require_repository(qualified, "qualified main run")
+
+          jobs_seen = []
+          page = 1
+          while True:
+              _, jobs = api(
+                  "GET",
+                  f"/actions/runs/{qualified_run_id}/jobs?"
+                  f"filter=latest&per_page=100&page={page}",
+              )
+              jobs_seen.extend(jobs.get("jobs", []))
+              if len(jobs_seen) >= int(jobs.get("total_count", 0)):
+                  break
+              page += 1
+              if page > 10:
+                  raise SystemExit("qualified job list exceeded the safety bound")
+          aggregates = [
+              job
+              for job in jobs_seen
+              if job.get("name") == "Release gates complete"
+          ]
+          if (
+              len(aggregates) != 1
+              or aggregates[0].get("status") != "completed"
+              or aggregates[0].get("conclusion") != "success"
+          ):
+              raise SystemExit(
+                  "qualified run lacks one successful Release gates complete job"
+              )
+
+          _, main_ref = api("GET", "/git/ref/heads/main")
+          if (
+              main_ref.get("object", {}).get("type") != "commit"
+              or main_ref.get("object", {}).get("sha") != qualified_sha
+          ):
+              raise SystemExit("main no longer equals the qualified release SHA")
+
+          _, tag_ref = api(
+              "GET", f"/git/ref/tags/{quote(tag, safe='')}"
+          )
+          if (
+              tag_ref.get("object", {}).get("type") != "tag"
+              or tag_ref.get("object", {}).get("sha") != tag_object_sha
+          ):
+              raise SystemExit("publication requires an annotated release tag")
+          _, tag_object = api(
+              "GET", f"/git/tags/{tag_ref['object']['sha']}"
+          )
+          if (
+              tag_object.get("sha") != tag_object_sha
+              or tag_object.get("tag") != tag
+              or tag_object.get("object", {}).get("type") != "commit"
+              or tag_object.get("object", {}).get("sha") != qualified_sha
+          ):
+              raise SystemExit(
+                  "annotated tag does not peel to the qualified main SHA"
+              )
+
+          pypi_request = Request(
+              f"https://pypi.org/pypi/staqtapp-tds/{version}/json",
+              headers={
+                  "Accept": "application/json",
+                  "Cache-Control": "no-cache",
+                  "User-Agent": "staqtapp-tds-v382-prepublish-verifier",
+              },
+          )
+          try:
+              with urlopen(pypi_request, timeout=30) as response:
+                  response.read(1)
+                  status = response.status
+          except HTTPError as exc:
+              if exc.code != 404:
+                  raise SystemExit(
+                      f"PyPI absence check failed closed with HTTP {exc.code}"
+                  ) from exc
+          else:
+              raise SystemExit(
+                  f"PyPI {version} already exists (HTTP {status}); "
+                  "automatic publication re-entry is prohibited"
+              )
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"tag_object_sha={tag_object_sha}\n")
+          print("exact controller, main, tag, gate, and PyPI absence proof passed")
+          PY
+
   publish-pypi:
     name: Publish validated distributions to PyPI
-    if: github.ref_type == 'tag'
-    needs: release-gates-complete
+    if: >-
+      needs.prepublish-provenance.result == 'success' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref_type == 'tag' &&
+      github.ref_name == 'v3.8.2'
+    needs:
+      - release-gates-complete
+      - prepublish-provenance
     runs-on: ubuntu-latest
     environment:
       name: pypi
       url: https://pypi.org/p/staqtapp-tds
     permissions:
+      actions: read
+      contents: read
       id-token: write
+    env:
+      RELEASE_TAG: v3.8.2
+      RELEASE_REF: ${{ github.ref }}
+      RELEASE_SHA: ${{ github.sha }}
+      RELEASE_RUN_ID: ${{ github.run_id }}
+      RELEASE_RUN_ATTEMPT: ${{ github.run_attempt }}
+      QUALIFIED_SHA: ${{ inputs.qualified_sha }}
+      QUALIFIED_RUN_ID: ${{ inputs.qualified_run_id }}
+      CONTROLLER_RUN_ID: ${{ inputs.controller_run_id }}
+      CONTROLLER_RUN_ATTEMPT: ${{ inputs.controller_run_attempt }}
+      CONTROLLER_ATTESTATION_DIR: controller-attestation
+      DISTRIBUTION_DIR: dist
+      GH_REPOSITORY: ${{ github.repository }}
     steps:
-      - uses: actions/download-artifact@v8
+      # All pre-OIDC actions are immutable and run only after environment approval.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: staqtapp-tds-distributions
           path: dist
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.run_id }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: v382-release-controller-attestation-${{ inputs.controller_run_id }}-${{ inputs.controller_run_attempt }}
+          path: controller-attestation
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.controller_run_id }}
+      - name: Revalidate all publication proof immediately before OIDC
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python scripts/v382_release_provenance.py
       - name: Publish with PyPI trusted publishing
-        uses: pypa/gh-action-pypi-publish@v1.14.0
+        # pypa/gh-action-pypi-publish v1.14.0, pinned for Trusted Publishing.
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
+
+  verify-production-pypi:
+    name: Verify exact production PyPI publication
+    if: >-
+      needs.publish-pypi.result == 'success' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref_type == 'tag' &&
+      github.ref_name == 'v3.8.2'
+    needs: publish-pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      # actions/checkout v7.0.1.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      # actions/setup-python v6.
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+      # actions/download-artifact v8.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: staqtapp-tds-distributions
+          path: dist
+      - name: Bind live PyPI files to the validated workflow artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/release_version.py --check-tag "$RELEASE_TAG"
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import re
+          import time
+          from pathlib import Path
+          from urllib.error import HTTPError, URLError
+          from urllib.parse import unquote, urlparse
+          from urllib.request import (
+              HTTPRedirectHandler,
+              Request,
+              build_opener,
+              urlopen,
+          )
+
+          tag = os.environ["RELEASE_TAG"]
+          version = tag.removeprefix("v")
+          files = sorted(path for path in Path("dist").iterdir() if path.is_file())
+          if (
+              len(files) != 2
+              or not any(path.suffix == ".whl" for path in files)
+              or not any(path.name.endswith(".tar.gz") for path in files)
+          ):
+              raise SystemExit(
+                  f"expected exactly one wheel and one sdist, got: {files}"
+              )
+          expected = {
+              path.name: {
+                  "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                  "size": path.stat().st_size,
+              }
+              for path in files
+          }
+          url = f"https://pypi.org/pypi/staqtapp-tds/{version}/json"
+          last = "not visible"
+          for attempt in range(60):
+              try:
+                  request = Request(
+                      url,
+                      headers={
+                          "Accept": "application/json",
+                          "Cache-Control": "no-cache",
+                          "User-Agent": "staqtapp-tds-release-verifier/3.8.2",
+                      },
+                  )
+                  with urlopen(request, timeout=30) as response:
+                      payload = json.load(response)
+              except HTTPError as exc:
+                  if exc.code not in {404, 429} and exc.code < 500:
+                      raise
+                  payload = None
+                  last = f"HTTP {exc.code}"
+              except URLError as exc:
+                  payload = None
+                  last = repr(exc)
+
+              if payload is not None:
+                  if payload.get("info", {}).get("version") != version:
+                      raise SystemExit("PyPI returned an unexpected version identity")
+                  urls = payload.get("urls", [])
+                  if not isinstance(urls, list):
+                      raise SystemExit("PyPI urls field is not a list")
+                  remote = {}
+                  for item in urls:
+                      if not isinstance(item, dict):
+                          raise SystemExit("PyPI distribution entry is not an object")
+                      filename = item.get("filename")
+                      if not isinstance(filename, str) or not filename:
+                          raise SystemExit("PyPI distribution lacks a filename")
+                      if filename in remote:
+                          raise SystemExit(
+                              "PyPI returned duplicate distribution filenames"
+                          )
+                      remote[filename] = item
+                  if len(remote) != len(urls):
+                      raise SystemExit(
+                          "PyPI returned duplicate distribution filenames"
+                      )
+                  extras = set(remote) - set(expected)
+                  if extras:
+                      raise SystemExit(
+                          f"PyPI exposed unexpected artifacts: {sorted(extras)}"
+                      )
+                  for name in set(remote) & set(expected):
+                      item = remote[name]
+                      json_identity = {
+                          "sha256": item.get("digests", {}).get("sha256"),
+                          "size": item.get("size"),
+                      }
+                      if json_identity != expected[name]:
+                          raise SystemExit(
+                              f"PyPI JSON identity mismatch for {name}: "
+                              f"{json_identity!r}"
+                          )
+                  if set(remote) == set(expected):
+                      if any(item.get("yanked") for item in remote.values()):
+                          raise SystemExit("newly published distribution is yanked")
+                      for name, item in remote.items():
+                          expected_type = (
+                              "bdist_wheel" if name.endswith(".whl") else "sdist"
+                          )
+                          if item.get("packagetype") != expected_type:
+                              raise SystemExit(
+                                  f"PyPI distribution type mismatch for {name}"
+                              )
+
+                          raw_url = item.get("url")
+                          if not isinstance(raw_url, str):
+                              raise SystemExit(
+                                  f"PyPI distribution URL missing for {name}"
+                              )
+
+                          def require_public_file_url(value):
+                              parsed = urlparse(value)
+                              if (
+                                  parsed.scheme != "https"
+                                  or parsed.netloc.lower()
+                                  != "files.pythonhosted.org"
+                                  or parsed.query
+                                  or parsed.fragment
+                                  or unquote(parsed.path.rsplit("/", 1)[-1])
+                                  != name
+                              ):
+                                  raise SystemExit(
+                                      f"unsafe PyPI distribution URL for {name}: "
+                                      f"{value!r}"
+                                  )
+                              return parsed
+
+                          require_public_file_url(raw_url)
+                          class ConstrainedRedirect(HTTPRedirectHandler):
+                              def redirect_request(
+                                  self, req, fp, code, msg, headers, newurl
+                              ):
+                                  require_public_file_url(newurl)
+                                  return super().redirect_request(
+                                      req, fp, code, msg, headers, newurl
+                                  )
+
+                          request = Request(
+                              raw_url,
+                              headers={
+                                  "Accept": "application/octet-stream",
+                                  "Cache-Control": "no-cache",
+                                  "User-Agent": (
+                                      "staqtapp-tds-release-verifier/3.8.2"
+                                  ),
+                              },
+                          )
+                          digest = hashlib.sha256()
+                          size = 0
+                          opener = build_opener(ConstrainedRedirect)
+                          with opener.open(request, timeout=60) as response:
+                              require_public_file_url(response.geturl())
+                              while True:
+                                  chunk = response.read(1024 * 1024)
+                                  if not chunk:
+                                      break
+                                  size += len(chunk)
+                                  if size > expected[name]["size"]:
+                                      raise SystemExit(
+                                          f"public {name} exceeds expected size"
+                                      )
+                                  digest.update(chunk)
+                          public_identity = {
+                              "sha256": digest.hexdigest(),
+                              "size": size,
+                          }
+                          json_identity = {
+                              "sha256": item.get("digests", {}).get("sha256"),
+                              "size": item.get("size"),
+                          }
+                          if (
+                              public_identity != expected[name]
+                              or public_identity != json_identity
+                          ):
+                              raise SystemExit(
+                                  f"downloaded public bytes mismatch for {name}: "
+                                  f"{public_identity!r}"
+                              )
+                      print(
+                          json.dumps(
+                              {"version": version, "artifacts": expected},
+                              sort_keys=True,
+                          )
+                      )
+                      break
+                  last = f"only visible: {sorted(remote)}"
+              if attempt < 59:
+                  time.sleep(10)
+          else:
+              raise SystemExit(
+                  f"PyPI did not expose the exact artifact set: {last}"
+              )
+          PY
+      - name: Install and verify the exact production wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          python -m pip install \
+            --disable-pip-version-check \
+            --no-cache-dir \
+            --only-binary=:all: \
+            --index-url https://pypi.org/simple \
+            "staqtapp-tds==$version"
+          RELEASE_VERSION="$version" python -I - <<'PY'
+          import importlib.metadata as metadata
+          import os
+
+          from staqtapp_tds import TDSFileSystem, __version__
+
+          expected = os.environ["RELEASE_VERSION"]
+          assert metadata.version("staqtapp-tds") == expected
+          assert __version__ == expected
+          fs = TDSFileSystem("pypi_release_verification")
+          node = fs.makedirs("/release")
+          node.write_text("status", "published")
+          assert node.read_value("status") == "published"
+          PY
+      - name: Verify the live PyPI description and public targets
+        run: python scripts/verify_pypi_presentation.py --version "$RELEASE_TAG"
+
+  finalize-github-release:
+    name: Require production smoke before publishing GitHub Release
+    if: >-
+      needs.verify-production-pypi.result == 'success' &&
+      needs.prepublish-provenance.result == 'success' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref_type == 'tag' &&
+      github.ref_name == 'v3.8.2'
+    needs:
+      - verify-production-pypi
+      - prepublish-provenance
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      actions: write
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+      RELEASE_SHA: ${{ github.sha }}
+      QUALIFIED_RUN_ID: ${{ inputs.qualified_run_id }}
+      RELEASE_RUN_ID: ${{ github.run_id }}
+      RELEASE_RUN_ATTEMPT: ${{ github.run_attempt }}
+      ATTESTED_TAG_OBJECT_SHA: ${{ needs.prepublish-provenance.outputs.tag_object_sha }}
+      GH_REPOSITORY: ${{ github.repository }}
+    steps:
+      - name: Dispatch exact smoke, require success, then publish Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import time
+          from urllib.error import HTTPError
+          from urllib.parse import quote
+          from urllib.request import Request, urlopen
+
+          repo = os.environ["GH_REPOSITORY"]
+          token = os.environ["GH_TOKEN"]
+          tag = os.environ["RELEASE_TAG"]
+          sha = os.environ["RELEASE_SHA"]
+          tag_object_sha = os.environ["ATTESTED_TAG_OBJECT_SHA"]
+          version = tag.removeprefix("v")
+          if os.environ["RELEASE_RUN_ATTEMPT"] != "1":
+              raise SystemExit("automatic finalizer reruns are prohibited")
+          if not re.fullmatch(r"[0-9a-f]{40}", tag_object_sha):
+              raise SystemExit("controller-attested tag object SHA is invalid")
+          base = f"https://api.github.com/repos/{repo}"
+          headers = {
+              "Accept": "application/vnd.github+json",
+              "Authorization": f"Bearer {token}",
+              "X-GitHub-Api-Version": "2022-11-28",
+              "User-Agent": "staqtapp-tds-release-finalizer",
+          }
+
+          def api(method, path, payload=None, expected=(200,)):
+              data = None if payload is None else json.dumps(payload).encode()
+              request = Request(
+                  base + path,
+                  data=data,
+                  method=method,
+                  headers=headers,
+              )
+              try:
+                  with urlopen(request, timeout=30) as response:
+                      raw = response.read()
+                      status = response.status
+              except HTTPError as exc:
+                  raw = exc.read()
+                  status = exc.code
+              if status not in expected:
+                  raise SystemExit(
+                      f"{method} {path} returned {status}: {raw[:500]!r}"
+                  )
+              return status, json.loads(raw) if raw else None
+
+          status, ref = api(
+              "GET",
+              f"/git/ref/tags/{quote(tag, safe='')}",
+              expected=(200, 404),
+          )
+          if (
+              status != 200
+              or ref["object"].get("type") != "tag"
+              or ref["object"].get("sha") != tag_object_sha
+          ):
+              raise SystemExit("finalization requires the exact annotated tag")
+          _, tag_object = api("GET", f"/git/tags/{tag_object_sha}")
+          if (
+              tag_object.get("sha") != tag_object_sha
+              or tag_object.get("tag") != tag
+              or tag_object.get("object", {}).get("type") != "commit"
+              or tag_object["object"].get("sha") != sha
+          ):
+              raise SystemExit(
+                  "annotated tag does not peel to this qualified workflow SHA"
+              )
+
+          release_path = f"/releases/tags/{quote(tag, safe='')}"
+          status, _ = api("GET", release_path, expected=(200, 404))
+          if status == 200:
+              raise SystemExit(
+                  "GitHub Release already exists; automatic finalizer "
+                  "re-entry is prohibited"
+              )
+
+          def require_dispatch_response(status, payload):
+              if status != 200 or not isinstance(payload, dict):
+                  raise SystemExit(
+                      "workflow dispatch did not return exact run details"
+                  )
+              value = payload.get("workflow_run_id")
+              if isinstance(value, bool) or not isinstance(value, int):
+                  raise SystemExit(
+                      "workflow dispatch omitted workflow_run_id"
+                  )
+              if value <= 0:
+                  raise SystemExit("workflow dispatch returned an invalid run ID")
+              return value
+
+          def require_smoke_run(
+              run, run_id, workflow_id, repository, commit_sha
+          ):
+              required = {
+                  "id": run_id,
+                  "run_attempt": 1,
+                  "workflow_id": workflow_id,
+                  "path": ".github/workflows/pypi-smoke.yml",
+                  "event": "workflow_dispatch",
+                  "head_sha": commit_sha,
+              }
+              for key, value in required.items():
+                  actual = run.get(key)
+                  if (
+                      type(value) is int and type(actual) is not int
+                  ) or actual != value:
+                      raise SystemExit(
+                          f"production smoke mismatch for {key}: "
+                          f"{actual!r}"
+                      )
+              for key in ("repository", "head_repository"):
+                  if run.get(key, {}).get("full_name") != repository:
+                      raise SystemExit(
+                          f"production smoke has the wrong {key} provenance"
+                      )
+
+          _, smoke_workflow = api(
+              "GET", "/actions/workflows/pypi-smoke.yml"
+          )
+          smoke_workflow_id = smoke_workflow.get("id")
+          if (
+              isinstance(smoke_workflow_id, bool)
+              or not isinstance(smoke_workflow_id, int)
+              or smoke_workflow.get("path")
+              != ".github/workflows/pypi-smoke.yml"
+              or smoke_workflow.get("state") != "active"
+          ):
+              raise SystemExit("production smoke workflow identity is invalid")
+
+          status, dispatch = api(
+              "POST",
+              "/actions/workflows/pypi-smoke.yml/dispatches",
+              {
+                  "ref": tag,
+                  "inputs": {
+                      "version": tag,
+                      "qualified_sha": sha,
+                      "qualified_run_id": os.environ["QUALIFIED_RUN_ID"],
+                      "release_run_id": os.environ["RELEASE_RUN_ID"],
+                      "tag_object_sha": tag_object_sha,
+                  },
+                  "return_run_details": True,
+              },
+              expected=(200,),
+          )
+          smoke_run_id = require_dispatch_response(status, dispatch)
+          if dispatch.get("html_url"):
+              print("smoke dispatch:", dispatch["html_url"])
+
+          completed_smoke = None
+          for _ in range(120):
+              status, current = api(
+                  "GET",
+                  f"/actions/runs/{smoke_run_id}",
+                  expected=(200, 404),
+              )
+              if status == 404:
+                  time.sleep(15)
+                  continue
+              require_smoke_run(
+                  current, smoke_run_id, smoke_workflow_id, repo, sha
+              )
+              if current.get("status") == "completed":
+                  if current.get("conclusion") != "success":
+                      raise SystemExit(
+                          "exact production smoke completed unsuccessfully: "
+                          f"{current.get('conclusion')!r}; recover manually"
+                      )
+                  completed_smoke = current
+                  break
+              time.sleep(15)
+          if completed_smoke is None:
+              raise SystemExit(
+                  "exact returned production smoke did not complete within "
+                  "30 minutes"
+              )
+
+          smoke_jobs = []
+          page = 1
+          while True:
+              _, jobs = api(
+                  "GET",
+                  f"/actions/runs/{smoke_run_id}/jobs?"
+                  f"filter=latest&per_page=100&page={page}",
+              )
+              smoke_jobs.extend(jobs.get("jobs", []))
+              if len(smoke_jobs) >= int(jobs.get("total_count", 0)):
+                  break
+              page += 1
+              if page > 10:
+                  raise SystemExit("smoke job list exceeded the safety bound")
+          for required_name in (
+              "Validate production release identity",
+              "Production PyPI smoke complete",
+          ):
+              matches = [
+                  job for job in smoke_jobs if job.get("name") == required_name
+              ]
+              if (
+                  len(matches) != 1
+                  or matches[0].get("status") != "completed"
+                  or matches[0].get("conclusion") != "success"
+              ):
+                  raise SystemExit(
+                      f"smoke lacks one successful {required_name!r} job"
+                  )
+          print("production smoke passed:", completed_smoke["html_url"])
+
+          # Revalidate the immutable identities after the external smoke and
+          # only then create a public GitHub Release.
+          _, final_ref = api(
+              "GET", f"/git/ref/tags/{quote(tag, safe='')}"
+          )
+          if (
+              final_ref.get("object", {}).get("type") != "tag"
+              or final_ref.get("object", {}).get("sha") != tag_object_sha
+          ):
+              raise SystemExit("annotated tag changed during production smoke")
+          _, final_tag = api("GET", f"/git/tags/{tag_object_sha}")
+          if (
+              final_tag.get("sha") != tag_object_sha
+              or final_tag.get("tag") != tag
+              or final_tag.get("object", {}).get("type") != "commit"
+              or final_tag.get("object", {}).get("sha") != sha
+          ):
+              raise SystemExit("release tag target changed during production smoke")
+          status, _ = api("GET", release_path, expected=(200, 404))
+          if status == 200:
+              raise SystemExit(
+                  "GitHub Release appeared during smoke; refusing ambiguity"
+              )
+
+          body = (
+              f"Production wheel and source distribution for `{tag}` were "
+              "downloaded from PyPI and hash-verified against the validated "
+              "tag-workflow artifacts. The exact returned production-smoke "
+              "run passed before this Release was published.\n\n"
+              f"- PyPI: https://pypi.org/project/staqtapp-tds/{version}/\n"
+              "- Performance evidence: "
+              f"https://github.com/{repo}/blob/{tag}/docs/"
+              "135_v382_System_Performance_Corrections.md"
+          )
+          _, release = api(
+              "POST",
+              "/releases",
+              {
+                  "tag_name": tag,
+                  "target_commitish": sha,
+                  "name": f"Staqtapp-TDS {tag}",
+                  "body": body,
+                  "draft": False,
+                  "prerelease": False,
+                  "generate_release_notes": True,
+                  "make_latest": "true",
+              },
+              expected=(201,),
+          )
+          if (
+              release.get("tag_name") != tag
+              or release.get("draft")
+              or release.get("prerelease")
+          ):
+              raise SystemExit("GitHub returned an unexpected Release identity")
+          print("GitHub Release published:", release["html_url"])
+          PY

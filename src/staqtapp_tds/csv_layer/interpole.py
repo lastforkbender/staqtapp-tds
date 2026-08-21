@@ -378,7 +378,8 @@ def _build_interpole_stages(
     row_offsets_hash = _canonical_sha256(row_offsets)
     content_hashes_hash = _canonical_sha256(content_hashes)
     dialect_hash = _canonical_sha256(dialect)
-    canonical_sha256 = hashlib.sha256(canonical.encode(manifest.encoding)).hexdigest()
+    canonical_bytes = canonical.encode(manifest.encoding)
+    canonical_sha256 = hashlib.sha256(canonical_bytes).hexdigest()
 
     revalidation_errors = tuple(str(error) for error in getattr(stored_revalidation, "errors", ()) or ())
     native_commit_errors = tuple(str(error) for error in getattr(native_commit, "errors", ()) or ())
@@ -424,7 +425,7 @@ def _build_interpole_stages(
             source_key=keys["raw"],
             source_hashes={"raw_sha256": manifest.raw_sha256, "canonical_sha256": canonical_sha256},
             metrics={
-                "canonical_size": len(canonical.encode(manifest.encoding)),
+                "canonical_size": len(canonical_bytes),
                 "canonical_line_count": canonical.count("\n"),
                 "canonical_materialized": False,
             },

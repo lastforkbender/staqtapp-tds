@@ -83,7 +83,7 @@ class EaglegateContractError(ValueError):
 
 
 def _int(name: str, value: int, lo: int = 0, hi: int = _U63) -> int:
-    if isinstance(value, bool) or not isinstance(value, int):
+    if type(value) is not int:
         raise EaglegateContractError(f"{name} must be an integer")
     if value < lo:
         raise EaglegateContractError(f"{name} must be at least {lo}")
@@ -95,13 +95,13 @@ def _int(name: str, value: int, lo: int = 0, hi: int = _U63) -> int:
 
 
 def _bool(name: str, value: bool) -> bool:
-    if not isinstance(value, bool):
+    if type(value) is not bool:
         raise EaglegateContractError(f"{name} must be a boolean")
     return value
 
 
 def _ascii(name: str, value: str, *, empty: bool = False, limit: int = 192) -> str:
-    if not isinstance(value, str) or (not value and not empty):
+    if type(value) is not str or (not value and not empty):
         raise EaglegateContractError(f"{name} must be a valid string")
     try:
         raw = value.encode("ascii")
@@ -119,7 +119,7 @@ def _ascii(name: str, value: str, *, empty: bool = False, limit: int = 192) -> s
 def _root(name: str, value: str, *, empty: bool = False) -> str:
     if empty and value == "":
         return value
-    if not isinstance(value, str) or not _ROOT_RE.fullmatch(value):
+    if type(value) is not str or not _ROOT_RE.fullmatch(value):
         raise EaglegateContractError(
             f"{name} must be lowercase sha256:<64-hex>",
             fault=EaglegateFault.IDENTITY_MISMATCH,

@@ -366,46 +366,22 @@ def validate_csv_scan_profile(
     native storage behavior.
     """
     keys = artifact_keys(csv_id)
-    checked: list[str] = []
-    errors: list[str] = []
-
     manifest = load_csv_manifest(directory, csv_id)
-    checked.append("manifest")
     raw_value = directory.read_value(keys["raw"])
-    checked.append("raw")
     if not isinstance(raw_value, str):
         raise TypeError(f"CSV raw artifact {keys['raw']!r} is not text")
     row_value = directory.read_value(keys["row_offsets"])
-    checked.append("row_offsets")
     if not isinstance(row_value, dict):
         raise TypeError(f"CSV row-offset artifact {keys['row_offsets']!r} is not a JSON object")
 
     raw = raw_value.encode(manifest.encoding)
     profile = scan_csv_bytes(raw, manifest.dialect, encoding=manifest.encoding, chunk_size=chunk_size)
     row_map = CSVRowOffsetMap.from_mapping(row_value)
-
-    raw_sha256_verified = profile.raw_sha256 == manifest.raw_sha256 == row_map.source_hash
-    if not raw_sha256_verified:
-        errors.append("scan_raw_sha256_mismatch")
-    row_offsets_match = profile.row_offsets == row_map.row_offsets
-    if not row_offsets_match:
-        errors.append("scan_row_offsets_mismatch")
-    row_count_match = profile.row_count == manifest.row_count == row_map.row_count
-    if not row_count_match:
-        errors.append("scan_row_count_mismatch")
-
-    status = "valid" if not errors else "invalid"
-    return CSVScanParityReport(
-        csv_id=csv_id,
-        status=status,
-        raw_sha256_verified=raw_sha256_verified,
-        row_offsets_match=row_offsets_match,
-        row_count_match=row_count_match,
-        scan_row_count=profile.row_count,
-        artifact_row_count=row_map.row_count,
-        checked_artifacts=tuple(checked),
-        errors=tuple(errors),
-        scanner=profile.scanner,
+    return _compare_scan_profile_to_artifacts(
+        csv_id,
+        profile,
+        manifest,
+        row_map,
         chunk_size=chunk_size,
     )
 
@@ -424,9 +400,24 @@ def scan_csv_row_anchors(
     :func:`scan_csv_bytes` so routine scan profiles stay compact and callers opt
     in only when row-level anchor evidence is needed.
     """
+    profile = scan_csv_bytes(raw, dialect, encoding=encoding, chunk_size=chunk_size)
+    return _row_anchors_from_scan_profile(raw, profile)
+
+
+def _row_anchors_from_scan_profile(
+    raw: BytesLike,
+    profile: CSVScanProfile,
+) -> CSVRowAnchorProfile:
+    """Hash row spans from an already-computed scan profile.
+
+    This private composition seam lets workflows that require both scan and
+    row-anchor evidence reuse the authoritative hash and offset scan while
+    retaining the exact public profiles and per-row hashes.
+    """
     view = memoryview(raw).cast("B")
     n = len(view)
-    profile = scan_csv_bytes(view, dialect, encoding=encoding, chunk_size=chunk_size)
+    if n != profile.raw_size:
+        raise ValueError("scan profile extent does not match CSV source")
     spans: list[int] = []
     hashes: list[str] = []
     offsets = profile.row_offsets
@@ -436,7 +427,7 @@ def scan_csv_row_anchors(
         spans.append(span)
         hashes.append(hashlib.sha256(view[start:end]).hexdigest())
     return CSVRowAnchorProfile(
-        encoding=encoding,
+        encoding=profile.encoding,
         raw_size=n,
         raw_sha256=profile.raw_sha256,
         row_offsets=offsets,
@@ -444,8 +435,76 @@ def scan_csv_row_anchors(
         row_anchor_hashes=tuple(hashes),
         row_count=profile.row_count,
         digest_algorithm="sha256",
-        chunk_size=chunk_size,
+        chunk_size=profile.chunk_size,
         chunk_count=profile.chunk_count,
+    )
+
+
+def _compare_scan_profile_to_artifacts(
+    csv_id: str,
+    profile: CSVScanProfile,
+    manifest: Any,
+    row_map: CSVRowOffsetMap,
+    *,
+    chunk_size: int | None,
+) -> CSVScanParityReport:
+    """Build scan parity from one already-loaded immutable evidence set."""
+    errors: list[str] = []
+    raw_sha256_verified = profile.raw_sha256 == manifest.raw_sha256 == row_map.source_hash
+    if not raw_sha256_verified:
+        errors.append("scan_raw_sha256_mismatch")
+    row_offsets_match = profile.row_offsets == row_map.row_offsets
+    if not row_offsets_match:
+        errors.append("scan_row_offsets_mismatch")
+    row_count_match = profile.row_count == manifest.row_count == row_map.row_count
+    if not row_count_match:
+        errors.append("scan_row_count_mismatch")
+    return CSVScanParityReport(
+        csv_id=csv_id,
+        status="valid" if not errors else "invalid",
+        raw_sha256_verified=raw_sha256_verified,
+        row_offsets_match=row_offsets_match,
+        row_count_match=row_count_match,
+        scan_row_count=profile.row_count,
+        artifact_row_count=row_map.row_count,
+        checked_artifacts=("manifest", "raw", "row_offsets"),
+        errors=tuple(errors),
+        scanner=profile.scanner,
+        chunk_size=chunk_size,
+    )
+
+
+def _compare_row_anchors_to_artifacts(
+    csv_id: str,
+    anchors: CSVRowAnchorProfile,
+    manifest: Any,
+    row_map: CSVRowOffsetMap,
+    *,
+    chunk_size: int | None,
+) -> CSVRowAnchorParityReport:
+    """Build row-anchor parity from one already-loaded evidence set."""
+    errors: list[str] = []
+    raw_sha256_verified = anchors.raw_sha256 == manifest.raw_sha256 == row_map.source_hash
+    if not raw_sha256_verified:
+        errors.append("anchor_raw_sha256_mismatch")
+    row_offsets_match = anchors.row_offsets == row_map.row_offsets
+    if not row_offsets_match:
+        errors.append("anchor_row_offsets_mismatch")
+    row_count_match = anchors.row_count == manifest.row_count == row_map.row_count
+    if not row_count_match:
+        errors.append("anchor_row_count_mismatch")
+    return CSVRowAnchorParityReport(
+        csv_id=csv_id,
+        status="valid" if not errors else "invalid",
+        raw_sha256_verified=raw_sha256_verified,
+        row_offsets_match=row_offsets_match,
+        row_count_match=row_count_match,
+        anchor_row_count=anchors.row_count,
+        artifact_row_count=row_map.row_count,
+        checked_artifacts=("manifest", "raw", "row_offsets"),
+        errors=tuple(errors),
+        scanner=anchors.scanner,
+        chunk_size=chunk_size,
     )
 
 
@@ -473,45 +532,21 @@ def validate_csv_row_anchors(
     tically from the preserved raw source and current row-offset map.
     """
     keys = artifact_keys(csv_id)
-    checked: list[str] = []
-    errors: list[str] = []
-
     manifest = load_csv_manifest(directory, csv_id)
-    checked.append("manifest")
     raw_value = directory.read_value(keys["raw"])
-    checked.append("raw")
     if not isinstance(raw_value, str):
         raise TypeError(f"CSV raw artifact {keys['raw']!r} is not text")
     row_value = directory.read_value(keys["row_offsets"])
-    checked.append("row_offsets")
     if not isinstance(row_value, dict):
         raise TypeError(f"CSV row-offset artifact {keys['row_offsets']!r} is not a JSON object")
 
     raw = raw_value.encode(manifest.encoding)
     anchors = scan_csv_row_anchors(raw, manifest.dialect, encoding=manifest.encoding, chunk_size=chunk_size)
     row_map = CSVRowOffsetMap.from_mapping(row_value)
-
-    raw_sha256_verified = anchors.raw_sha256 == manifest.raw_sha256 == row_map.source_hash
-    if not raw_sha256_verified:
-        errors.append("anchor_raw_sha256_mismatch")
-    row_offsets_match = anchors.row_offsets == row_map.row_offsets
-    if not row_offsets_match:
-        errors.append("anchor_row_offsets_mismatch")
-    row_count_match = anchors.row_count == manifest.row_count == row_map.row_count
-    if not row_count_match:
-        errors.append("anchor_row_count_mismatch")
-
-    status = "valid" if not errors else "invalid"
-    return CSVRowAnchorParityReport(
-        csv_id=csv_id,
-        status=status,
-        raw_sha256_verified=raw_sha256_verified,
-        row_offsets_match=row_offsets_match,
-        row_count_match=row_count_match,
-        anchor_row_count=anchors.row_count,
-        artifact_row_count=row_map.row_count,
-        checked_artifacts=tuple(checked),
-        errors=tuple(errors),
-        scanner=anchors.scanner,
+    return _compare_row_anchors_to_artifacts(
+        csv_id,
+        anchors,
+        manifest,
+        row_map,
         chunk_size=chunk_size,
     )

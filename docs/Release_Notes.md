@@ -1,5 +1,39 @@
 # TDS Release Notes
 
+## v3.8.2 — System Performance Corrections
+
+The user's system-wide audit request superseded the attached allocator-only
+assessment as the scope of this release. v3.8.2 repairs
+confirmed scaling failures across native Core, persistence/telemetry, JSON
+observation, CSV evidence operations, Generation Authority, Driver
+Foundry/VM/Studio orchestration, Trace Rank, and Eaglegate admission. It changes no
+stored format, canonical CSV byte contract, public authority boundary, Browser
+capture, or important link.
+
+The correction removes quadratic automatic-handle allocation, repeated linear
+manifest payload lookup, repeated whole-source CSV scans and hashes, duplicate
+decompression and full-file persistence copies, repeated immutable manifest
+hashing, and redundant Driver validation/table/copy work. Review hardening also
+binds CSV artifact writes to the canonical CSV identity, publishes sidecar
+reload indexes atomically, admits only exact immutable Generation records for
+cached roots, preserves the custom observation sampler namespace, and
+decode-normalizes non-exact Trace graph records before sealing. Trace Rank uses
+a proof-scoped read seam only after admission; its public untrusted-input
+materializer remains fail closed. Eaglegate reuses immutable admission
+identities without changing target-only or shadow status. See
+`docs/135_v382_System_Performance_Corrections.md` for the local measurement summary and
+the higher-risk hypotheses deliberately deferred from this patch.
+
+The 306-process allocator research qualifier was retired after proving
+operationally infeasible and produced no performance decision. v3.8.2 therefore
+makes no retained allocator-speedup claim. Allocator correctness, ABI, and
+lifecycle coverage is carried by the normal functional and adversarial tests,
+sanitizers, supported-platform compatibility matrices, distribution builds,
+and installed-package smoke tests. This release adds no Driver or Eaglegate
+execution, canary, promotion, activation, token-acceptance, or KV-commit
+authority. Eaglegate remains shadow/target-only; the manual credentialed H100
+workflow remains unexecuted and required for hardware-evidence claims.
+
 ## v3.8.1 — Fixed-Point Reference and Live Workspace Telemetry
 
 This patch releases the off-path Phase 5 fixed-point path reference oracle and

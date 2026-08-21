@@ -1,8 +1,36 @@
-# Staqtapp-TDS v3.8.1
+# Staqtapp-TDS v3.8.2
 
-> **Release status:** v3.8.1 は current production PyPI release です。Publication は complete aggregate release gate を通過した exact `v3.8.1` tag からのみ許可されます。v3.6 Foundation、v3.7 Generation Authority、v3.8 Eaglegate / packed graph、Phase 5 fixed-point reference oracle、Browser idle-performance 修正、workspace telemetry mount を含みます。Manual credentialed H100 workflow は未実行であり hardware evidence に引き続き必要です。Eaglegate は shadow / target-only のままで、production activation authority を持ちません。
+## v3.8.2 の測定済み performance correction
 
-> **v3.8.1 reference / telemetry release:** Phase 1–4 convergence を保持し、deterministic off-path Phase 5 fixed-point path reference oracle を追加します。Browser は 19 page のうち 1 page だけを active rendering し、polling は serialized / visibility-aware になりました。Detached Browser 向けに atomic workspace telemetry mount も追加します。Production request、canary、promotion、activation、execution、token acceptance、KV commit authority は含みません。
+以下の representative paired measurement は v3.8.1 と v3.8.2 を比較し、
+semantic result の完全一致を必須としています。
+
+| 対象 | 測定結果 |
+|---|---|
+| Core / observation | 200,000 telemetry call は 4.38 倍高速化し、JSON canonical dump / fast load はそれぞれ 4.12 倍 / 4.90 倍高速化しました。 |
+| Persistence | 64 MiB raw payload で elapsed time は 8.98% 短縮し、traced Python peak allocation は 67,129,697 B から 1,064,702 B に低減しました。 |
+| CSV / Generation | CSV scan + row anchor は 3.15 倍高速化し、row-offset packing の traced Python peak allocation は 88.36% 低減しました。4,096-payload manifest の cached root 8 回 read は 310.724119 ms から 0.006660 ms に短縮しました。 |
+| Driver platform | Direct VM、managed VM、Studio review workload はそれぞれ 33.72%、28.02%、73.41% 高速化しました。 |
+| Trace Rank | Graph admission、byte admission、public fail-closed materialization はそれぞれ 3.57 倍、2.05 倍、1.63 倍高速化しました。 |
+| Eaglegate | 測定した 1 / 3 / 128 plan fixture の warmed public admission は 13.79 倍～14.45 倍高速化しました。 |
+
+これらは Linux x86-64、CPython 3.12.13、GCC `-O3` における
+workload-specific measurement です。Exact root、hash、byte、counter の一致を
+必須としています。`tracemalloc` は process RSS ではなく traced Python
+allocation を示します。Retained allocator speedup は claim しません。
+306-process research qualifier は operationally infeasible であることが判明した
+ため廃止され、performance decision は生成されませんでした。Allocator の
+correctness、ABI、lifecycle は normal test、sanitizer、compatibility matrix、
+distribution build、installed-package smoke test で検証します。完全な method と result は
+`docs/135_v382_System_Performance_Corrections.md` に記録しています。
+
+> **Release status:** v3.8.2 は production release です。Stored format、
+> canonical CSV byte、public authority boundary、Browser capture、important
+> link は変更しません。この correction は新しい Driver、Eaglegate、
+> execution、canary、promotion、activation、token acceptance、KV commit
+> authority を付与しません。Manual credentialed H100 workflow は未実行で、
+> hardware evidence には引き続き必要です。Eaglegate は shadow / target-only
+> のままです。
 
 > **v3.6.0 Foundation substrate:** fail-closed native ABI / lifecycle、strict checksum / UTF-8 truth、generation-bound handle、bounded C11 diagnostics、immutable packed read、x86-64 / AArch64 semantic parity を保持します。
 
@@ -102,7 +130,7 @@ TDS は storage hot path を狭く保つ設計です。Native index、lookup、p
 
 ```bash
 # Current production PyPI release（両方の UI を含む）
-python -m pip install staqtapp-tds==3.8.1
+python -m pip install staqtapp-tds==3.8.2
 
 # main TDS telemetry UI を起動
 staqtapp-tds
@@ -258,6 +286,18 @@ TDS は preparation、evidence、review、authority を明確に分離します�
 
 ## Validation status
 
+v3.8.2 production release は Core、observation、CSV / Generation、Driver、Trace
+Rank、Eaglegate における whole-structure work の重複を修正します。Native
+automatic handle allocation、sidecar lookup、decompression、bounded persistence
+write と atomic reload index publication、exact JSON / telemetry counter と
+sampler compatibility、CSV hash / scan / verified chunk reuse と canonical
+artifact routing、exact immutable Generation manifest identity / logarithmic
+payload lookup、Driver validation / contract table / deep copy、exact-record
+Trace admission と non-exact subclass の canonical normalization、immutable
+Eaglegate admission identity を対象にしています。測定 evidence、変更しない
+contract、deferred high-risk work は
+`docs/135_v382_System_Performance_Corrections.md` を参照してください。
+
 v3.8.1 release は Phase 1–4 の 4 boundary を保持します。v3.7 Generation
 Authority は exact CSV と composite Eaglegate generation を head-root CAS、
 cross-process pin、deterministic recovery、rollback、retirement で publish
@@ -315,7 +355,16 @@ v3.8.1 は reference-only Phase 5 fixed-point path oracle と Browser / workspac
 telemetry correction を追加します。Frontier execution または Eaglegate
 activation authority は追加しません。Local qualification は 1,159 passed、
 45 skipped、HTTP workspace smoke、distribution artifact check を完了し、
-production publication は complete tag matrix によって gate されます。
+production publication は complete tag matrix を通じて完了しました。
+
+v3.8.2 は production system-performance correction です。v3.8.1 の stored
+format、canonical CSV-byte identity、evidence identity、authority boundary を
+保持し、変更 path には regression sentinel があります。報告する measurement
+は workload-specific であり universal hardware claim ではありません。廃止した
+306-process allocator research qualifier は performance decision を生成して
+いないため、v3.8.2 は retained allocator-speedup を claim しません。Allocator
+の correctness、ABI、lifecycle は normal test、sanitizer、compatibility、build、
+installed-smoke gate で検証します。
 
 ## Repository map
 

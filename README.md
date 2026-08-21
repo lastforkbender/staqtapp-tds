@@ -1,12 +1,37 @@
-> **v3.8.1 fixed-point reference and telemetry release**
->
-> This patch retains the Phase 1–4 convergence and adds the deterministic,
-> off-path Phase 5 fixed-point path reference oracle. It also makes the Browser
-> render one active page at a time, removes overlapping idle polling and costly
-> compositing, and adds an atomic workspace telemetry mount for a detached
-> Browser process. Eaglegate and Trace Rank remain off the production request
-> path with no canary, promotion, activation, execution, token-acceptance, or
-> KV-commit authority.
+# Staqtapp-TDS v3.8.2
+
+## v3.8.2 measured performance corrections
+
+v3.8.2 corrects confirmed scaling failures across persistence and observation,
+CSV evidence workflows, Generation Authority, Driver Foundry/VM/Studio
+orchestration, Trace Rank, and Eaglegate admission. Representative paired
+v3.8.1-to-v3.8.2 measurements required identical semantic results:
+
+| Area | Measured result |
+|---|---|
+| Core / observation | 200,000 telemetry calls were 4.38× faster; JSON canonical dump and fast load were 4.12× and 4.90× faster. |
+| Persistence | For a 64 MiB raw payload, elapsed time improved by 8.98% and traced Python peak allocation fell from 67,129,697 B to 1,064,702 B. |
+| CSV / Generation | CSV scan plus row anchors was 3.15× faster; row-offset packing used 88.36% less traced Python peak allocation; eight cached root reads over a 4,096-payload manifest fell from 310.724119 ms to 0.006660 ms. |
+| Driver platform | Direct VM, managed VM, and Studio review workloads were 33.72%, 28.02%, and 73.41% faster. |
+| Trace Rank | Graph admission, byte admission, and public fail-closed materialization were 3.57×, 2.05×, and 1.63× faster. |
+| Eaglegate | Warmed public admission was 13.79×–14.45× faster across the measured 1-, 3-, and 128-plan fixtures. |
+
+These workload-specific measurements were made on Linux x86-64 with CPython
+3.12.13 and GCC `-O3`; exact roots, hashes, bytes, or counters had to match.
+`tracemalloc` values describe traced Python allocation, not process RSS. No
+retained allocator speedup is claimed: the 306-process research qualifier was
+retired after proving operationally infeasible and produced no performance
+decision. Allocator correctness, ABI, and lifecycle coverage is provided by
+normal tests, sanitizers, compatibility matrices, distribution builds, and
+installed-package smoke tests. Full methods and results are recorded in
+`docs/135_v382_System_Performance_Corrections.md`.
+
+> **Release status:** v3.8.2 is the production release. It preserves stored
+> formats, canonical CSV bytes, public authority boundaries, Browser captures,
+> and important links. The correction grants no new Driver, Eaglegate,
+> execution, canary, promotion, activation, token-acceptance, or KV-commit
+> authority. The manual credentialed H100 workflow has not been executed and
+> remains required for hardware evidence; Eaglegate remains shadow/target-only.
 
 > **v3.6.0 Foundation substrate**
 >
@@ -17,10 +42,6 @@
 > **Current security contract**
 >
 > At-rest encryption is not implemented. Requests using `DirFlags.ENCRYPTED` fail closed instead of storing plaintext. New v2 persistence files require their integrity sidecar. `.tds` input should be treated as trusted until explicit resource-budget hardening is complete. Native extensions are optional and are built only when `STAQTAPP_TDS_BUILD_NATIVE=1` is set.
-
-# Staqtapp-TDS v3.8.1
-
-> **Release status:** v3.8.1 is the current production PyPI release. Publication is permitted only from the exact `v3.8.1` tag after the complete aggregate release gate succeeds. The v3.6 Foundation, v3.7 Generation Authority, v3.8 Eaglegate/packed graph, Phase 5 fixed-point reference oracle, Browser idle-performance repair, and workspace telemetry mount are included. The manual credentialed H100 workflow has not been executed and remains required for hardware evidence; Eaglegate remains shadow/target-only and has no production activation authority.
 
 **Temporal Directory System - native-indexed `.tds` storage, controlled variables, trace ranking, CSV evidence operations, semantic review, and centralized observability for AI systems.**
 
@@ -118,7 +139,7 @@ TDS is designed around a narrow storage hot path. Native indexing, lookup, persi
 
 ```bash
 # Current production PyPI release; includes both UIs
-python -m pip install staqtapp-tds==3.8.1
+python -m pip install staqtapp-tds==3.8.2
 
 # Launch the main TDS telemetry UI
 staqtapp-tds
@@ -276,6 +297,22 @@ TDS intentionally distinguishes preparation, evidence, review, and authority:
 
 ## Validation status
 
+The v3.8.2 production release corrects repeated whole-structure work across Core,
+observation, CSV/Generation, Driver, Trace Rank, and Eaglegate. Native automatic
+handle allocation uses its locked monotonic high-water invariant instead of
+scanning capacity; persistence indexes immutable sidecars once, decompresses
+once, publishes reload indexes atomically, and writes through a bounded buffer;
+JSON/telemetry retains exact counters and sampler compatibility while avoiding
+per-call records and duplicate tree/table scans; CSV workflows reuse
+authoritative hashes, scans, and verified chunks and route artifacts from the
+canonical CSV identity; exact immutable Generation manifests cache identities
+and use logarithmic payload lookup; Driver paths avoid redundant validation,
+table construction, and deep copies; Trace Rank admits exact records once and
+decode-normalizes non-exact subclasses before proof-scoped materialization; and
+Eaglegate reuses immutable admission identities and validated plan lookup. See
+`docs/135_v382_System_Performance_Corrections.md` for measured evidence,
+unchanged contracts, and deferred higher-risk work.
+
 The v3.8.1 release retains four explicit convergence boundaries. The v3.7
 Generation Authority publishes exact CSV and composite Eaglegate generations
 with head-root CAS, cross-process pins, deterministic recovery, rollback, and
@@ -349,7 +386,16 @@ Version `3.8.1` adds the reference-only Phase 5 fixed-point path oracle and the
 Browser/workspace telemetry correction. It does not add Frontier execution or
 Eaglegate activation authority. Local qualification completed with 1,159 tests
 passed and 45 skipped, plus HTTP workspace and distribution-artifact smoke
-checks; production publication remains gated by the complete tag matrix.
+checks; production publication completed through the tag matrix.
+
+Version `3.8.2` is the production system-performance correction. It preserves
+the v3.8.1 stored formats, canonical CSV-byte identities, evidence identities,
+and authority boundaries, with regression sentinels for the changed paths.
+The reported measurements are workload-specific, not universal hardware
+claims. The retired 306-process allocator research qualifier produced no
+performance decision, so v3.8.2 makes no retained allocator-speedup claim;
+allocator correctness, ABI, and lifecycle behavior are covered by the normal
+test, sanitizer, compatibility, build, and installed-smoke gates.
 
 ## Repository map
 

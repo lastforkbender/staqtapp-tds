@@ -19,6 +19,11 @@ def test_v370_has_one_permanent_generation_workflow_and_no_transfer_artifacts():
     assert "tests/test_v370_readme_current_status.py" in source
     assert "tests/test_v370_generation_workflow_contract.py" in source
     assert "TDS v3.7 Generation Authority gates complete" in source
+    assert "Prove v3.8.2 production status and authority boundary" in source
+    assert 'assert "staqtapp-tds==3.8.2" in english' in source
+    assert 'assert "staqtapp-tds==3.8.2" in japanese' in source
+    assert 'assert "NON-RELEASEABLE" not in english' in source
+    assert 'assert "NON-RELEASEABLE" not in japanese' in source
     assert "      - main" in source
 
     for forbidden in (

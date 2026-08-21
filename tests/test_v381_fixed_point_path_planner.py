@@ -24,6 +24,9 @@ from staqtapp_tds.trace_rank import (
     Edge,
     FeatureBlock,
     ImmutableSourceBinding,
+    PackedGraphError,
+    PackedGraphFault,
+    PackedGraphLimits,
     PackedWaypointGraph,
     ProvenanceRecord,
     QualifiedPathPolicy,
@@ -206,6 +209,193 @@ def _request(
         candidate_waypoints=candidates,
         budget=budget or TraceRankPathBudget(),
     )
+
+
+def test_verified_graph_admission_performs_one_whole_graph_pass(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    graph, sources = _build_graph(
+        (
+            (Edge(1, 1, 7, 0, 0, 0b0001),),
+            (),
+        )
+    )
+    counts = {"serialize": 0, "structure": 0, "sources": 0}
+    original_serialize = PackedWaypointGraph.to_bytes
+    original_structure = PackedWaypointGraph._validate_structure
+    original_sources = PackedWaypointGraph._validate_sources
+
+    def counted_serialize(self, *args, **kwargs):
+        counts["serialize"] += 1
+        return original_serialize(self, *args, **kwargs)
+
+    def counted_structure(self, *args, **kwargs):
+        counts["structure"] += 1
+        return original_structure(self, *args, **kwargs)
+
+    def counted_sources(self, *args, **kwargs):
+        counts["sources"] += 1
+        return original_sources(self, *args, **kwargs)
+
+    monkeypatch.setattr(PackedWaypointGraph, "to_bytes", counted_serialize)
+    monkeypatch.setattr(
+        PackedWaypointGraph,
+        "_validate_structure",
+        counted_structure,
+    )
+    monkeypatch.setattr(PackedWaypointGraph, "_validate_sources", counted_sources)
+    evidence = (_root("single-pass-source-evidence"),)
+    edge_catalog = _root("single-pass-edge-catalog")
+
+    verified = VerifiedPackedGraph.from_graph(
+        graph,
+        sources,
+        source_evidence_roots=evidence,
+        edge_catalog_root=edge_catalog,
+    )
+    assert counts == {"serialize": 1, "structure": 1, "sources": 1}
+
+    counts.update(serialize=0, structure=0, sources=0)
+    decoded = VerifiedPackedGraph.from_bytes(
+        verified.packed_bytes,
+        sources,
+        source_evidence_roots=evidence,
+        edge_catalog_root=edge_catalog,
+    )
+    assert counts == {"serialize": 0, "structure": 1, "sources": 1}
+    assert decoded.packed_bytes == verified.packed_bytes
+    assert decoded.graph_admission_root == verified.graph_admission_root
+
+
+def test_from_graph_normalizes_subclasses_that_misrepresent_packed_bytes() -> None:
+    graph, sources = _build_graph(((), ()))
+    alternate = replace(
+        graph,
+        feature_schema_root=_root("alternate-feature-schema"),
+    )
+    alternate_payload = alternate.to_bytes(sources)
+
+    class MisrepresentingGraph(PackedWaypointGraph):
+        def to_bytes(self, *args, **kwargs):
+            return alternate_payload
+
+    supplied = MisrepresentingGraph(
+        **{field.name: getattr(graph, field.name) for field in fields(graph)}
+    )
+    verified = VerifiedPackedGraph.from_graph(
+        supplied,
+        sources,
+        source_evidence_roots=(_root("subclass-source-evidence"),),
+        edge_catalog_root=_root("subclass-edge-catalog"),
+    )
+
+    assert verified.packed_bytes == alternate_payload
+    assert verified.graph == alternate
+    assert verified.graph is not supplied
+    assert verified.feature_schema_root == alternate.feature_schema_root
+    assert verified.canonical_dict()["feature_schema_root"] == (
+        PackedWaypointGraph.from_bytes(alternate_payload, sources).feature_schema_root
+    )
+
+
+def test_graph_records_reject_scalar_subclasses_before_admission() -> None:
+    class MisleadingInt(int):
+        def __add__(self, other):
+            return 999
+
+    with pytest.raises(PackedGraphError, match="base_cost must be an integer"):
+        Edge(1, 1, MisleadingInt(7), 0, 0, 0b0001)
+
+
+def test_verified_graph_subclasses_cannot_override_factory_proof_checks() -> None:
+    graph, sources = _build_graph(((), ()))
+
+    class EvilVerified(VerifiedPackedGraph):
+        @staticmethod
+        def _is_exact_graph_value(graph):
+            return True
+
+    with pytest.raises(
+        TraceRankPlannerError,
+        match="factories must be called on VerifiedPackedGraph",
+    ):
+        EvilVerified.from_graph(
+            graph,
+            sources,
+            source_evidence_roots=(_root("evil-proof-evidence"),),
+            edge_catalog_root=_root("evil-proof-catalog"),
+        )
+
+    assert not hasattr(VerifiedPackedGraph, "_seal_admitted_graph")
+
+
+def test_packed_graph_limit_subclasses_cannot_bypass_narrow_limits() -> None:
+    graph, sources = _build_graph(((), ()))
+
+    class MisleadingLimits(PackedGraphLimits):
+        def __eq__(self, other):
+            return True
+
+    malicious = MisleadingLimits(max_waypoints=1)
+    with pytest.raises(PackedGraphError, match="exact PackedGraphLimits"):
+        PackedWaypointGraph.build(
+            server_namespace_root=graph.server_namespace_root,
+            feature_schema_root=graph.feature_schema_root,
+            hard_mask_universe=graph.hard_mask_universe,
+            source_bindings=sources,
+            provenance=graph.provenance,
+            feature_blocks=graph.feature_blocks,
+            waypoints=graph.waypoints,
+            edge_offsets=graph.edge_offsets,
+            edges=graph.edges,
+            limits=malicious,
+        )
+
+
+def test_verified_materialization_uses_only_admitted_immutable_bindings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    graph, sources = _build_graph(((), ()))
+    verified = _verify(graph, sources)
+    calls = 0
+    original_sources = PackedWaypointGraph._validate_sources
+
+    def counted_sources(self, *args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return original_sources(self, *args, **kwargs)
+
+    monkeypatch.setattr(PackedWaypointGraph, "_validate_sources", counted_sources)
+
+    expected = graph.materialize_waypoint(1, sources)
+    assert calls == 1
+    calls = 0
+    assert verified.materialize_waypoint(1) == expected
+    assert calls == 0
+
+    altered = (
+        ImmutableSourceBinding(
+            sources[0].generation_root,
+            b"X" + sources[0].source_bytes[1:],
+            sources[0].row_offsets,
+        ),
+    )
+    with pytest.raises(PackedGraphError) as error:
+        graph.materialize_waypoint(1, altered)
+    assert error.value.fault is PackedGraphFault.SOURCE_MISMATCH
+
+
+def test_verified_and_public_materialization_preserve_index_error_parity() -> None:
+    graph, sources = _build_graph(((), ()))
+    verified = _verify(graph, sources)
+
+    with pytest.raises(PackedGraphError) as public_error:
+        graph.materialize_waypoint(len(graph.waypoints), sources)
+    with pytest.raises(PackedGraphError) as verified_error:
+        verified.materialize_waypoint(len(graph.waypoints))
+
+    assert str(verified_error.value) == str(public_error.value)
+    assert verified_error.value.fault is public_error.value.fault
 
 
 def _reference_best_path(

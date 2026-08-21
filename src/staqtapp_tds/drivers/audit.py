@@ -61,6 +61,17 @@ def vm_contract_table() -> Mapping[str, Mapping[str, Any]]:
     return {name: contract.to_dict() for name, contract in _VM_CONTRACTS.items()}
 
 
+def vm_instruction_cost(name: str) -> int:
+    """Return one opcode cost without materializing the display table.
+
+    ``vm_contract_table`` intentionally returns fresh JSON-friendly mappings for
+    UI and documentation callers. The VM hot loop only needs one integer and
+    must not rebuild that complete table for every instruction.
+    """
+
+    return _VM_CONTRACTS[name].cost
+
+
 def audit_vm_contract(package: BytecodePackage) -> None:
     """Fail-closed audit before a bytecode package may be loaded by the VM skeleton."""
 
