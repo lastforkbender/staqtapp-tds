@@ -415,13 +415,14 @@ def test_v382_postpublish_resume_cannot_reenter_the_publisher() -> None:
     assert _needs(resume) == set()
     assert resume["permissions"] == {"actions": "read", "contents": "read"}
     assert "v382_postpublish_resume" in resume["if"]
-    assert "inputs.release_run_id != ''" in resume["if"]
+    assert "inputs.release_run_id == '32493678825'" in resume["if"]
     assert "postpublish-preflight" in resume["steps"][-1]["run"]
     assert "v382_postpublish_resume" not in publish["if"]
     assert "postpublish-finalize" in finalize["steps"][-1]["run"]
     assert "v382_postpublish_resume" in verify["if"]
     assert "needs.publish-pypi.result == 'skipped'" in verify["if"]
     assert "v382_postpublish_resume" in smoke["if"]
+    assert smoke["if"].startswith("always() &&")
     assert "v382_postpublish_resume" in aggregate["if"]
     assert "v382_postpublish_resume" in finalize["if"]
     assert "needs.publish-pypi.result == 'skipped'" in finalize["if"]
@@ -570,6 +571,23 @@ def test_v382_recovery_failure_step_and_diff_checks_are_unambiguous() -> None:
     api.comparison["files"].append({"filename": "src/staqtapp_tds/version.py"})
     with pytest.raises(provenance.ReleaseProvenanceError):
         recovery._require_recovery_diff(api, "b" * 40)
+
+    api.comparison = {
+        "status": "ahead",
+        "base_commit": {"sha": recovery.PUBLISHING_RECOVERY_SHA},
+        "merge_base_commit": {"sha": recovery.PUBLISHING_RECOVERY_SHA},
+        "ahead_by": 1,
+        "behind_by": 0,
+        "total_commits": 1,
+        "files": [
+            {"filename": path}
+            for path in sorted(recovery.POSTPUBLISH_REPAIR_PATHS)
+        ],
+    }
+    recovery._require_postpublish_repair_diff(api, "c" * 40)
+    api.comparison["ahead_by"] = 2
+    with pytest.raises(provenance.ReleaseProvenanceError):
+        recovery._require_postpublish_repair_diff(api, "c" * 40)
 
 
 def test_release_uses_normal_correctness_gates_without_performance_authority() -> None:
