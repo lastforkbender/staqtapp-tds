@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping, Sequence
 
-from .audit import audit_vm_contract, vm_contract_table
+from .audit import audit_vm_contract, vm_instruction_cost
 from .bytecode import BytecodePackage
 from .trace import TraceEvidence, rank_traces
 
@@ -451,9 +451,10 @@ def _op_scan(operands: Mapping[str, Any], ctx: _RuntimeContext, *, instruction_p
     depth = int(operands.get("depth", 0 if not recursive else 64))
     matched: list[dict[str, Any]] = []
     prefix = scope.rstrip("/")
+    child_prefix = prefix + "/"
     for record in ctx.records:
         path = str(record.get("path", ""))
-        if not (path == prefix or path.startswith(prefix + "/")):
+        if not (path == prefix or path.startswith(child_prefix)):
             continue
         rel = path[len(prefix):].strip("/")
         record_depth = 0 if not rel else rel.count("/") + 1
@@ -461,7 +462,10 @@ def _op_scan(operands: Mapping[str, Any], ctx: _RuntimeContext, *, instruction_p
             continue
         if recursive and record_depth > depth:
             continue
-        matched.append(copy.deepcopy(record))
+        # ``_normalize_records`` already owns a deep snapshot of every input
+        # record. SCAN and subsequent predicates only read those records, so a
+        # second full deep copy per match adds no isolation.
+        matched.append(record)
         if len(matched) >= limit:
             break
     ctx.current = matched
@@ -561,7 +565,10 @@ def _op_score(operands: Mapping[str, Any], ctx: _RuntimeContext, *, instruction_
     ranked = rank_traces(traces)
     out: list[dict[str, Any]] = []
     for evidence in ranked:
-        item = copy.deepcopy(by_key[(evidence.driver_id, evidence.path)])
+        # EXTRACT/EMIT create VM-owned result rows and SCORE only adds a scalar
+        # top-level field. A shallow row copy preserves the previous row while
+        # avoiding another recursive copy of every extracted value.
+        item = dict(by_key[(evidence.driver_id, evidence.path)])
         item["rank_score"] = evidence.rank_score
         out.append(item)
     ctx.extracted = out
@@ -682,17 +689,23 @@ def _resolve_path(record: Mapping[str, Any], dotted: str) -> Any:
 
 def _flatten_strings(value: Any) -> list[str]:
     out: list[str] = []
+    _append_flattened_strings(value, out)
+    return out
+
+
+def _append_flattened_strings(value: Any, out: list[str]) -> None:
+    """Append scalar text in traversal order without recursive list merging."""
+
     if isinstance(value, str):
         out.append(value)
     elif isinstance(value, Mapping):
         for item in value.values():
-            out.extend(_flatten_strings(item))
+            _append_flattened_strings(item, out)
     elif isinstance(value, Sequence) and not isinstance(value, (bytes, bytearray, str)):
         for item in value:
-            out.extend(_flatten_strings(item))
+            _append_flattened_strings(item, out)
     elif value is not None:
         out.append(str(value))
-    return out
 
 
 def _normalize_records(records: Any) -> list[dict[str, Any]]:
@@ -717,6 +730,6 @@ def _operands_for(package: BytecodePackage, operand_ref: int) -> Mapping[str, An
 
 def _instruction_cost(name: str) -> int:
     try:
-        return int(vm_contract_table()[name]["cost"])
+        return vm_instruction_cost(name)
     except KeyError as exc:
         raise _VMRuntimeFault(VMStatus.FAULTED, "vm.unsupported_opcode", f"unsupported runtime opcode {name}") from exc

@@ -139,60 +139,16 @@ class DriverStudioManualProposalBuilder:
     def build_source(self, task: StudioManualDriverTask) -> str:
         """Render a deterministic TDDL source proposal from form fields."""
 
-        normalized = _normalize_task(task)
-        lines: list[str] = [
-            f"driver {normalized.driver_id} v{normalized.driver_version}",
-            "",
-            "manifest:",
-            f"  kind = {_quote(normalized.kind)}",
-            f"  description = {_quote(normalized.description)}",
-            f"  safety = {_quote(normalized.safety)}",
-            "",
-            "requires:",
-        ]
-        for capability in normalized.capabilities:
-            lines.append(f"  capability {capability}")
-        for adapter in normalized.adapters:
-            lines.append(f"  adapter {adapter}")
-        lines.extend(
-            [
-                "",
-                "limits:",
-                f"  max_scan = {normalized.scan_limit}",
-                f"  max_depth = {normalized.max_depth}",
-                f"  timeout_ms = {normalized.timeout_ms}",
-                "",
-                "program:",
-                f"  SCAN scope={_quote(normalized.scan_scope)} recursive={_bool(normalized.recursive)} limit={normalized.scan_limit} depth={normalized.max_depth}",
-                "  READ target=\"manifest\"",
-                f"  MATCH field={_quote(normalized.match_field)} eq={_quote(normalized.match_eq)}",
-            ]
-        )
-        if normalized.semantic_query:
-            lines.append(
-                f"  MATCH using={_quote(_semantic_adapter(normalized))} query={_quote(normalized.semantic_query)} threshold={_float(normalized.semantic_threshold)}"
-            )
-        lines.extend(
-            [
-                f"  EXTRACT from=\"manifest\" fields={_list_literal(normalized.extract_fields)}",
-                f"  SCORE using={_quote(normalized.score_adapter)} weight={_quote(normalized.score_weight)} threshold={_float(normalized.score_threshold)}",
-                f"  TRACE event={_quote(normalized.trace_event)}",
-                f"  EMIT mode={_quote(normalized.emit_mode)} limit={normalized.emit_limit}",
-                "  HALT",
-                "",
-                "evolution:",
-            ]
-        )
-        for rule in normalized.evolution:
-            lines.append(f"  {rule}")
-        return "\n".join(lines).strip() + "\n"
+        return _build_normalized_source(_normalize_task(task))
 
     def preview_task(self, task: StudioManualDriverTask) -> StudioManualProposalPreview:
         """Return source preview and metrics without compiling or executing."""
 
         try:
             normalized = _normalize_task(task)
-            source = self.build_source(normalized)
+            # The preview already owns the normalized immutable task. Rendering
+            # it directly avoids repeating every token, adapter and bound check.
+            source = _build_normalized_source(normalized)
             warnings = _task_warnings(normalized)
             return StudioManualProposalPreview(
                 ok=True,
@@ -272,6 +228,57 @@ def studio_manual_builder_capability_matrix() -> Mapping[str, bool]:
     """Convenience function for displaying the manual builder boundary."""
 
     return DriverStudioManualProposalBuilder().capability_matrix()
+
+
+def _build_normalized_source(normalized: StudioManualDriverTask) -> str:
+    """Render a task that has already passed ``_normalize_task``."""
+
+    lines: list[str] = [
+        f"driver {normalized.driver_id} v{normalized.driver_version}",
+        "",
+        "manifest:",
+        f"  kind = {_quote(normalized.kind)}",
+        f"  description = {_quote(normalized.description)}",
+        f"  safety = {_quote(normalized.safety)}",
+        "",
+        "requires:",
+    ]
+    for capability in normalized.capabilities:
+        lines.append(f"  capability {capability}")
+    for adapter in normalized.adapters:
+        lines.append(f"  adapter {adapter}")
+    lines.extend(
+        [
+            "",
+            "limits:",
+            f"  max_scan = {normalized.scan_limit}",
+            f"  max_depth = {normalized.max_depth}",
+            f"  timeout_ms = {normalized.timeout_ms}",
+            "",
+            "program:",
+            f"  SCAN scope={_quote(normalized.scan_scope)} recursive={_bool(normalized.recursive)} limit={normalized.scan_limit} depth={normalized.max_depth}",
+            "  READ target=\"manifest\"",
+            f"  MATCH field={_quote(normalized.match_field)} eq={_quote(normalized.match_eq)}",
+        ]
+    )
+    if normalized.semantic_query:
+        lines.append(
+            f"  MATCH using={_quote(_semantic_adapter(normalized))} query={_quote(normalized.semantic_query)} threshold={_float(normalized.semantic_threshold)}"
+        )
+    lines.extend(
+        [
+            f"  EXTRACT from=\"manifest\" fields={_list_literal(normalized.extract_fields)}",
+            f"  SCORE using={_quote(normalized.score_adapter)} weight={_quote(normalized.score_weight)} threshold={_float(normalized.score_threshold)}",
+            f"  TRACE event={_quote(normalized.trace_event)}",
+            f"  EMIT mode={_quote(normalized.emit_mode)} limit={normalized.emit_limit}",
+            "  HALT",
+            "",
+            "evolution:",
+        ]
+    )
+    for rule in normalized.evolution:
+        lines.append(f"  {rule}")
+    return "\n".join(lines).strip() + "\n"
 
 
 _TOKEN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")

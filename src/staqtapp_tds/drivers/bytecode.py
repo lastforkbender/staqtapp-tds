@@ -93,9 +93,19 @@ class BytecodePackage:
         return _canonical_json(self.to_dict()).encode("utf-8")
 
     def to_unsigned_dict(self) -> dict[str, Any]:
-        data = self.to_dict()
-        data.pop("package_hash", None)
-        return data
+        # Keep hash verification on the exact public wire representation while
+        # avoiding construction (and immediate removal) of ``package_hash``.
+        return {
+            "header": dict(self.header),
+            "manifest": dict(self.manifest),
+            "capabilities": list(self.capabilities),
+            "adapters": list(self.adapters),
+            "limits": dict(self.limits),
+            "instructions": [instr.to_dict() for instr in self.instructions],
+            "constants": list(self.constants),
+            "evolution": list(self.evolution),
+            "source_hash": self.source_hash,
+        }
 
     def verify_hash(self) -> bool:
         return _hash_dict(self.to_unsigned_dict()) == self.package_hash
@@ -124,65 +134,121 @@ def compile_tddl(source_or_program: str | TDDLProgram) -> BytecodePackage:
     """Compile TDDL source/program into deterministic non-executing bytecode."""
 
     if isinstance(source_or_program, str):
-        source = source_or_program
-        program = parse_tddl(source_or_program)
-    else:
-        program = source_or_program
+        _program, package = _parse_and_compile_tddl(
+            source_or_program,
+            preserve_source_text=True,
+        )
+        return package
+    return compile_program(source_or_program)
+
+
+def _make_safe_compile_surfaces():
+    """Close the unchecked builder over source/program validation gates.
+
+    The package builder is deliberately lexical rather than a module-level
+    function accepting arbitrary ``TDDLProgram`` objects. Source callers can
+    only reach it after ``parse_tddl`` validates the exact local result, while
+    program callers can only reach it after ``validate_tddl``. This preserves
+    the single validation walk without exposing a forgeable trusted seam.
+    """
+
+    def build_package(
+        program: TDDLProgram,
+        *,
+        source_material: str | Mapping[str, Any] | None = None,
+    ) -> BytecodePackage:
+        constants: list[Any] = []
+        constant_refs: dict[str, int] = {}
+        byte_instructions: list[BytecodeInstruction] = []
+
+        for instr in program.instructions:
+            if instr.name.value not in _SUPPORTED_OPCODE_NAMES:
+                raise TDDLValidationError(
+                    f"{instr.name.value} is not supported by bytecode "
+                    f"v{BYTECODE_VERSION}"
+                )
+            operand_ref = _intern_constant(
+                _normalize_value(instr.operands), constants, constant_refs
+            )
+            opcode = int(BytecodeOpcode[instr.name.value])
+            byte_instructions.append(
+                BytecodeInstruction(
+                    opcode=opcode,
+                    name=instr.name.value,
+                    operand_ref=operand_ref,
+                    line=instr.line,
+                )
+            )
+
+        header = {
+            "magic": BYTECODE_MAGIC,
+            "bytecode_version": BYTECODE_VERSION,
+            "grammar_version": GRAMMAR_VERSION,
+            "builder_version": BUILDER_VERSION,
+            "driver_id": program.driver_id,
+            "driver_version": program.version,
+        }
+        source_hash = _hash_value(
+            source_material
+            if source_material is not None
+            else _program_canonical_dict(program)
+        )
+        unsigned = {
+            "header": header,
+            "manifest": _normalize_mapping(program.manifest),
+            "capabilities": list(program.capabilities),
+            "adapters": list(program.adapters),
+            "limits": _normalize_mapping(program.limits),
+            "instructions": [instr.to_dict() for instr in byte_instructions],
+            "constants": constants,
+            "evolution": list(program.evolution),
+            "source_hash": source_hash,
+        }
+        package_hash = _hash_dict(unsigned)
+        package = BytecodePackage(
+            header=header,
+            manifest=unsigned["manifest"],
+            capabilities=tuple(program.capabilities),
+            adapters=tuple(program.adapters),
+            limits=unsigned["limits"],
+            instructions=tuple(byte_instructions),
+            constants=tuple(constants),
+            evolution=tuple(program.evolution),
+            source_hash=source_hash,
+            package_hash=package_hash,
+        )
+        validate_bytecode_package(package)
+        return package
+
+    def parse_and_compile_tddl(
+        source: str,
+        *,
+        preserve_source_text: bool = False,
+    ) -> tuple[TDDLProgram, BytecodePackage]:
+        program = parse_tddl(source)
+        source_material: str | Mapping[str, Any]
+        if preserve_source_text:
+            source_material = source
+        else:
+            source_material = _program_canonical_dict(program)
+        return program, build_package(program, source_material=source_material)
+
+    def compile_validated_program(
+        program: TDDLProgram,
+        *,
+        source_material: str | Mapping[str, Any] | None = None,
+    ) -> BytecodePackage:
         validate_tddl(program)
-        source = _program_canonical_dict(program)
-    return compile_program(program, source_material=source)
+        return build_package(program, source_material=source_material)
+
+    return parse_and_compile_tddl, compile_validated_program
 
 
-def compile_program(program: TDDLProgram, *, source_material: str | Mapping[str, Any] | None = None) -> BytecodePackage:
-    """Compile an already-validated TDDL program to a bytecode package."""
-
-    validate_tddl(program)
-    constants: list[Any] = []
-    constant_refs: dict[str, int] = {}
-    byte_instructions: list[BytecodeInstruction] = []
-
-    for instr in program.instructions:
-        if instr.name.value not in _SUPPORTED_OPCODE_NAMES:
-            raise TDDLValidationError(f"{instr.name.value} is not supported by bytecode v{BYTECODE_VERSION}")
-        operand_ref = _intern_constant(_normalize_value(instr.operands), constants, constant_refs)
-        opcode = int(BytecodeOpcode[instr.name.value])
-        byte_instructions.append(BytecodeInstruction(opcode=opcode, name=instr.name.value, operand_ref=operand_ref, line=instr.line))
-
-    header = {
-        "magic": BYTECODE_MAGIC,
-        "bytecode_version": BYTECODE_VERSION,
-        "grammar_version": GRAMMAR_VERSION,
-        "builder_version": BUILDER_VERSION,
-        "driver_id": program.driver_id,
-        "driver_version": program.version,
-    }
-    source_hash = _hash_value(source_material if source_material is not None else _program_canonical_dict(program))
-    unsigned = {
-        "header": header,
-        "manifest": _normalize_mapping(program.manifest),
-        "capabilities": list(program.capabilities),
-        "adapters": list(program.adapters),
-        "limits": _normalize_mapping(program.limits),
-        "instructions": [instr.to_dict() for instr in byte_instructions],
-        "constants": constants,
-        "evolution": list(program.evolution),
-        "source_hash": source_hash,
-    }
-    package_hash = _hash_dict(unsigned)
-    package = BytecodePackage(
-        header=header,
-        manifest=unsigned["manifest"],
-        capabilities=tuple(program.capabilities),
-        adapters=tuple(program.adapters),
-        limits=unsigned["limits"],
-        instructions=tuple(byte_instructions),
-        constants=tuple(constants),
-        evolution=tuple(program.evolution),
-        source_hash=source_hash,
-        package_hash=package_hash,
-    )
-    validate_bytecode_package(package)
-    return package
+_parse_and_compile_tddl, compile_program = _make_safe_compile_surfaces()
+compile_program.__name__ = "compile_program"
+compile_program.__qualname__ = "compile_program"
+compile_program.__doc__ = "Compile an untrusted TDDL program after full validation."
+del _make_safe_compile_surfaces
 
 
 def validate_bytecode_package(package: BytecodePackage) -> None:

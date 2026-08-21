@@ -15,7 +15,7 @@ from enum import Enum
 from typing import Any, Mapping, Sequence
 
 from .audit import audit_vm_contract
-from .bytecode import BytecodePackage, compile_tddl
+from .bytecode import BytecodePackage, _parse_and_compile_tddl
 from .manifest import DriverManifest
 from .registry import DriverRegistry, DriverState
 from .tddl import TDDLProgram, TDDLValidationError, parse_tddl
@@ -201,8 +201,9 @@ class DriverFoundry:
         """Compile TDDL source to a deterministic bytecode package."""
 
         try:
-            program = parse_tddl(source)
-            package = compile_tddl(program)
+            # Parse, validate, and compile inside one fused source-only gate.
+            # No arbitrary program can enter the unchecked package builder.
+            program, package = _parse_and_compile_tddl(source)
             return _result(
                 ok=True,
                 stage=FoundryStage.COMPILE,
